@@ -39,7 +39,7 @@ jobs:
           git push origin HEAD:main
       - name: Collect source snapshot
         run: git archive --format=zip HEAD -o /tmp/ArtSpace-source.zip
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: ArtSpace-source
           path: /tmp/ArtSpace-source.zip
