@@ -46,9 +46,16 @@ test('clipping masks retain editable anchors, native references, undo and local 
   await page.mouse.click(148, 15); await page.keyboard.press('End');
   await page.keyboard.press('ArrowUp'); await page.keyboard.press('ArrowUp'); await page.keyboard.press('Enter');
   await expect.poll(async () => (await state(page)).anchors.length).toBeGreaterThanOrEqual(4);
+  // Entering from the menu exposes anchors without selecting them. Exercise selection and
+  // anchor-only Escape clearing explicitly; Escape with no anchor selection deselects the object.
+  await page.keyboard.press('Control+a');
+  await expect.poll(async () => (await state(page)).anchors.filter(a => a.selected).length).toBeGreaterThanOrEqual(4);
   await page.keyboard.press('Escape');
+  await expect.poll(async () => (await state(page)).anchors.length).toBeGreaterThanOrEqual(4);
+  await expect.poll(async () => (await state(page)).anchors.filter(a => a.selected).length).toBe(0);
   const first = (await state(page)).anchors[0];
   await page.mouse.click(first.x, first.y);
+  await expect.poll(async () => (await state(page)).anchors.filter(a => a.selected).length).toBe(1);
   const beforeDrag = await state(page);
   await page.mouse.move(first.x, first.y); await page.mouse.down();
   await page.mouse.move(first.x + 28, first.y + 16, { steps: 10 }); await page.mouse.up();
