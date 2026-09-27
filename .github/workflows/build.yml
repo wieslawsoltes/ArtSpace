@@ -1,0 +1,108 @@
+name: Build
+on:
+  push:
+    branches: [main]
+    paths-ignore: ['docs/**', '**.md', 'eng/**', '.github/workflows/initialize.yml', '.github/workflows/integrate.yml', '.github/workflows/pages.yml', '.github/workflows/release.yml']
+  pull_request:
+    paths-ignore: ['docs/**', '**.md']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+env:
+  DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+  DOTNET_NOLOGO: '1'
+jobs:
+  engine:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+      - name: Geometry, document and transaction regressions
+        run: dotnet run --project tests/ArtSpace.Tests -c Release
+  desktop:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+      - name: Fetch licensed font assets
+        shell: bash
+        run: python3 scripts/fetch-assets.py
+      - name: Compile native Uno host
+        run: dotnet build src/ArtSpace.App -c Release -f net10.0-desktop -p:ArtSpaceDesktopOnly=true
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install browser toolchain and licensed assets
+        run: |
+          dotnet workload install wasm-tools --skip-manifest-update
+          python3 scripts/fetch-assets.py
+      - name: Publish Uno WebAssembly application
+        run: |
+          dotnet publish src/ArtSpace.App -f net10.0-browserwasm -c Release -o artifacts/publish -p:WasmShellWebAppBasePath=/ArtSpace/
+          python3 scripts/collect-site.py artifacts/publish artifacts/site
+      - name: Pack reusable libraries for desktop and browser
+        run: |
+          for project in src/*/*.csproj; do
+            case "$project" in */ArtSpace.App/*) continue;; esac
+            dotnet pack "$project" -c Release -o artifacts/packages
+          done
+      - name: Test actual browser interactions
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+          python3 scripts/serve-site.py --directory artifacts/site --port 4173 > artifacts/server.log 2>&1 &
+          npx playwright test tests/browser/illustration.spec.mjs
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: ArtSpace-browser
+          path: artifacts/site
+          include-hidden-files: true
+          if-no-files-found: ignore
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: ArtSpace-packages
+          path: artifacts/packages
+          if-no-files-found: ignore
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: ArtSpace-browser-validation
+          path: |
+            artifacts/screenshots
+            artifacts/playwright-report
+            artifacts/test-results
+            artifacts/browser-results.xml
+            artifacts/server.log
+          if-no-files-found: ignore
+      - name: Archive committed source only
+        if: always()
+        run: git archive --format=zip --output=/tmp/ArtSpace-source.zip HEAD
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: ArtSpace-source
+          path: /tmp/ArtSpace-source.zip
