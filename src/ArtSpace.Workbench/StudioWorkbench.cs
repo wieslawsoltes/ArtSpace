@@ -59,6 +59,13 @@ public sealed partial class StudioWorkbench : UserControl, IDisposable
             reveal.Visibility = presenting ? Visibility.Collapsed : Visibility.Visible;
             if (presenting) ShowStatus("Prototype preview · Click linked layers · Esc to return");
         };
+        PreviewKeyDown += (_, e) =>
+        {
+            if (e.Key == VirtualKey.Tab && !Keyboard.IsTextInput(e.OriginalSource as DependencyObject))
+            {
+                TogglePanels(); e.Handled = true;
+            }
+        };
         KeyDown += OnKeyDown; KeyUp += (_, e) => { if (e.Key == VirtualKey.Space) Surface.IsSpaceDown = false; };
         SizeChanged += (_, _) =>
         {

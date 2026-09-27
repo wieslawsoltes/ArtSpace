@@ -18,7 +18,7 @@ public partial class App : Application
     protected override async void OnLaunched(LaunchActivatedEventArgs args)
     {
         _window = new Window { Title = "ArtSpace" };
-        _window.Content = new Grid { Background = Studio.Brush("#F5F5F5"), Children = { new TextBlock { Text = "ArtSpace", FontSize = 28, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center } } };
+        _window.Content = new Grid { Background = Studio.Brush("#292929"), Children = { new TextBlock { Text = "ArtSpace", FontSize = 28, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center } } };
         _window.Activate();
         try
         {

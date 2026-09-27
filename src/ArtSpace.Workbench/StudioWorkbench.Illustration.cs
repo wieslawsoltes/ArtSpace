@@ -205,7 +205,7 @@ public sealed partial class StudioWorkbench
         for (var r = 0; r < 2; r++) palette.RowDefinitions.Add(new() { Height = new(23) });
         for (var i = 0; i < colors.Length; i++)
         {
-            var color = colors[i]; var button = new StudioButton("", () => { Surface.FillColor = color; Change("Apply swatch", n => n.Fill = color); }) { Height = 23, Padding = new(0), CornerRadius = new(0), RestBackground = color, Background = Studio.Brush(color), BorderThickness = new(1), BorderBrush = Studio.Brush("#252525") };
+            var color = colors[i]; var button = new StudioButton("", () => { Surface.FillColor = color; Change("Apply swatch", n => n.Fill = color); }) { Height = 23, HorizontalAlignment = HorizontalAlignment.Stretch, Padding = new(0), CornerRadius = new(0), RestBackground = color, Background = Studio.Brush(color), BorderThickness = new(1), BorderBrush = Studio.Brush("#252525") };
             AutomationProperties.SetName(button, "Swatch " + color); Grid.SetRow(button, i / 8); Grid.SetColumn(button, i % 8); palette.Children.Add(button);
         }
         swatches.Body.Children.Add(palette);

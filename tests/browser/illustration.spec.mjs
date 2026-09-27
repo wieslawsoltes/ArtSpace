@@ -58,8 +58,9 @@ test('tool conventions, pen path, gradient, zoom and artboard creation', async (
   await page.keyboard.press('z'); await page.mouse.click(850, 520);
   await expect.poll(async () => (await state(page)).zoom).toBeGreaterThan(zoom);
   await page.keyboard.press('Control+0');
+  const rootsBeforeArtboard = (await state(page)).roots;
   await draw(page, 'Shift+o', [830, 200], [1000, 350]);
-  await expect.poll(async () => (await state(page)).roots).toBe(initial.roots + 1);
+  await expect.poll(async () => (await state(page)).roots).toBe(rootsBeforeArtboard + 1);
   expect((await state(page)).kind).toBe('Frame');
   await page.keyboard.press('a');
   await expect.poll(async () => (await state(page)).tool).toBe('DirectSelect');

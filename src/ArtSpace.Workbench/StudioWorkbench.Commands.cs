@@ -140,7 +140,6 @@ public sealed partial class StudioWorkbench
                 VirtualKey.Number2 when shift => () => Surface.Fit(true),
                 VirtualKey.Number0 => () => Surface.ZoomTo(1),
                 VirtualKey.F2 => () => { if (Session.Primary is { } n) RunAsync(() => RenameLayerAsync(n)); },
-                VirtualKey.Tab => TogglePanels,
                 VirtualKey.Escape => () => { Surface.CancelGesture(); Session.Select((DesignNode?)null); Session.Tool = EditorTool.Move; },
                 VirtualKey.Enter => () => { Surface.FinishPath(false); if (Session.Primary?.Kind == NodeKind.Text) Surface.BeginTextEdit(Session.Primary); },
                 VirtualKey.Space => () => Surface.IsSpaceDown = true,
