@@ -90,6 +90,10 @@ Test("expand shape preserves appearance", () => { var n=Node(); n.Kind=NodeKind.
 Test("SVG retains cap and join", () => { var n=Node(); n.Strokes=[new(){Cap=StrokeCap.Square,Join=StrokeJoin.Bevel}]; var svg=SvgFormat.Export([n],n.WorldBounds); Check(svg.Contains("stroke-linecap=\"square\"") && svg.Contains("stroke-linejoin=\"bevel\"")); });
 Test("invalid strokes are rejected", () => { var n=Node(); n.Strokes=[new(){Width=double.NaN}]; Throws(()=>Editor(n)); });
 
+Test("offset normalizes expanded selection bounds", () => { var n=Node(20,30); var e=Editor(n); e.Select(n); using var r=new SceneRenderer(); IllustrationOperations.OffsetPaths(e,r,10); var p=e.Primary!; Equal(p.X,10); Equal(p.Y,20); Equal(p.Width,120); Equal(p.Height,120); });
+Test("offset preserves rotated center", () => { var n=Node(20,30); n.Rotation=37; var center=n.WorldBounds.Center; var e=Editor(n); e.Select(n); using var r=new SceneRenderer(); IllustrationOperations.OffsetPaths(e,r,10); Equal(e.Primary!.WorldBounds.Center.X,center.X); Equal(e.Primary.WorldBounds.Center.Y,center.Y); });
+Test("inset normalizes reduced selection bounds", () => { var n=Node(20,30); var e=Editor(n); e.Select(n); using var r=new SceneRenderer(); IllustrationOperations.OffsetPaths(e,r,-10); Equal(e.Primary!.X,30); Equal(e.Primary.Y,40); Equal(e.Primary.Width,80); Equal(e.Primary.Height,80); });
+
 var failed = 0;
 foreach (var (name, test) in tests) { try { test(); Console.WriteLine("PASS " + name); } catch (Exception ex) { failed++; Console.WriteLine("FAIL " + name + "\n" + ex); } }
 Console.WriteLine($"RESULT: {tests.Count - failed}/{tests.Count} passed");

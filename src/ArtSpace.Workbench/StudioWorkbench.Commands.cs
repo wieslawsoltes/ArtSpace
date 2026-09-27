@@ -12,27 +12,10 @@ public sealed partial class StudioWorkbench
     private sealed record QuickAction(string Name, string Shortcut, Action Execute);
     private IEnumerable<QuickAction> Actions()
     {
-        yield return new("New document", "", () => RunAsync(NewDocumentAsync));
-        yield return new("Open document or import SVG", "Ctrl O", () => RunAsync(OpenAsync));
-        yield return new("Save document", "Ctrl S", () => RunAsync(SaveAsync));
-        yield return new("Export PNG", "", () => RunAsync(() => ExportAsync(false)));
-        yield return new("Export SVG", "", () => RunAsync(() => ExportAsync(true)));
-        yield return new("Undo", "Ctrl Z", () => Run(Session.Undo));
-        yield return new("Redo", "Ctrl Shift Z", () => Run(Session.Redo));
-        yield return new("Duplicate", "Ctrl D", () => Run(() => Session.DuplicateSelection()));
-        yield return new("Group selection", "Ctrl G", () => Run(() => Session.GroupSelection()));
-        yield return new("Frame selection", "Ctrl Alt G", () => Run(() => Session.GroupSelection(true)));
-        yield return new("Ungroup", "Ctrl Shift G", () => Run(Session.UngroupSelection));
-        yield return new("Create component", "Ctrl Alt K", () => Run(() => ComponentService.MakeComponent(Session)));
-        yield return new("Add auto layout", "Shift A", AddAutoLayout);
-        yield return new("Fit all", "Shift 1", () => Surface.Fit());
-        yield return new("Fit selection", "Shift 2", () => Surface.Fit(true));
-        yield return new("Toggle grid", "Ctrl '", () => { Session.GridVisible = !Session.GridVisible; Surface.Invalidate(); });
-        yield return new("Toggle rulers", "Shift R", () => { Session.RulersVisible = !Session.RulersVisible; Surface.Invalidate(); });
-        yield return new("Toggle outlines", "Ctrl Shift O", () => { Session.OutlinesVisible = !Session.OutlinesVisible; Surface.Invalidate(); });
-        yield return new("Toggle snapping", "", () => { Session.SnapEnabled = !Session.SnapEnabled; ShowStatus(Session.SnapEnabled ? "Snapping on" : "Snapping off"); });
-        yield return new("Present prototype", "", () => Run(Surface.Present));
-        yield return new("Keyboard shortcuts", "?", () => RunAsync(ShowHelpAsync));
+        foreach (var menu in new[] { "File", "Edit", "Object", "Type", "Select", "Effect", "View", "Window", "Help" })
+            foreach (var command in IllustrationMenu(menu))
+                if (command.Enabled && command.Execute is not null && command.Label.Length > 0 && command.Label != "Find a Command…")
+                    yield return new(menu + " / " + command.Label, command.Shortcut, command.Execute);
     }
     private static void AddMenu(MenuFlyout menu, string text, Action action, bool enabled = true)
     {
@@ -71,8 +54,8 @@ public sealed partial class StudioWorkbench
         AddMenu(menu, "Group selection           Ctrl G", () => Run(() => Session.GroupSelection()), selected);
         AddMenu(menu, "Frame selection", () => Run(() => Session.GroupSelection(true)), selected);
         AddMenu(menu, "Ungroup                      Ctrl Shift G", () => Run(Session.UngroupSelection), selected);
-        AddMenu(menu, "Add auto layout            Shift A", AddAutoLayout, selected);
-        AddMenu(menu, "Create component", () => Run(() => ComponentService.MakeComponent(Session)), Session.SelectionRoots.Count == 1);
+        AddMenu(menu, "Add auto layout", AddAutoLayout, selected);
+        AddMenu(menu, "Create symbol", () => Run(() => ComponentService.MakeComponent(Session)), Session.SelectionRoots.Count == 1);
         menu.Items.Add(new MenuFlyoutSeparator());
         AddMenu(menu, "Bring to front", () => Run(() => Session.Reorder(1, true)), selected);
         AddMenu(menu, "Bring forward", () => Run(() => Session.Reorder(1)), selected);

@@ -12,6 +12,10 @@ public sealed partial class StudioWorkbench
     private readonly TextBlock _selectionLabel = Studio.Text("No Selection", 11);
     private double _dockWidth = 314;
     private bool _illustrationReady;
+    private ColorField? _fillControl, _strokeControl;
+    private NumericField? _strokeWidthControl;
+    private ComboBox? _opacityControl;
+    private bool _syncingAppearance;
 
     private static void Detach(FrameworkElement element)
     {
@@ -134,12 +138,12 @@ public sealed partial class StudioWorkbench
     {
         _selectionLabel.Width = 95; _controlBar.Children.Add(_selectionLabel);
         _controlBar.Children.Add(Studio.Text("Fill", 10, Studio.Muted));
-        _controlBar.Children.Add(new ColorField(Surface.FillColor, color => { Surface.FillColor = color; Change("Fill color", n => n.Fill = color); }) { Width = 108 });
+        _controlBar.Children.Add(_fillControl = new ColorField(Surface.FillColor, color => { Surface.FillColor = color; Change("Fill color", n => n.Fill = color); }) { Width = 108 });
         _controlBar.Children.Add(Studio.Text("Stroke", 10, Studio.Muted));
-        _controlBar.Children.Add(new ColorField(Surface.StrokeColor, color => { Surface.StrokeColor = color; Change("Stroke color", n => { if (n.Strokes.Count == 0) n.Strokes.Add(new()); n.Strokes[0].Color = color; }); }) { Width = 108 });
-        _controlBar.Children.Add(Number("pt", Surface.StrokeWidth, width => { Surface.StrokeWidth = Math.Clamp(width, 0, 1000); Change("Stroke width", n => { if (n.Strokes.Count == 0) n.Strokes.Add(new()); n.Strokes[0].Width = Surface.StrokeWidth; }); }, 0, 1000));
+        _controlBar.Children.Add(_strokeControl = new ColorField(Surface.StrokeColor, color => { Surface.StrokeColor = color; Change("Stroke color", n => { if (n.Strokes.Count == 0) n.Strokes.Add(new()); n.Strokes[0].Color = color; }); }) { Width = 108 });
+        _controlBar.Children.Add(_strokeWidthControl = Number("pt", Surface.StrokeWidth, width => { Surface.StrokeWidth = Math.Clamp(width, 0, 1000); Change("Stroke width", n => { if (n.Strokes.Count == 0) n.Strokes.Add(new()); n.Strokes[0].Width = Surface.StrokeWidth; }); }, 0, 1000));
         _controlBar.Children.Add(Studio.Text("Opacity", 10, Studio.Muted));
-        var opacity = Studio.Choice(new[] { "100%", "75%", "50%", "25%", "10%" }, "100%", value => Change("Opacity", n => n.Opacity = double.Parse(value.TrimEnd('%'), System.Globalization.CultureInfo.InvariantCulture) / 100), "Object opacity"); opacity.Width = 78; _controlBar.Children.Add(opacity);
+        var opacity = Studio.Choice(new[] { "100%", "75%", "50%", "25%", "10%" }, "100%", value => { if (!_syncingAppearance) Change("Opacity", n => n.Opacity = double.Parse(value.TrimEnd('%'), System.Globalization.CultureInfo.InvariantCulture) / 100); }, "Object opacity"); opacity.Width = 78; _opacityControl = opacity; _controlBar.Children.Add(opacity);
         foreach (var direction in new[] { "left", "center", "right", "top", "middle", "bottom" })
             _controlBar.Children.Add(new IconButton(direction, "Align " + direction, () => Run(() => Session.Align(direction))) { Width = 27, Height = 29, Padding = new(5) });
     }
@@ -148,6 +152,27 @@ public sealed partial class StudioWorkbench
     {
         if (!_illustrationReady) return;
         _selectionLabel.Text = Session.Primary is { } selected ? (selected.Kind == NodeKind.Frame ? "Artboard" : selected.Kind.ToString()) : "No Selection";
+        _syncingAppearance = true;
+        try
+        {
+            var primary = Session.Primary;
+            if (primary is not null)
+            {
+                Surface.FillColor = primary.Fill;
+                Surface.StrokeColor = primary.Strokes.FirstOrDefault()?.Color ?? Surface.StrokeColor;
+                Surface.StrokeWidth = primary.Strokes.FirstOrDefault()?.Width ?? 0;
+            }
+            if (_fillControl is not null) _fillControl.Value = Surface.FillColor;
+            if (_strokeControl is not null) _strokeControl.Value = Surface.StrokeColor;
+            if (_strokeWidthControl is not null) _strokeWidthControl.Value = Surface.StrokeWidth;
+            if (_opacityControl is not null)
+            {
+                var value = Numbers.Format((primary?.Opacity ?? 1) * 100) + "%";
+                if (!_opacityControl.Items.Contains(value)) _opacityControl.Items.Add(value);
+                _opacityControl.SelectedItem = value;
+            }
+        }
+        finally { _syncingAppearance = false; }
         _artboards.Children.Clear();
         _artboards.Children.Add(new StudioButton("+ New artboard", () => Run(AddArtboard)) { HorizontalAlignment = HorizontalAlignment.Stretch, RestBackground = Studio.Field });
         foreach (var board in Session.Page.Nodes.Where(n => n.IsFrame))

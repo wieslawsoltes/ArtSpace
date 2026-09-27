@@ -117,7 +117,13 @@ public static class IllustrationOperations
                 if (result.IsEmpty) continue;
                 var output = DocumentJson.CloneNode(node, true);
                 output.Kind = NodeKind.Path; output.Name = node.Name + " offset";
-                output.PathData = result.ToSvgPathData(); output.PathWidth = node.Width; output.PathHeight = node.Height;
+                var bounds = result.TightBounds;
+                using var normalized = new SKPath(result);
+                normalized.Transform(SKMatrix.CreateTranslation(-bounds.Left, -bounds.Top));
+                output.Width = output.PathWidth = Math.Max(.001, bounds.Width);
+                output.Height = output.PathHeight = Math.Max(.001, bounds.Height);
+                output.PathData = normalized.ToSvgPathData();
+                NodeGeometry.SetLocalMatrix(output, Matrix2D.Translation(bounds.Left, bounds.Top) * node.LocalMatrix);
                 output.Points.Clear();
                 editor.AddNode(output, node.Parent); selected.Add(output.Id);
             }
