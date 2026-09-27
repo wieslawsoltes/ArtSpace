@@ -1,0 +1,43 @@
+name: Clipping integration
+on:
+  push:
+    branches: [feat/clipping-and-performance]
+    paths: ['.github/workflows/clipping-integration.yml']
+permissions:
+  contents: write
+jobs:
+  integrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feat/clipping-and-performance
+      - name: Apply reviewed integration
+        run: |
+          python3 eng/integrate-clipping.py
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src tests Directory.Build.props
+          git rm eng/integrate-clipping.py
+          git commit -m 'Integrate clipping sets, indexed snapping and retained geometry/text caches'
+          git push origin HEAD:feat/clipping-and-performance
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+      - name: Regression tests
+        run: dotnet run --project tests/ArtSpace.Tests -c Release
+      - name: Native compilation
+        run: |
+          python3 scripts/fetch-assets.py
+          dotnet build src/ArtSpace.App -c Release -f net10.0-desktop -p:ArtSpaceDesktopOnly=true
+      - name: CPU benchmarks and equivalence checks
+        run: |
+          mkdir -p artifacts/benchmarks
+          dotnet run --project tests/ArtSpace.Tests -c Release --no-build -- --benchmark > artifacts/benchmarks/cpu.json
+          cat artifacts/benchmarks/cpu.json
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: ArtSpace-performance
+          path: artifacts/benchmarks
