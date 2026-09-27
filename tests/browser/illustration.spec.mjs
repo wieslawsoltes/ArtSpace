@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import fs from 'node:fs/promises';
+import './path-cases.mjs';
 const state = page => page.evaluate(() => globalThis.__artSpaceState);
 
 async function ready(page) {
@@ -86,7 +87,6 @@ test('custom Object menu supports keyboard command execution and transactional u
   await ready(page); await page.mouse.click(540, 330);
   await draw(page, 'm', [520, 420], [700, 520]);
   await expect.poll(async () => (await state(page)).kind).toBe('Rectangle');
-  // The real Uno menu receives pointer activation followed by keyboard navigation.
   await page.mouse.click(148, 15);
   await fs.mkdir('artifacts/screenshots', { recursive: true });
   await page.screenshot({ path: 'artifacts/screenshots/object-menu.png' });
