@@ -4,7 +4,7 @@ using ArtSpace.Layout;
 
 namespace ArtSpace.Editing;
 
-public enum EditorTool { Move, Scale, Frame, Section, Rectangle, Ellipse, Line, Arrow, Polygon, Star, Pen, Pencil, Text, Hand, Comment, Slice, DirectSelect, Brush, Gradient, Eyedropper, Zoom }
+public enum EditorTool { Move, Scale, Frame, Section, Rectangle, Ellipse, Line, Arrow, Polygon, Star, Pen, Pencil, Text, Hand, Comment, Slice, DirectSelect, Brush, Gradient, Eyedropper, Zoom, AddAnchor, DeleteAnchor, AnchorPoint }
 public enum EditorChangeKind { Document, Selection, Preview, Viewport, Tool }
 public sealed class EditorChangedEventArgs(EditorChangeKind kind, string label = "") : EventArgs
 {

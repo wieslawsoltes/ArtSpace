@@ -68,7 +68,7 @@ public static partial class SvgFormat
             for (var i = 0; i < lines.Length; i++) element.Add(new XElement(Ns + "tspan", new XAttribute("x", F(x)), new XAttribute("y", F(node.FontSize + i * node.FontSize * node.LineHeight)), lines[i]));
             return element;
         }
-        var shape = new XElement(Ns + "path", new XAttribute("d", VectorPath.Build(node)));
+        var shape = new XElement(Ns + "path", new XAttribute("d", VectorPath.Build(node)), new XAttribute("fill-rule", node.FillRule == PathFillRule.EvenOdd ? "evenodd" : "nonzero"));
         if (node.Kind == NodeKind.Path && node.PathWidth > 0 && node.PathHeight > 0) shape.SetAttributeValue("transform", $"scale({F(node.Width / node.PathWidth)} {F(node.Height / node.PathHeight)})");
         return shape;
     }
@@ -113,6 +113,7 @@ public static partial class SvgFormat
                 default: warnings.Add($"{kind} elements were not imported."); return null;
             }
             string? Attribute(string key) => element.Attribute(key)?.Value ?? Style(element, key) ?? element.Ancestors().Select(a => a.Attribute(key)?.Value ?? Style(a, key)).FirstOrDefault(v => v is not null);
+            node.FillRule = Attribute("fill-rule") == "evenodd" ? PathFillRule.EvenOdd : PathFillRule.NonZero;
             var fill = Attribute("fill") ?? "#000000";
             if (kind is not "g" and not "svg" && fill != "none")
             {

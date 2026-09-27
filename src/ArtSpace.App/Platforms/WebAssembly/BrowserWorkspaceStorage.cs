@@ -62,6 +62,20 @@ internal static class BrowserDiagnostics
                 json.WriteString("kind", primary?.Kind.ToString()); json.WriteBoolean("visible", primary?.Visible ?? false); json.WriteBoolean("locked", primary?.Locked ?? false); json.WriteNumber("x", primary?.X ?? 0); json.WriteNumber("y", primary?.Y ?? 0);
                 json.WriteNumber("width", primary?.Width ?? 0); json.WriteNumber("height", primary?.Height ?? 0);
                 json.WriteBoolean("canUndo", session.CanUndo); json.WriteBoolean("canRedo", session.CanRedo);
+                var origin = workbench.Surface.TransformToVisual(null).TransformPoint(new Windows.Foundation.Point(0, 0));
+                json.WriteNumber("canvasX", origin.X); json.WriteNumber("canvasY", origin.Y);
+                json.WriteString("fillRule", primary?.FillRule.ToString());
+                json.WriteStartArray("anchors");
+                foreach (var anchor in workbench.Surface.GetPathAnchors())
+                {
+                    json.WriteStartObject(); json.WriteNumber("contour", anchor.Contour); json.WriteNumber("index", anchor.Index);
+                    json.WriteNumber("x", anchor.Position.X + origin.X); json.WriteNumber("y", anchor.Position.Y + origin.Y);
+                    json.WriteBoolean("selected", anchor.Selected);
+                    if (anchor.ControlIn.HasValue) { json.WriteNumber("inX", anchor.ControlIn.Value.X + origin.X); json.WriteNumber("inY", anchor.ControlIn.Value.Y + origin.Y); }
+                    if (anchor.ControlOut.HasValue) { json.WriteNumber("outX", anchor.ControlOut.Value.X + origin.X); json.WriteNumber("outY", anchor.ControlOut.Value.Y + origin.Y); }
+                    json.WriteEndObject();
+                }
+                json.WriteEndArray();
                 json.WriteBoolean("presenting", workbench.Surface.IsPresenting); json.WriteEndObject();
             }
             BrowserFiles.PublishDiagnostics(System.Text.Encoding.UTF8.GetString(stream.ToArray()));

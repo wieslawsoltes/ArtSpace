@@ -79,6 +79,11 @@ public sealed partial class StudioWorkbench
         if (Surface.IsPresenting) { if (e.Key == VirtualKey.Escape) { Surface.ExitPresentation(); e.Handled = true; } return; }
         if (control && e.Key == VirtualKey.S) { RunAsync(SaveAsync); e.Handled = true; return; }
         if (Keyboard.IsTextInput(e.OriginalSource as DependencyObject)) return;
+        try
+        {
+            if (Surface.HandlePathKey(e.Key, control, shift, alt)) { e.Handled = true; return; }
+        }
+        catch (Exception ex) { ShowStatus(ex.Message, true); e.Handled = true; return; }
         Action? action = null;
         if (control)
         {
@@ -95,7 +100,7 @@ public sealed partial class StudioWorkbench
                 VirtualKey.C => () => RunAsync(() => CopyAsync(false)),
                 VirtualKey.X => () => RunAsync(() => CopyAsync(true)),
                 VirtualKey.V => () => RunAsync(PasteAsync),
-                VirtualKey.O when shift => () => { Session.OutlinesVisible = !Session.OutlinesVisible; Surface.Invalidate(); },
+                VirtualKey.O when shift => () => ArtSpace.Illustration.PathOperations.CreateOutlines(Session, Surface.Renderer),
                 VirtualKey.O => () => RunAsync(OpenAsync),
                 VirtualKey.G when alt => () => Session.GroupSelection(true),
                 VirtualKey.G when shift => Session.UngroupSelection,
@@ -132,6 +137,7 @@ public sealed partial class StudioWorkbench
                 VirtualKey.O when shift => () => Session.Tool = EditorTool.Frame,
                 VirtualKey.L => () => Session.Tool = EditorTool.Ellipse,
                 VirtualKey.P => () => Session.Tool = shift ? EditorTool.Pencil : EditorTool.Pen,
+                VirtualKey.C when shift => () => Session.Tool = EditorTool.AnchorPoint,
                 VirtualKey.T => () => Session.Tool = EditorTool.Text,
                 VirtualKey.H => () => Session.Tool = EditorTool.Hand,
                 VirtualKey.C => () => Session.Tool = EditorTool.Comment,
@@ -145,11 +151,13 @@ public sealed partial class StudioWorkbench
                 VirtualKey.Space => () => Surface.IsSpaceDown = true,
                 _ => null
             };
+            if ((int)e.Key == 187) action = () => Session.Tool = EditorTool.AddAnchor;
+            if ((int)e.Key == 189) action = () => Session.Tool = EditorTool.DeleteAnchor;
             if ((int)e.Key == 220) action = () => Session.Tool = EditorTool.Line;
-            if ((int)e.Key is 187 or 107) action = () => Surface.ZoomTo(Session.Viewport.Zoom * 1.25);
-            if ((int)e.Key is 189 or 109) action = () => Surface.ZoomTo(Session.Viewport.Zoom / 1.25);
             if ((int)e.Key == 191) action = () => RunAsync(shift ? ShowHelpAsync : ShowQuickActionsAsync);
         }
+        if (control && ((int)e.Key is 187 or 107)) action = () => Surface.ZoomTo(Session.Viewport.Zoom * 1.25);
+        if (control && ((int)e.Key is 189 or 109)) action = () => Surface.ZoomTo(Session.Viewport.Zoom / 1.25);
         if (action is not null)
         {
             try { action(); } catch (Exception ex) { ShowStatus(ex.Message, true); } e.Handled = true;

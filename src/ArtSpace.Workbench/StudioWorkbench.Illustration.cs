@@ -106,6 +106,7 @@ public sealed partial class StudioWorkbench
         {
             (EditorTool.Move,"move","Selection (V)"), (EditorTool.DirectSelect,"directselect","Direct Selection (A)"),
             (EditorTool.Pen,"pen","Pen (P)"), (EditorTool.Pencil,"pencil","Pencil (N)"),
+            (EditorTool.AddAnchor,"plus","Add Anchor Point (+)"), (EditorTool.DeleteAnchor,"minus","Remove Anchor Point (-)"),
             (EditorTool.Text,"text","Type (T)"), (EditorTool.Line,"line","Line Segment (\\)"),
             (EditorTool.Rectangle,"rectangle","Rectangle (M)"), (EditorTool.Ellipse,"ellipse","Ellipse (L)"),
             (EditorTool.Polygon,"polygon","Polygon"), (EditorTool.Star,"star","Star"),
@@ -194,6 +195,23 @@ public sealed partial class StudioWorkbench
 
     private void AddIllustrationSections()
     {
+        if (PathEditing.CanEdit(Session.Primary))
+        {
+            var pathSection = AddSection("Path");
+            pathSection.Body.Children.Add(new StudioButton("Edit anchors", () => Run(Surface.EnterPathEditing)) { HorizontalAlignment = HorizontalAlignment.Stretch });
+            pathSection.Body.Children.Add(Studio.Choice(new[] { "Nonzero", "Even-odd" }, Session.Primary!.FillRule == PathFillRule.EvenOdd ? "Even-odd" : "Nonzero", value => Change("Fill rule", n => n.FillRule = value == "Even-odd" ? PathFillRule.EvenOdd : PathFillRule.NonZero), "Path fill rule"));
+            if (Surface.SelectedAnchorCount > 0)
+            {
+                pathSection.Body.Children.Add(Studio.Text(Surface.SelectedAnchorCount + " anchors selected", 10, Studio.Muted));
+                pathSection.Body.Children.Add(Studio.Columns((new StudioButton("Smooth", () => Run(() => SmoothPathAnchors(true))), -1), (new StudioButton("Corner", () => Run(() => SmoothPathAnchors(false))), -1)));
+                pathSection.Body.Children.Add(new StudioButton("Remove selected anchors", () => Run(() => Surface.RemoveSelectedAnchors(false))));
+            }
+        }
+        if (Session.Primary?.Kind == NodeKind.Text)
+        {
+            var typeSection = AddSection("Type");
+            typeSection.Body.Children.Add(new StudioButton("Create outlines", () => Run(() => PathOperations.CreateOutlines(Session, Surface.Renderer))) { HorizontalAlignment = HorizontalAlignment.Stretch });
+        }
         var section = AddSection("Pathfinder");
         var actions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10 };
         foreach (var (op, glyph) in new[] { (BooleanOperation.Union,"union"), (BooleanOperation.Subtract,"subtract"), (BooleanOperation.Intersect,"intersect"), (BooleanOperation.Exclude,"exclude") })
@@ -247,13 +265,19 @@ public sealed partial class StudioWorkbench
                 yield return Async("Blend…", () => NumberOperation("Intermediate blend steps (1–256)", "8", value => IllustrationOperations.Blend(Session, checked((int)value))));
                 yield return Async("Radial Repeat…", () => NumberOperation("Radial copies (2–128)", "8", value => IllustrationOperations.RadialRepeat(Session, checked((int)value))));
                 yield return separator;
-                yield return Item("Add Anchor Points", () => IllustrationOperations.AddAnchors(Session), enabled: selected);
-                yield return Item("Smooth Anchors", () => IllustrationOperations.SmoothAnchors(Session, true), enabled: selected);
-                yield return Item("Corner Anchors", () => IllustrationOperations.SmoothAnchors(Session, false), enabled: selected);
-                yield return Item("Reverse Path Direction", () => IllustrationOperations.ReversePaths(Session), enabled: selected);
-                yield return Item("Close Path", () => Session.UpdateSelection("Close path", n => n.Closed = true), enabled: selected);
+                yield return Item("Edit Anchors", Surface.EnterPathEditing, "A", PathEditing.CanEdit(Session.Primary));
+                yield return Item("Anchor Point Tool", () => Session.Tool = EditorTool.AnchorPoint, "Shift C");
+                yield return Item("Make Compound Path", () => PathOperations.MakeCompound(Session, Surface.Renderer), enabled: Session.SelectionRoots.Count > 1);
+                yield return Item("Release Compound Path", () => PathOperations.ReleaseCompound(Session, Surface.Renderer), enabled: selected);
+                yield return separator;
+                yield return Item("Add Anchor Points", () => PathOperations.AddAnchors(Session, Surface.Renderer), enabled: selected);
+                yield return Item("Smooth Anchors", () => SmoothPathAnchors(true), enabled: selected);
+                yield return Item("Corner Anchors", () => SmoothPathAnchors(false), enabled: selected);
+                yield return Item("Reverse Path Direction", () => PathOperations.Reverse(Session, Surface.Renderer), enabled: selected);
+                yield return Item("Close Path", () => PathOperations.Close(Session, Surface.Renderer), enabled: selected);
                 break;
             case "Type":
+                yield return Item("Create Outlines", () => PathOperations.CreateOutlines(Session, Surface.Renderer), "Ctrl Shift O", Session.SelectionRoots.Any(n => n.DescendantsAndSelf().Any(c => c.Kind == NodeKind.Text && !c.IsEffectivelyLocked)));
                 yield return Item("Type Tool", () => Session.Tool = EditorTool.Text, "T");
                 yield return Item("Edit Text", () => { if (Session.Primary?.Kind == NodeKind.Text) Surface.BeginTextEdit(Session.Primary); }, "Enter", Session.Primary?.Kind == NodeKind.Text);
                 foreach (var weight in new[] { 400, 500, 600, 700, 900 }) yield return Item("Weight " + weight, () => Session.UpdateSelection("Font weight", n => n.FontWeight = weight), enabled: selected);
@@ -286,6 +310,12 @@ public sealed partial class StudioWorkbench
             default:
                 yield return Async("Tools, Shortcuts & Help", ShowHelpAsync, "?"); yield return Async("Find a Command…", ShowQuickActionsAsync, "Ctrl K"); break;
         }
+    }
+
+    private void SmoothPathAnchors(bool smooth)
+    {
+        if (!Surface.EditSelectedAnchors(smooth ? "Smooth selected anchors" : "Corner selected anchors", (path, anchors) => path.Smooth(anchors, smooth)))
+            PathOperations.Smooth(Session, Surface.Renderer, smooth);
     }
 
     private void SetGradient(bool radial)

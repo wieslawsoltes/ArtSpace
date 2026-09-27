@@ -20,12 +20,13 @@ public static class BooleanOperations
         for (var i = 1; i < nodes.Length; i++)
         {
             using var path = new SKPath(renderer.Geometry(nodes[i])); path.Transform(SceneRenderer.Matrix(nodes[i].LocalMatrix));
-            using var combined = result.Op(path, op) ?? throw new InvalidOperationException("Skia could not compute this Boolean operation."); result.Reset(); result.AddPath(combined);
+            using var combined = result.Op(path, op) ?? throw new InvalidOperationException("Skia could not compute this Boolean operation."); result.Reset(); result.AddPath(combined); result.FillType = combined.FillType;
         }
         if (result.IsEmpty) { editor.DeleteSelection(); return; }
         var bounds = result.TightBounds; result.Transform(SKMatrix.CreateTranslation(-bounds.Left, -bounds.Top));
         var node = DocumentJson.CloneNode(nodes[0], true);
         node.Kind = NodeKind.Path; node.Name = operation + " result"; node.X = bounds.Left; node.Y = bounds.Top; node.Width = Math.Max(1, bounds.Width); node.Height = Math.Max(1, bounds.Height); node.PathWidth = node.Width; node.PathHeight = node.Height;
+        node.FillRule = result.FillType == SKPathFillType.EvenOdd ? PathFillRule.EvenOdd : PathFillRule.NonZero;
         node.Rotation = 0; node.FlipX = node.FlipY = false; node.Points.Clear(); node.PathData = result.ToSvgPathData(); node.Children.Clear();
         editor.Edit(operation + " shapes", () => { foreach (var old in nodes) editor.RemoveNode(old); editor.AddNode(node, parent); editor.Select(node); });
     }

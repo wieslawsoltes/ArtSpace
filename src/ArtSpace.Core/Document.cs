@@ -104,6 +104,7 @@ public sealed class DesignNode
     public double LineHeight { get; set; } = 1.25;
     public double LetterSpacing { get; set; }
     public TextAlignment TextAlign { get; set; }
+    public PathFillRule FillRule { get; set; }
     public string? PathData { get; set; }
     public double PathWidth { get; set; }
     public double PathHeight { get; set; }
