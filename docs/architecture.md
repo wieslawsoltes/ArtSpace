@@ -4,48 +4,52 @@ ArtSpace shares C# source across native Uno desktop and WebAssembly hosts. There
 
 ## Package boundaries
 
-Six libraries are independent of Uno: `Core` owns document/geometry/editable contours; `Layout` handles constraints/snapping; `Documents` validates and serializes formats; `Editing` owns transactions and selection; `Skia` renders and converts geometry; `Illustration` exposes editing commands. `Controls`, `Editor` and `Workbench` target desktop/browser Uno. All nine are packable.
+Six libraries are independent of Uno: `Core` owns document/geometry/editable contours; `Layout` handles constraints/snapping; `Documents` validates and serializes formats; `Editing` owns transactions/selection; `Skia` renders and converts geometry; `Illustration` exposes editing/clipping commands. `Controls`, `Editor` and `Workbench` target desktop/browser Uno. All nine are packable.
 
-Controls do not own document state. The editor surface can be embedded separately from the full workbench. The host supplies `EditorSession`, `IWorkspaceStorage`, fonts and lifetime/disposal. Source provenance is recorded in `THIRD-PARTY-NOTICES.md`.
+Controls do not own document state. The surface is embeddable without the full workbench. The host supplies `EditorSession`, `IWorkspaceStorage`, fonts and disposal. Provenance is recorded in `THIRD-PARTY-NOTICES.md`; no temporary source-migration workflow is required for consumer builds.
 
-## Rendering
+## Rendering and ownership
 
-The canvas derives from Uno `SKCanvasElement` and paints into Uno's shared Skia composition path. It does not maintain an additional application-owned CPU framebuffer for interactive painting. SkiaSharp supplies paths, clipping, gradients, text, compositing and raster export. Actual backend/hardware acceleration depends on the host/browser/driver; software rendering is valid.
+The canvas derives from Uno `SKCanvasElement` and paints into Uno's shared Skia composition path. It does not maintain an additional application-owned CPU framebuffer for interactive painting. Backend/hardware acceleration depends on the host/browser/driver. The pinned stack is .NET SDK 10.0.401, Uno SDK 6.7.30 and compatible SkiaSharp 3.119.2 managed/native assets. Compile-time compatibility is not native ABI validation.
 
-The pinned stack is .NET SDK 10.0.401, Uno SDK 6.7.30 and compatible SkiaSharp 3.119.2 managed/native assets. Do not independently replace the managed Skia version without updating and validating Uno's matching native runtime. Compile-time compatibility is not ABI validation.
+`SceneRenderer` owns cached paths. `Geometry(node)` is borrowed: copy before transforming and do not dispose it. `CreateTextOutline(node)` returns an owned path. The exact geometry snapshot includes geometry parameters, path dimensions/data, native points/tangents and fill rule; hits do not rebuild SVG text. Pruning removes deleted IDs without discarding unchanged native geometry. Cached text runs own fonts and are invalidated by typography/typeface changes rather than paint/position changes.
 
-`SceneRenderer` owns cached paths. `Geometry(node)` returns a borrowed object; callers that transform or retain it must copy it. `CreateTextOutline(node)` returns an owned path. The geometry cache includes path fill rule and dimensions. Rendering and hit testing use the same transform hierarchy and fill behavior.
+Clipping transforms the mask's filled geometry into its container's local coordinates and intersects the canvas clip before drawing content. The mask itself is not painted in Preview. Compound fill rules and the same transformed geometry are used in picking. Outline mode reveals mask and hidden contours. A container's own fill remains independent of its child clipping region.
 
-Path construction, Boolean operations, conic conversion, offsets and stroke expansion run on CPU even when final painting is accelerated. This is not a raw-WebGPU or GPU-compute-only engine. Path caching is not a million-object spatial index or throughput guarantee.
+Culling uses the actual canvas clip and conservatively inflated leaf geometry, not an arbitrary fixed world-space viewport margin. Groups may overflow their nominal bounds; text and filtered/shadow subtrees are kept conservative. The full hierarchy is still visited. CPU geometry operations and scene traversal remain; this is not a raw-WebGPU compute engine or million-object throughput guarantee.
 
-## Contours and typography
+## Contours and text
 
-`EditablePath` is a temporary managed editing buffer, not a second persisted document tree. It contains independent open/closed contours with anchors and optional cubic handles. The native document retains legacy pen points or SVG path data plus a nonzero/even-odd fill rule.
+`EditablePath` is a temporary managed contour/anchor/tangent buffer, not a second persisted document tree. The document retains pen points or SVG path data and fill rules. `PathEditing.Read` preserves lines/cubics, elevates quadratics exactly and adaptively approximates rational conics with bounded subdivision. `Write` normalizes geometry while re-expressing transforms/gradient endpoints. A pre-gesture basis avoids accumulation of normalization drift. Managed anchors are doubles; Skia geometry is float-based.
 
-`PathEditing.Read` iterates actual Skia verbs. Lines and cubics are preserved, quadratics are elevated exactly, and rational conics are approximated by bounded adaptive cubic subdivision. Closing duplicate endpoints are merged while retaining their incoming handle. Hit testing uses bounded adaptive subdivision and segment projection.
+Painting and outlining share text runs for baseline, wrapping, alignment and tracking. Line breaking uses Unicode scalar offsets and prefix advances. This remains a basic text engine, not complete complex-script shaping, bidi, fallback or variable-font support. See [path editing](path-editing.md).
 
-`PathEditing.Write` normalizes the resulting geometry, re-expresses the node transform and gradient endpoints, and preserves world placement. Its optional basis snapshot supports absolute pointer updates without cumulative normalization drift. Managed coordinates are double precision, but Skia geometry is float-based. See [precision and limits](path-editing.md#precision-and-limits).
+## Transactions, selection and snapping
 
-Painting and text outlining share text runs, including baseline, wrapping, alignment and tracking. The line breaker uses prefix advances and Unicode scalar offsets rather than repeatedly measuring a growing line. This remains a basic text implementation, not a complete shaping/bidi/fallback engine. Outlining preserves the node identity and appearance but removes its editable text semantics; undo restores the original.
+Commands use `EditorSession.Edit` or `UpdateSelection`. Gestures begin once, preview and commit once. Cancellation restores the original snapshot. The snapshot is retained until commit serialization succeeds, so serialization errors remain reversible. History uses bounded document snapshots rather than fine-grained edit deltas.
 
-## Transactions and input
+Selection/root arrays are reused for geometry previews and viewport changes. Structural changes, selection changes and document notifications invalidate them. Embedding hosts making direct model changes must use the session notification/transaction contract.
 
-`EditorSession` owns active page, selection, viewport and bounded snapshot history. Commands use `Edit` or `UpdateSelection`. Pointer gestures begin once, preview mutations and commit once. Cancellation and exceptions restore the snapshot. Entering anchor selection without editing does not convert primitives or create history.
+`SnapIndex` captures stationary target rectangles at drag start and indexes their edge/center coordinates by axis. Queries preserve the exhaustive reference's ordering, tie-breaking and guide extents. Index construction is `O(N log N)`; a query is `O(log N + G)` for live guides. Auto-layout documents rebuild conservatively because other target bounds may move during preview. The target data are retained; diagnostic counters and editor sessions are intended for their owning execution context.
 
-The direct-selection surface maintains contour/anchor addresses outside the persisted document. It supports multi-anchor translation, local-axis constraints, world-coordinate nudging, tangent alignment with opposite-length preservation, Alt-independent handles, insertion, marquee and cancellation. Explicit anchor removal reconnects neighbors; Delete/Backspace cuts incident segments and can produce multiple open contours. One object's contours are edited at a time.
+## Clipping model and commands
 
-Custom menus keep an active-item index rather than relying on asynchronous popup focus timing. A small production browser adapter forwards navigation keys when browser focus routing consumes them before Uno events. JavaScript performs no document mutation; C# decides ownership. Text inputs and modal dialogs retain native behavior. The adapter is not test-only.
+`ClipPathId` references a direct vector child; the `ClippingPath` helper resolves it. `ClippingOperations` implements Make, Release, EditMask and EditContents without an Uno dependency. Make retains geometry, creates/reuses a clipping container, removes mask appearance and preserves node identities/stacking. Release removes the relation while retaining the group and unpainted mask. Active clipping paths cannot be regrouped into a different parent without releasing them first.
 
-## Storage and trust
+Validation rejects dangling/non-child/text/container mask references. Clone/paste and component synchronization remap mask IDs. Deleting a clipping path releases its owner's reference. Mask-anchor edits remain ordinary contour transactions.
 
-WebAssembly uses IndexedDB, local file selection/download and clipboard through an `IWorkspaceStorage` bridge; native storage uses application-local data. Autosave is recovery, not a backup service, and document contents are not uploaded.
+## Input and storage
 
-Native JSON is validated before activation, with depth/count/size limits, identifiers, finite geometry and supported appearance values. SVG parsing disables external entities and does not execute scripts. Unsupported elements are reported. Editable contours reject inverse/unbounded fill types and enforce count/subdivision limits. Continue expanding malformed-input and excessive-complexity coverage.
+Direct selection maintains active contour/anchor addresses outside persisted data. It supports multiple anchors within one object, marquee, nudging, direction handles, insertion/removal and cancellation. Custom menus maintain an active index independent of popup focus timing. The production browser adapter forwards selected input/modifiers; C# decides ownership. Text inputs and modal dialogs retain their normal behavior.
+
+WebAssembly uses IndexedDB and local file/clipboard bridges behind `IWorkspaceStorage`; desktop uses application-local data. Autosave is recovery, not backup, and document contents are not uploaded.
+
+Native schema 1 remains readable; saves upgrade to schema 2. The version guard stops older readers from silently ignoring clipping. Native validation enforces bounded size/count/depth and geometry/appearance/reference invariants. SVG parsing disables external entities and never executes imported scripts. Supported clipping is a local `userSpaceOnUse` definition with one vector shape/compound path. Missing, external, recursive or unsupported definitions fail closed. General SVG transform/paint-server/opacity-mask limits remain.
 
 ## Validation and delivery
 
-107 engine cases include exact-subdivision properties, conic samples, tangent behavior, fill-rule roundtrips, transformed bounds, glyph coverage and rollback. Seven browser scenarios drive the actual published Uno app under `/ArtSpace/` with pointer, keyboard and file-picker input. Opt-in `?test=1` diagnostics expose read-only state and anchor positions, never mutation commands.
+The engine runner has 141 cases. The benchmark harness additionally checks schema migration, serialization rollback, mask ownership and miter picking before measuring. Ten browser scenarios drive the real published Uno app under `/ArtSpace/`. Diagnostics are read-only; no test-only document mutation API exists.
 
-Build compiles Windows/Linux/macOS, publishes browser output, packs all libraries and retains tests/screenshots. Pages deploys successful main-branch artifacts, verifies `build-info.json` and tests the public URL. Tagged releases generate browser/native/source archives, packages and checksums; NuGet publication needs an explicit secret. CI software graphics is not physical-GPU validation, and native compilation is not interactive runtime certification.
+Build validates native compilation, engine/benchmark behavior, package generation and browser acceptance. Pages verifies artifact commit provenance and public-site acceptance. Tagged releases run browser tests and create native/browser/source/package archives; NuGet publication needs explicit credentials. See [clipping/performance](clipping-and-performance.md) for reproducible fixtures and interpretation. Software graphics is not physical-GPU validation; compilation is not native interactive certification.
 
-Primary references: [Uno SKCanvasElement](https://platform.uno/docs/articles/controls/SKCanvasElement.html), [Uno SDK](https://platform.uno/docs/articles/features/using-the-uno-sdk.html), [SkiaSharp](https://github.com/mono/SkiaSharp), [Skia license](https://skia.googlesource.com/skia/+/main/LICENSE), and [GitHub Pages custom workflows](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages).
+Primary references: [Uno canvas](https://platform.uno/docs/articles/controls/SKCanvasElement.html), [Uno SDK](https://platform.uno/docs/articles/features/using-the-uno-sdk.html), [SkiaSharp](https://github.com/mono/SkiaSharp), [Skia license](https://skia.googlesource.com/skia/+/main/LICENSE), [SkCanvas](https://api.skia.org/classSkCanvas.html), and [GitHub Pages workflows](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages).
