@@ -1,7 +1,7 @@
 name: Integrate illustration
 on:
   push:
-    paths: ['.github/workflows/integrate.yml', 'eng/integrate-illustration.py']
+    paths: ['.github/workflows/integrate.yml', 'eng/*.py']
   workflow_dispatch:
 permissions:
   contents: write
@@ -23,11 +23,12 @@ jobs:
       - name: Materialize reviewed source adaptation
         run: |
           python3 eng/integrate-illustration.py
+          python3 eng/polish.py
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add src tests Directory.Build.props ArtSpace.slnx playwright.config.mjs eng/illustration-integrated.txt
           if ! git diff --cached --quiet; then
-            git commit -m 'Integrate dark illustration workbench and vector operations'
+            git commit -m 'Integrate reviewed illustration fixes'
             git pull --rebase origin main
             git push origin HEAD:main
           fi
