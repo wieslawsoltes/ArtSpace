@@ -1,0 +1,88 @@
+name: Integrate illustration
+on:
+  push:
+    paths: ['.github/workflows/integrate.yml', 'eng/integrate-illustration.py']
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: integrate-illustration
+  cancel-in-progress: false
+jobs:
+  integrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      DOTNET_NOLOGO: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Materialize reviewed source adaptation
+        run: |
+          python3 eng/integrate-illustration.py
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src tests Directory.Build.props ArtSpace.slnx playwright.config.mjs eng/illustration-integrated.txt
+          if ! git diff --cached --quiet; then
+            git commit -m 'Integrate dark illustration workbench and vector operations'
+            git pull --rebase origin main
+            git push origin HEAD:main
+          fi
+          echo "GITHUB_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+      - name: Source snapshot without generated font assets
+        if: always()
+        run: git archive --format=zip HEAD -o /tmp/ArtSpace-source.zip
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ArtSpace-source
+          path: /tmp/ArtSpace-source.zip
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Fetch licensed assets and verify toolchain
+        run: |
+          python3 scripts/fetch-assets.py
+          python3 - <<'PY'
+          import json,urllib.request
+          with urllib.request.urlopen('https://api.nuget.org/v3-flatcontainer/uno.sdk/index.json') as r: v=json.load(r)['versions']
+          print('LATEST STABLE Uno.Sdk:',[x for x in v if '-' not in x][-1])
+          print(open('global.json').read())
+          PY
+      - name: Geometry and document regression tests
+        run: dotnet run --project tests/ArtSpace.Tests -c Release
+      - name: Compile desktop host
+        run: dotnet build src/ArtSpace.App -c Release -f net10.0-desktop -p:ArtSpaceDesktopOnly=true
+      - name: Browser workload
+        run: dotnet workload install wasm-tools --skip-manifest-update
+      - name: Publish real Uno WebAssembly app
+        run: |
+          dotnet publish src/ArtSpace.App -f net10.0-browserwasm -c Release -o artifacts/publish -p:WasmShellWebAppBasePath=/ArtSpace/
+          python3 scripts/collect-site.py artifacts/publish artifacts/site
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ArtSpace-browser
+          path: artifacts/site
+          include-hidden-files: true
+      - name: Browser acceptance and screenshots
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+          python3 scripts/serve-site.py --directory artifacts/site --port 4173 > /tmp/artspace-http.log 2>&1 &
+          npx playwright test tests/browser/illustration.spec.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ArtSpace-validation
+          path: |
+            artifacts/screenshots
+            artifacts/test-results
+            artifacts/playwright-report
+            artifacts/browser-results.xml
