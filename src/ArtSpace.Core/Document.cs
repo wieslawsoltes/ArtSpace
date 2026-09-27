@@ -91,6 +91,9 @@ public sealed class DesignNode
     public bool Visible { get; set; } = true;
     public bool Locked { get; set; }
     public bool ClipContent { get; set; }
+    /// <summary>Identifier of the direct child whose filled geometry clips this container's contents.</summary>
+    public string? ClipPathId { get; set; }
+    [JsonIgnore] public DesignNode? ClippingPath => ClipPathId is null ? null : Children.Find(n => n.Id == ClipPathId);
     public bool Expanded { get; set; } = true;
     public int Sides { get; set; } = 5;
     public double StarRatio { get; set; } = .45;

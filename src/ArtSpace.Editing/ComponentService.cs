@@ -58,6 +58,10 @@ public static class ComponentService
                 var source = n.SourceId!; n.Id = existing.GetValueOrDefault(source) ?? Guid.NewGuid().ToString("N");
                 if (instance.Overrides.TryGetValue(source, out var o)) { if (o.Text is not null) n.Text = o.Text; if (o.Fill is not null) n.Fill = o.Fill; if (o.Visible.HasValue) n.Visible = o.Visible.Value; }
             }
+            var remapped = copy.DescendantsAndSelf().ToDictionary(n => n.SourceId!, n => n.Id);
+            foreach (var n in copy.DescendantsAndSelf())
+                if (n.ClipPathId is { } mask && remapped.TryGetValue(mask, out var id)) n.ClipPathId = id;
+            instance.ClipPathId = copy.ClipPathId;
             instance.Children = copy.Children; foreach (var child in instance.Children) child.Parent = instance;
             instance.Fills = copy.Fills; instance.Strokes = copy.Strokes; instance.Shadows = copy.Shadows; instance.CornerRadius = copy.CornerRadius;
             instance.Layout = copy.Layout;

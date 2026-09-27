@@ -56,8 +56,22 @@ public sealed class EditorSession
     public string RedoLabel => _redo.TryPeek(out var item) ? item.Label : "";
     public IReadOnlyList<string> History => _undo.Select(e => e.Label).ToArray();
     public IReadOnlySet<string> SelectedIds => _selected;
-    public IReadOnlyList<DesignNode> Selection => Page.AllNodes().Where(n => _selected.Contains(n.Id)).ToArray();
-    public IReadOnlyList<DesignNode> SelectionRoots => Selection.Where(n => !Ancestors(n).Any(a => _selected.Contains(a.Id))).ToArray();
+    private IReadOnlyList<DesignNode>? _selectionCache, _rootsCache;
+    public long SelectionMaterializations { get; private set; }
+    private void InvalidateSelection() { _selectionCache = null; _rootsCache = null; }
+    public IReadOnlyList<DesignNode> Selection
+    {
+        get
+        {
+            if (_selectionCache is null)
+            {
+                SelectionMaterializations++;
+                _selectionCache = Array.AsReadOnly(Page.AllNodes().Where(n => _selected.Contains(n.Id)).ToArray());
+            }
+            return _selectionCache;
+        }
+    }
+    public IReadOnlyList<DesignNode> SelectionRoots => _rootsCache ??= Array.AsReadOnly(Selection.Where(n => !Ancestors(n).Any(a => _selected.Contains(a.Id))).ToArray());
     public DesignNode? Primary => Selection.LastOrDefault();
     public EditorTool Tool { get => _tool; set { if (_tool == value) return; _tool = value; Notify(EditorChangeKind.Tool); } }
     public EditorSession(DesignDocument document)
@@ -88,7 +102,11 @@ public sealed class EditorSession
     {
         var nodes = SelectionRoots; return nodes.Count == 0 ? default : nodes.Select(n => n.WorldBounds).Aggregate(RectD.Union);
     }
-    public void Notify(EditorChangeKind kind, string label = "") => Changed?.Invoke(this, new(kind, label));
+    public void Notify(EditorChangeKind kind, string label = "")
+    {
+        if (kind is EditorChangeKind.Document or EditorChangeKind.Selection) InvalidateSelection();
+        Changed?.Invoke(this, new(kind, label));
+    }
     public void Preview()
     {
         LayoutEngine.Arrange(Page.Nodes); Notify(EditorChangeKind.Preview);
@@ -96,14 +114,15 @@ public sealed class EditorSession
     public void BeginInteraction(string label)
     {
         if (_before is not null) throw new InvalidOperationException("An edit transaction is already active.");
-        _before = Capture(); _interactionLabel = label;
+        InvalidateSelection(); _before = Capture(); _interactionLabel = label;
     }
     public void CommitInteraction()
     {
         if (_before is null) return;
         ComponentService.Synchronize(Document);
         foreach (var page in Document.Pages) LayoutEngine.Arrange(page.Nodes);
-        var before = _before; _before = null; var after = Capture();
+        // Retain the rollback snapshot until serialization has succeeded.
+        var before = _before; var after = Capture(); _before = null;
         if (before.Json != after.Json)
         {
             _undo.Add(new(_interactionLabel, before, after)); _redo.Clear();
@@ -137,9 +156,14 @@ public sealed class EditorSession
     }
     public void AddNode(DesignNode node, DesignNode? parent = null)
     {
-        node.Parent = parent; (parent?.Children ?? Page.Nodes).Add(node);
+        node.Parent = parent; (parent?.Children ?? Page.Nodes).Add(node); InvalidateSelection();
     }
-    public void RemoveNode(DesignNode node) => (node.Parent?.Children ?? Page.Nodes).Remove(node);
+    public void RemoveNode(DesignNode node)
+    {
+        var parent = node.Parent; (parent?.Children ?? Page.Nodes).Remove(node);
+        if (parent?.ClipPathId == node.Id) parent.ClipPathId = null;
+        InvalidateSelection();
+    }
     public void DeleteSelection()
     {
         var nodes = SelectionRoots.Where(n => !n.IsEffectivelyLocked).ToArray(); if (nodes.Length == 0) return;
@@ -176,7 +200,7 @@ public sealed class EditorSession
         {
             var clone = DocumentJson.CloneNode(node, true); clone.X += offset; clone.Y += offset; AddNode(clone, node.Parent); newIds.Add(clone.Id);
         }
-        _selected.Clear(); _selected.UnionWith(newIds);
+        _selected.Clear(); _selected.UnionWith(newIds); InvalidateSelection();
     }
     public string CopySelection() => DocumentJson.SaveNodes(SelectionRoots.Select(node =>
     {
@@ -193,6 +217,8 @@ public sealed class EditorSession
     {
         var nodes = SelectionRoots.Where(n => !n.IsEffectivelyLocked).ToArray(); if (nodes.Length == 0) return;
         var parent = nodes[0].Parent; if (nodes.Any(n => n.Parent != parent)) return;
+        if (nodes.Any(n => n.Parent?.ClipPathId == n.Id))
+            throw new InvalidOperationException("Release the clipping mask before grouping its clipping path.");
         Edit(asFrame ? "Frame selection" : "Group selection", () =>
         {
             var bounds = nodes.Select(n => n.LocalMatrix.Map(n.LocalBounds)).Aggregate(RectD.Union);

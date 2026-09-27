@@ -6,16 +6,35 @@ namespace ArtSpace.Skia;
 /// <summary>Retained geometry cache with explicit native-resource ownership. No Uno dependency.</summary>
 public sealed partial class SceneRenderer : IDisposable
 {
-    private sealed record CachedPath(string Signature, SKPath Path);
+    private sealed record CachedPath(GeometrySnapshot Snapshot, SKPath Path);
     private readonly Dictionary<string, CachedPath> _paths = [];
     private readonly Dictionary<string, SKTypeface> _typefaces = [];
     private SKTypeface? _customTypeface;
     public bool Outlines { get; set; }
     public long RenderedNodes { get; private set; }
-    public void SetTypeface(SKTypeface typeface) { _customTypeface?.Dispose(); _customTypeface = typeface; }
+    public long VisitedNodes { get; private set; }
+    public long CulledNodes { get; private set; }
+    public long GeometryBuilds { get; private set; }
+    public long GeometryCacheHits { get; private set; }
+    public bool EnableCulling { get; set; } = true;
+    public int CachedGeometryCount => _paths.Count;
+    public void PruneCache(IEnumerable<DesignNode> roots)
+    {
+        var retained = roots.SelectMany(n => n.DescendantsAndSelf()).Select(n => n.Id).ToHashSet(StringComparer.Ordinal);
+        foreach (var id in _paths.Keys.Where(id => !retained.Contains(id)).ToArray())
+        { _paths[id].Path.Dispose(); _paths.Remove(id); }
+        foreach (var id in _textLayouts.Keys.Where(id => !retained.Contains(id)).ToArray())
+        { _textLayouts[id].Font.Dispose(); _textLayouts.Remove(id); }
+    }
+    public void SetTypeface(SKTypeface typeface)
+    {
+        ArgumentNullException.ThrowIfNull(typeface);
+        if (ReferenceEquals(typeface, _customTypeface)) return;
+        ClearTextLayouts(); _customTypeface?.Dispose(); _customTypeface = typeface;
+    }
     public void ClearCache()
     {
-        foreach (var p in _paths.Values) p.Path.Dispose(); _paths.Clear();
+        foreach (var p in _paths.Values) p.Path.Dispose(); _paths.Clear(); ClearTextLayouts();
     }
     public static SKColor Color(string? hex, double opacity = 1)
     {
@@ -26,34 +45,45 @@ public sealed partial class SceneRenderer : IDisposable
     public static SKRect Rect(RectD r) => new((float)r.X, (float)r.Y, (float)r.Right, (float)r.Bottom);
     public SKPath Geometry(DesignNode node)
     {
-        var signature = VectorPath.Build(node) + "|" + node.FillRule;
-        if (node.Kind == NodeKind.Path && node.PathWidth > 0 && node.PathHeight > 0) signature += $"|{node.Width:R}|{node.Height:R}|{node.PathWidth:R}|{node.PathHeight:R}";
-        if (_paths.TryGetValue(node.Id, out var cache) && cache.Signature == signature) return cache.Path;
+        if (_paths.TryGetValue(node.Id, out var cache) && cache.Snapshot.Matches(node))
+        { GeometryCacheHits++; return cache.Path; }
         var path = SKPath.ParseSvgPathData(VectorPath.Build(node)) ?? new SKPath();
+        GeometryBuilds++;
         if (node.Kind == NodeKind.Path && node.PathWidth > 0 && node.PathHeight > 0) path.Transform(SKMatrix.CreateScale((float)(node.Width / node.PathWidth), (float)(node.Height / node.PathHeight)));
         path.FillType = node.FillRule == PathFillRule.EvenOdd ? SKPathFillType.EvenOdd : SKPathFillType.Winding;
         if (cache is not null) cache.Path.Dispose();
         if (_paths.Count > 100_000) ClearCache();
-        _paths[node.Id] = new(signature, path); return path;
+        _paths[node.Id] = new(new GeometrySnapshot(node), path); return path;
     }
     public void Draw(SKCanvas canvas, IEnumerable<DesignNode> nodes, RectD? worldViewport = null)
     {
-        RenderedNodes = 0;
-        foreach (var node in nodes)
-        {
-            if (worldViewport.HasValue && !node.WorldBounds.Inflate(100).Intersects(worldViewport.Value) && (node.Children.Count == 0 || node.ClipContent)) continue;
-            DrawNode(canvas, node);
-        }
+        RenderedNodes = VisitedNodes = CulledNodes = 0;
+        // Actual canvas clip is authoritative; fixed world inflation is unsafe for shadows.
+        foreach (var node in nodes) DrawNode(canvas, node);
     }
     public void DrawWorldNode(SKCanvas canvas, DesignNode node)
     {
         canvas.Save(); if (node.Parent is not null) canvas.Concat(Matrix(node.Parent.WorldMatrix)); DrawNode(canvas, node); canvas.Restore();
     }
-    private void DrawNode(SKCanvas canvas, DesignNode node)
+    private void DrawNode(SKCanvas canvas, DesignNode node, bool filteredAncestor = false)
     {
         if (!node.Visible || node.Opacity <= 0 || node.Kind == NodeKind.Slice) return;
-        RenderedNodes++;
+        VisitedNodes++;
         canvas.Save(); canvas.Concat(Matrix(node.LocalMatrix));
+        var filtered = filteredAncestor || node.Shadows.Any(s => s.Visible);
+        // Groups may overflow their nominal box; filtered sources can cast visible offscreen shadows.
+        if (EnableCulling && !filtered && node.Children.Count == 0 && node.Kind != NodeKind.Text)
+        {
+            var bounds = Geometry(node).TightBounds;
+            var outset = 1d;
+            foreach (var stroke in node.Strokes)
+                if (stroke.Visible) outset = Math.Max(outset, stroke.Width * .5 * Math.Max(2, stroke.Join == StrokeJoin.Miter ? stroke.MiterLimit : 2));
+            var matrix = canvas.TotalMatrix;
+            var scale = Math.Max(.000001, Math.Min(Math.Sqrt(matrix.ScaleX * matrix.ScaleX + matrix.SkewY * matrix.SkewY), Math.Sqrt(matrix.ScaleY * matrix.ScaleY + matrix.SkewX * matrix.SkewX)));
+            outset += 2 / scale; bounds.Inflate((float)outset, (float)outset);
+            if (canvas.QuickReject(bounds)) { CulledNodes++; canvas.Restore(); return; }
+        }
+        RenderedNodes++;
         var layer = node.Opacity < .999 || node.Blend != BlendKind.Normal || node.Shadows.Any(s => s.Visible);
         if (layer)
         {
@@ -82,11 +112,17 @@ public sealed partial class SceneRenderer : IDisposable
                 if (node.Kind == NodeKind.Text) DrawText(canvas, node, paint); else canvas.DrawPath(Geometry(node), paint);
             }
         }
-        if (node.ClipContent)
+        if (node.ClipContent && !Outlines)
         {
             using var clip = new SKPath(); clip.AddRoundRect(new SKRect(0, 0, (float)node.Width, (float)node.Height), (float)node.CornerRadius, (float)node.CornerRadius); canvas.ClipPath(clip, SKClipOperation.Intersect, true);
         }
-        foreach (var child in node.Children) DrawNode(canvas, child);
+        if (node.ClippingPath is { } mask && !Outlines)
+        {
+            using var clip = new SKPath(Geometry(mask)); clip.Transform(Matrix(mask.LocalMatrix));
+            canvas.ClipPath(clip, SKClipOperation.Intersect, true);
+        }
+        foreach (var child in node.Children)
+            if (Outlines || child.Id != node.ClipPathId) DrawNode(canvas, child, filtered);
         if (layer) canvas.Restore(); canvas.Restore();
     }
     private static SKShader? Shader(FillStyle fill, double width, double height)
@@ -109,15 +145,25 @@ public sealed partial class SceneRenderer : IDisposable
         {
             if (!node.IsEffectivelyVisible || node.IsEffectivelyLocked || node.Kind == NodeKind.Slice) continue;
             var local = node.WorldMatrix.Inverse.Map(point); var inside = node.LocalBounds.Contains(local);
-            if (!node.ClipContent || inside)
+            if (node.ClippingPath is { } mask)
             {
-                var child = HitTest(node.Children, point, deep, tolerance);
+                var maskPoint = mask.LocalMatrix.Inverse.Map(local);
+                if (!Geometry(mask).Contains((float)maskPoint.X, (float)maskPoint.Y)) continue;
+            }
+            if (!node.ClipContent || Geometry(node).Contains((float)local.X, (float)local.Y))
+            {
+                var child = HitTest(node.Children.Where(c => c.Id != node.ClipPathId), point, deep, tolerance);
                 if (child is not null) return deep || node.Kind == NodeKind.Frame || node.Kind == NodeKind.Section ? child : node;
             }
             if (node.Kind == NodeKind.Text && inside) return node;
             if (node.Kind == NodeKind.Group && node.Children.Count > 0) continue;
             if (node.Kind == NodeKind.Frame && inside && node.Fills.Count > 0) return node;
             var path = Geometry(node);
+            var pickBounds = path.TightBounds;
+            // Include the miter reach of both the visible stroke and the tolerance-expanded picking stroke.
+            var pickOutset = Math.Max(tolerance * 4, node.Strokes.Count == 0 ? 0 : node.Strokes.Max(s => s.Width * .5 * Math.Max(4, s.MiterLimit)));
+            pickBounds.Inflate((float)pickOutset + 1, (float)pickOutset + 1);
+            if (!pickBounds.Contains((float)local.X, (float)local.Y)) continue;
             if (node.Fills.Any(f => f.Visible) && path.Contains((float)local.X, (float)local.Y)) return node;
             if (node.Strokes.Count > 0)
             {

@@ -82,7 +82,7 @@ jobs:
           jq -e --arg sha "$EXPECTED_SHA" '.commit == $sha' /tmp/live-build.json
           npm ci
           npx playwright install --with-deps chromium
-          npx playwright test tests/browser/illustration.spec.mjs
+          npx playwright test
       - uses: actions/upload-artifact@v7
         if: always()
         with:

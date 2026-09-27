@@ -1,54 +1,56 @@
-# Feature matrix — 0.2.0-alpha.1
+# Feature matrix — 0.3.0-alpha.1
 
-ArtSpace is an independent illustration editor. Similar tools and workspace conventions are not a claim of complete Adobe Illustrator behavior, file compatibility or pixel parity.
+ArtSpace is an independent illustration editor. Familiar workspace conventions do not imply complete Adobe Illustrator behavior, file compatibility or pixel parity.
 
 | Capability | Status | Boundary |
 | --- | --- | --- |
-| Shared Uno desktop/browser application | Implemented | Same C# engine/workbench; interactive native testing is separate from compilation |
-| Dark illustration workspace | Implemented | Menus, control bar, toolbox, artboards, panels and status; not pixel-identical Illustrator |
-| Reusable custom controls | Implemented | Build on Uno input/layout/text primitives, not replacements for every primitive |
-| GPU-integrated painting | Implemented | SKCanvasElement/Skia, host-dependent acceleration; geometry work remains CPU-side |
-| Vector primitives | Implemented | Rectangles, ellipses, polygons, stars, lines and arrows |
-| Pen and cubic paths | Implemented | Native anchors/tangents and SVG path geometry |
-| Imported/compound anchor editing | Implemented with limits | Multiple contours within one object, including primitives, imported SVG, expanded/Boolean paths and outlined glyphs; rational curves are approximated on editing |
-| Multi-anchor editing | Implemented with limits | Shift selection, rectangular marquee, drag, nudge and cancellation within the active object; no cross-object anchor editing or lasso |
-| Anchor insertion/removal | Implemented | Exact cubic split, explicit reconnecting removal, Delete/Backspace segment cutting, smooth/corner and reversal |
-| Compound paths | Implemented with limits | Make/release, topmost appearance, nonzero/even-odd rules; not live Boolean compound objects |
-| Pencil/paintbrush | Limited | Fixed-width sampled strokes, not pressure/art/pattern/scatter brush parity |
-| Expansion and offsets | Implemented | Shape expansion, stroke outlines and positive/negative offsets |
-| Pathfinder | Limited | Union, subtract, intersect, exclude; no complete divide/trim/merge/crop/live suite |
-| Shape Builder, scissors, eraser, knife | Not implemented | Anchor cutting is not a substitute for these interaction tools |
-| Transformation | Implemented | Move, resize, rotate, flips, constraints, nudging, grouping and stacking |
+| Shared Uno desktop/browser app | Implemented | One C# engine/workbench; native compilation is distinct from interactive testing |
+| Dark illustration workspace | Implemented | Custom menus, control bar, toolbox, artboards and panels; not pixel-identical Illustrator |
+| Reusable custom controls | Implemented | Built on Uno input/layout/text primitives |
+| GPU-integrated painting | Implemented | SKCanvasElement/Skia, host-dependent acceleration; geometry remains CPU-side |
+| Primitives and pen paths | Implemented | Rectangles, ellipses, polygons, stars, lines, arrows and cubic paths |
+| Imported/compound anchor editing | Implemented with limits | Multiple contours in one object, including primitives and glyph outlines; rational curves are approximated on editing |
+| Multi-anchor editing | Implemented with limits | Shift selection, marquee, dragging, nudging and cancellation; no cross-object anchor selection/lasso |
+| Anchor insertion/removal | Implemented | Exact cubic split, reconnecting removal, incident-segment cutting, smooth/corner and reversal |
+| Compound paths | Implemented with limits | Make/release, topmost appearance, nonzero/even-odd fills; not live Boolean objects |
+| Pencil/paintbrush | Limited | Fixed-width sampled strokes, not pressure/art/pattern/scatter parity |
+| Expansion and offsets | Implemented | Shape/stroke expansion and positive/negative offsets |
+| Pathfinder | Limited | Union/subtract/intersect/exclude, not a complete divide/trim/crop/live suite |
+| Shape Builder, scissors, eraser, knife | Not implemented | Anchor cutting is not a substitute for these tools |
+| Transformation | Implemented | Move/resize/rotate/flip, constraints, grouping, order, alignment and distribution |
 | Envelope/perspective/mesh distortion | Not implemented | No full distortion toolset |
-| Blend and repeat | Limited | Bounded ordinary-object copies and compatible geometry; not live non-destructive operators |
-| Appearance stack | Limited | Multiple fills/strokes, not all nested Illustrator Appearance semantics |
-| Gradients | Limited | Linear/radial and on-canvas direction; no freeform or gradient mesh |
+| Blend and repeat | Limited | Bounded ordinary-object copies and compatible geometry; not live operators |
+| Appearance stack | Limited | Multiple fills/strokes, basic gradients/blends/shadows; not all nested Appearance/live-effect semantics |
 | Stroke appearance | Implemented | Width, dashes, caps, joins and miter; no variable-width profiles |
-| Opacity/blend/shadows | Limited | Supported Skia blends and basic drop shadows, not full transparency/live-effect semantics |
-| Clipping | Limited | Frame/artboard clipping, not arbitrary opacity masks or clipping-path workflows |
-| Artboards | Implemented | Multiple frame-based artboards, editing, navigation and export |
-| Multiple documents | Not implemented | One active session; artboards are not document tabs |
-| Layers | Implemented | Hierarchy, search, visibility, locking, rename, selection and order |
-| Docking | Limited | Resizable right tab group; no arbitrary floating or cross-window layout |
-| Symbols | Limited | Local linked components/instances/overrides, not full dynamic symbol semantics |
-| Text | Limited | Basic text, size/weight, wrapping, tracking and alignment; not advanced shaping |
-| Create Outlines | Implemented with limits | Glyph paths from the same basic text runs as painting, preserved identity/appearance/transforms and undo; whitespace retained |
-| Advanced typography | Not implemented | No general bidi/complex-script shaping, font fallback, type-on-path, glyph panel or variable-font axes |
+| Vector clipping masks | Implemented with limits | Editable mask/content, nested sets, compound holes, picking, Make/Release and persistence; masks must be direct vector children |
+| Opacity/luminance masks | Not implemented | Vector clipping does not implement transparency-mask semantics |
+| SVG clipping | Limited | Single vector/compound-path `userSpaceOnUse` definitions; missing/external/recursive/unsupported definitions rejected; existing transform/paint-server limitations remain |
+| Artboards | Implemented | Multiple frame-based artboards, editing/navigation/export |
+| Multiple documents | Not implemented | One active session; artboards are not separate documents |
+| Layers | Implemented | Hierarchy, search, visibility/locking, selection, rename and order |
+| Docking | Limited | Resizable right tab group; no arbitrary floating/cross-window layout |
+| Symbols | Limited | Linked local components/instances with remapped clipping references; not full dynamic symbol semantics |
+| Basic text | Limited | Size/weight, wrapping, tracking/alignment; not advanced shaping |
+| Create Outlines | Implemented with limits | Same glyph runs as painting, retained identity/appearance/transforms and undo; whitespace preserved |
+| Advanced typography | Not implemented | No general complex-script/bidi/fallback, type-on-path, glyph panel or variable-font axes |
 | Image placement/tracing | Not implemented | No links manager, Image Trace or raster editor |
-| RGB and PNG | Implemented | Screen-oriented, not press-ready color-managed output |
-| CMYK/ICC/spot/overprint/separations | Not implemented | No print-production/proofing claims |
-| Native `.artspace` | Implemented | Validated JSON, including path fill rules |
-| SVG interchange | Limited | Editable subset with inherited fill rules and unsupported-element reporting; not lossless Illustrator roundtrip |
+| RGB and PNG | Implemented | Screen-oriented, not press-ready output |
+| CMYK/ICC/spot/overprint/separations | Not implemented | No color-proofing/print-production claims |
+| Native `.artspace` | Implemented | Read schemas 1/2; saves upgrade to schema 2, which older versions reject |
+| SVG interchange | Limited | Safe editable subset, not lossless Illustrator roundtrip |
 | AI/EPS/PDF interchange | Not implemented | Do not rename native files to these extensions |
-| Undo/redo | Implemented | Bounded snapshots, one transaction per completed gesture |
-| Local recovery | Implemented | IndexedDB/native storage, not cloud backup or synchronization |
-| Collaboration/Adobe plugins/cloud | Not implemented | No Adobe service or remote document integration |
-| Million-object GPU compute | Not implemented | No throughput claim or physical-GPU benchmark |
+| Undo/redo | Implemented | Bounded snapshots, one transaction per completed gesture, rollback retained until serialization succeeds |
+| Local recovery | Implemented | IndexedDB/native storage, not cloud backup |
+| Retained caches | Implemented | Exact geometry snapshots, cached text/fonts and selection arrays, deleted-resource pruning |
+| Indexed snapping | Implemented with limits | Reference-equivalent stationary-target queries; cold construction costs and conservative auto-layout rebuilds remain |
+| Offscreen culling | Implemented with limits | Conservative leaf rejection; groups/shadows/text handled conservatively; hierarchy traversal still occurs |
+| Million-object GPU compute | Not implemented | No large-document throughput guarantee or physical-GPU benchmark |
+| Collaboration/Adobe plugins/cloud | Not implemented | No Adobe service integration |
 
 ## Validation interpretation
 
-The engine suite has **107 cases**. Seven browser scenarios exercise real Uno rendering and input, including imported contours, text outlines, anchor marquee/nudge/cancellation, file download/recovery, ordinary editing and menu navigation. Workflow results and artifacts identify the tested commit.
+There are 141 registered engine cases, five untimed benchmark boundary checks and ten browser scenarios. Browser tests use real Uno pointer/keyboard/file-picker input for ordinary editing, imported contours, text outlines, clipping, recovery and warm-cache retention. Workflow results and retained reports identify the tested commit.
 
-A screenshot proves its captured frame, not every command. Native compilation does not certify every native interaction. Software graphics in CI does not certify GPU throughput or color accuracy. Report issues with a minimal `.artspace`/SVG reproduction and the deployed commit in `build-info.json`.
+The benchmark verifies reference snapping corrections/guide extents and culling pixel equality. Single-run software-Skia CPU timings and managed allocations do not certify whole-app speed, startup time, physical-GPU throughput or color accuracy. Native compilation is not interactive native certification.
 
-Detailed numerical, interaction and typography limits are documented in [Path editing and text outlines](path-editing.md). Significant remaining areas include arbitrary masks, richer typography, endpoint joining/simplification, complete live-shape/effect workflows, print interchange, multiple documents, configurable docking and pressure-sensitive brushes.
+See [path editing](path-editing.md) and [clipping/performance](clipping-and-performance.md). Significant remaining work includes opacity masks, richer typography, endpoint joining/simplification, complete live-shape/effect tools, print interchange, multiple documents, configurable docking and pressure-sensitive brushes.

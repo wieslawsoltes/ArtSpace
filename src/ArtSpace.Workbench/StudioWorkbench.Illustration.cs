@@ -195,6 +195,13 @@ public sealed partial class StudioWorkbench
 
     private void AddIllustrationSections()
     {
+        if (ClippingOperations.FindGroup(Session.Primary) is not null)
+        {
+            var clip = AddSection("Clipping Mask");
+            clip.Body.Children.Add(new StudioButton("Edit Clipping Path", () => Run(() => { ClippingOperations.EditMask(Session); Surface.EnterPathEditing(); })));
+            clip.Body.Children.Add(new StudioButton("Edit Contents", () => Run(() => ClippingOperations.EditContents(Session))));
+            clip.Body.Children.Add(new StudioButton("Release Mask", () => Run(() => ClippingOperations.Release(Session))));
+        }
         if (PathEditing.CanEdit(Session.Primary))
         {
             var pathSection = AddSection("Path");
@@ -274,6 +281,10 @@ public sealed partial class StudioWorkbench
                 yield return Item("Smooth Anchors", () => SmoothPathAnchors(true), enabled: selected);
                 yield return Item("Corner Anchors", () => SmoothPathAnchors(false), enabled: selected);
                 yield return Item("Reverse Path Direction", () => PathOperations.Reverse(Session, Surface.Renderer), enabled: selected);
+                yield return Item("Make Clipping Mask", () => ClippingOperations.Make(Session), "Ctrl 7", selected);
+                yield return Item("Release Clipping Mask", () => ClippingOperations.Release(Session), "Ctrl Alt 7", selected);
+                yield return Item("Edit Clipping Path", () => { ClippingOperations.EditMask(Session); Surface.EnterPathEditing(); }, enabled: selected);
+                yield return Item("Edit Clipped Contents", () => ClippingOperations.EditContents(Session), enabled: selected);
                 yield return Item("Close Path", () => PathOperations.Close(Session, Surface.Renderer), enabled: selected);
                 break;
             case "Type":

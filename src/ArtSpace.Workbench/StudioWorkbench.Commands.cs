@@ -90,6 +90,7 @@ public sealed partial class StudioWorkbench
             action = e.Key switch
             {
                 VirtualKey.Z => shift ? Session.Redo : Session.Undo,
+                VirtualKey.Number7 => () => { if (Keyboard.Alt) ArtSpace.Illustration.ClippingOperations.Release(Session); else ArtSpace.Illustration.ClippingOperations.Make(Session); },
                 VirtualKey.Y => () => { Session.OutlinesVisible = !Session.OutlinesVisible; Surface.Invalidate(); },
                 VirtualKey.R => () => { Session.RulersVisible = !Session.RulersVisible; Surface.Invalidate(); },
                 VirtualKey.N => () => RunAsync(NewDocumentAsync),

@@ -54,7 +54,18 @@ public static partial class SvgFormat
         {
             var id = "clip-" + node.Id; defs.Add(new XElement(Ns + "clipPath", new XAttribute("id", id), new XElement(Ns + "rect", new XAttribute("width", F(node.Width)), new XAttribute("height", F(node.Height)), new XAttribute("rx", F(node.CornerRadius))))); children.SetAttributeValue("clip-path", "url(#" + id + ")");
         }
-        foreach (var child in node.Children) children.Add(ExportNode(child, defs));
+        var contentTarget = children;
+        if (node.ClippingPath is { } mask)
+        {
+            var id = "vector-clip-" + node.Id;
+            var shape = Shape(mask);
+            var scale = mask.Kind == NodeKind.Path && mask.PathWidth > 0 && mask.PathHeight > 0 ? Matrix2D.Scale(mask.Width / mask.PathWidth, mask.Height / mask.PathHeight) : Matrix2D.Identity;
+            shape.SetAttributeValue("transform", Transform(scale * mask.LocalMatrix));
+            shape.SetAttributeValue("clip-rule", mask.FillRule == PathFillRule.EvenOdd ? "evenodd" : "nonzero");
+            defs.Add(new XElement(Ns + "clipPath", new XAttribute("id", id), new XAttribute("clipPathUnits", "userSpaceOnUse"), shape));
+            contentTarget = new XElement(Ns + "g", new XAttribute("clip-path", "url(#" + id + ")")); children.Add(contentTarget);
+        }
+        foreach (var child in node.Children) if (child.Id != node.ClipPathId) contentTarget.Add(ExportNode(child, defs));
         if (children.HasElements) group.Add(children); return group;
     }
     private static XElement Shape(DesignNode node)
@@ -82,6 +93,12 @@ public static partial class SvgFormat
         var warnings = new HashSet<string>(); var viewBox = Values(root.Attribute("viewBox")?.Value);
         var width = Number(root, "width", viewBox.Length == 4 ? viewBox[2] : 800); var height = Number(root, "height", viewBox.Length == 4 ? viewBox[3] : 600);
         var frame = new DesignNode { Kind = NodeKind.Frame, Name = name, Width = Math.Max(1, width), Height = Math.Max(1, height), Fills = [], ClipContent = true };
+        var clips = new Dictionary<string, XElement>(StringComparer.Ordinal);
+        foreach (var definition in root.Descendants().Where(e => e.Name.LocalName == "clipPath"))
+        {
+            var id = definition.Attribute("id")?.Value;
+            if (id is not null && !clips.TryAdd(id, definition)) throw new InvalidDataException("Duplicate SVG clipping identifier.");
+        }
         var count = 0;
         foreach (var child in root.Elements())
         {
@@ -122,8 +139,23 @@ public static partial class SvgFormat
             }
             var stroke = Attribute("stroke"); if (stroke is not null && stroke != "none") node.Strokes.Add(new() { Color = stroke, Width = Numbers.Parse(Attribute("stroke-width") ?? "1", 1), Opacity = Numbers.Parse(Attribute("stroke-opacity") ?? "1", 1), Cap = Enum.TryParse<StrokeCap>(Attribute("stroke-linecap"), true, out var cap) ? cap : StrokeCap.Butt, Join = Enum.TryParse<StrokeJoin>(Attribute("stroke-linejoin"), true, out var join) ? join : StrokeJoin.Miter, MiterLimit = Numbers.Parse(Attribute("stroke-miterlimit") ?? "4", 4), Dashes = (Attribute("stroke-dasharray") ?? "").Split(new[] { ' ', ',' }, StringSplitOptions.RemoveEmptyEntries).Where(x => x != "none").Select(x => Numbers.Parse(x, 0)).Where(x => x > 0).ToList() });
             node.Opacity = Number(element, "opacity", 1); node.Visible = Attribute("display") != "none" && Attribute("visibility") != "hidden";
-            if (element.Attribute("transform") is { } attribute) NodeGeometry.SetLocalMatrix(node, node.LocalMatrix * ParseTransform(attribute.Value));
             if (kind is "g" or "svg") foreach (var child in element.Elements()) { var c = Read(child, depth + 1); if (c is not null) node.Add(c); }
+            var clipReference = element.Attribute("clip-path")?.Value ?? Style(element, "clip-path");
+            if (!string.IsNullOrWhiteSpace(clipReference) && clipReference != "none")
+            {
+                var reference = Regex.Match(clipReference, "^url\\(\\s*['\"]?#([^'\"\\s)]+)['\"]?\\s*\\)$", RegexOptions.CultureInvariant);
+                if (!reference.Success || !clips.TryGetValue(reference.Groups[1].Value, out var definition)) throw new InvalidDataException("Missing or external SVG clipping paths are not supported.");
+                if ((definition.Attribute("clipPathUnits")?.Value ?? "userSpaceOnUse") != "userSpaceOnUse") throw new InvalidDataException("Only userSpaceOnUse SVG clipping paths are supported.");
+                var shapes = definition.Elements().Where(e => e.Name.LocalName is not "title" and not "desc").ToArray();
+                if (shapes.Length != 1 || shapes[0].Name.LocalName is not ("path" or "rect" or "circle" or "ellipse" or "polygon" or "polyline" or "line") || shapes[0].Attribute("clip-path") is not null || Style(shapes[0], "clip-path") is not null) throw new InvalidDataException("An SVG clipping definition must contain one vector shape or compound path.");
+                var mask = Read(shapes[0], depth + 1) ?? throw new InvalidDataException("Invalid SVG clipping shape.");
+                mask.FillRule = (shapes[0].Attribute("clip-rule")?.Value ?? Style(shapes[0], "clip-rule") ?? definition.Attribute("clip-rule")?.Value ?? "nonzero") == "evenodd" ? PathFillRule.EvenOdd : PathFillRule.NonZero;
+                mask.Fills.Clear(); mask.Strokes.Clear(); mask.Shadows.Clear();
+                if (definition.Attribute("transform") is { } clipTransform) NodeGeometry.SetLocalMatrix(mask, mask.LocalMatrix * ParseTransform(clipTransform.Value));
+                var wrapper = new DesignNode { Kind = NodeKind.Group, Name = node.Name + " / Clip Group", Width = node.Width, Height = node.Height, Fills = [], ClipPathId = mask.Id };
+                wrapper.Opacity = node.Opacity; node.Opacity = 1; wrapper.Add(node); wrapper.Add(mask); node = wrapper;
+            }
+            if (element.Attribute("transform") is { } attribute) NodeGeometry.SetLocalMatrix(node, node.LocalMatrix * ParseTransform(attribute.Value));
             return node;
         }
     }
