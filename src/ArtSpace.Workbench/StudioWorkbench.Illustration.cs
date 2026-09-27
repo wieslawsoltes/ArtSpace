@@ -232,8 +232,8 @@ public sealed partial class StudioWorkbench
                 yield return Item("Type Tool", () => Session.Tool = EditorTool.Text, "T");
                 yield return Item("Edit Text", () => { if (Session.Primary?.Kind == NodeKind.Text) Surface.BeginTextEdit(Session.Primary); }, "Enter", Session.Primary?.Kind == NodeKind.Text);
                 foreach (var weight in new[] { 400, 500, 600, 700, 900 }) yield return Item("Weight " + weight, () => Session.UpdateSelection("Font weight", n => n.FontWeight = weight), enabled: selected);
-                yield return Item("Align Left", () => Session.UpdateSelection("Text alignment", n => n.TextAlign = TextAlignment.Left), enabled: selected);
-                yield return Item("Align Center", () => Session.UpdateSelection("Text alignment", n => n.TextAlign = TextAlignment.Center), enabled: selected);
+                yield return Item("Align Left", () => Session.UpdateSelection("Text alignment", n => n.TextAlign = ArtSpace.Core.TextAlignment.Left), enabled: selected);
+                yield return Item("Align Center", () => Session.UpdateSelection("Text alignment", n => n.TextAlign = ArtSpace.Core.TextAlignment.Center), enabled: selected);
                 break;
             case "Select":
                 yield return Item("All", Session.SelectAll, "Ctrl A"); yield return Item("Deselect", () => Session.Select((DesignNode?)null), "Escape");
