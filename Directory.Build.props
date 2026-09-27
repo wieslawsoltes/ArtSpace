@@ -5,7 +5,7 @@
     <LangVersion>14</LangVersion>
     <Version>0.1.0-alpha.1</Version>
     <!-- Uno 6.7's managed and native Skia dependencies must share one ABI version. -->
-    <ArtSpaceSkiaVersion>3.119.2</ArtSpaceSkiaVersion>
+    <ArtSpaceSkiaVersion>4.152.1</ArtSpaceSkiaVersion>
     <SkiaSharpVersion>$(ArtSpaceSkiaVersion)</SkiaSharpVersion>
     <Authors>Wiesław Šoltés; ArtSpace contributors</Authors>
     <Company>ArtSpace</Company>
