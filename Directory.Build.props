@@ -1,0 +1,29 @@
+<Project>
+  <PropertyGroup>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>14</LangVersion>
+    <Version>0.1.0-alpha.1</Version>
+    <!-- Uno 6.7's managed and native Skia dependencies must share one ABI version. -->
+    <ArtSpaceSkiaVersion>3.119.2</ArtSpaceSkiaVersion>
+    <SkiaSharpVersion>$(ArtSpaceSkiaVersion)</SkiaSharpVersion>
+    <Authors>Wiesław Šoltés; ArtSpace contributors</Authors>
+    <Company>ArtSpace</Company>
+    <Copyright>Copyright © 2026 ArtSpace contributors</Copyright>
+    <RepositoryUrl>https://github.com/wieslawsoltes/ArtSpace</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageProjectUrl>https://github.com/wieslawsoltes/ArtSpace</PackageProjectUrl>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <Deterministic>true</Deterministic>
+    <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
+    <NuGetAudit>false</NuGetAudit>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Include="$(MSBuildThisFileDirectory)README.md" Pack="true" PackagePath="/" Visible="false" />
+  </ItemGroup>
+</Project>

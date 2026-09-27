@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>true</IsPackable>
+    <Description>SkiaSharp rendering, hit testing, vector Boolean operations and raster export for ArtSpace.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../ArtSpace.Core/ArtSpace.Core.csproj" />
+    <ProjectReference Include="../ArtSpace.Editing/ArtSpace.Editing.csproj" />
+    <PackageReference Include="SkiaSharp" Version="$(ArtSpaceSkiaVersion)" />
+  </ItemGroup>
+</Project>

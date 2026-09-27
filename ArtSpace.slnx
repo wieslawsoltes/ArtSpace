@@ -1,0 +1,14 @@
+<Solution>
+ <Folder Name="/Libraries/">
+  <Project Path="src/ArtSpace.Core/ArtSpace.Core.csproj" />
+  <Project Path="src/ArtSpace.Layout/ArtSpace.Layout.csproj" />
+  <Project Path="src/ArtSpace.Documents/ArtSpace.Documents.csproj" />
+  <Project Path="src/ArtSpace.Editing/ArtSpace.Editing.csproj" />
+  <Project Path="src/ArtSpace.Skia/ArtSpace.Skia.csproj" />
+  <Project Path="src/ArtSpace.Controls/ArtSpace.Controls.csproj" />
+  <Project Path="src/ArtSpace.Editor/ArtSpace.Editor.csproj" />
+  <Project Path="src/ArtSpace.Workbench/ArtSpace.Workbench.csproj" />
+ </Folder>
+ <Project Path="src/ArtSpace.App/ArtSpace.App.csproj" />
+ <Folder Name="/Tests/"><Project Path="tests/ArtSpace.Tests/ArtSpace.Tests.csproj" /></Folder>
+</Solution>

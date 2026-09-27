@@ -1,0 +1,10 @@
+<Project Sdk="Uno.Sdk">
+ <PropertyGroup>
+  <TargetFrameworks>net10.0-browserwasm;net10.0-desktop</TargetFrameworks>
+  <TargetFrameworks Condition="'$(ArtSpaceDesktopOnly)' == 'true'">net10.0-desktop</TargetFrameworks>
+  <UnoSingleProject>true</UnoSingleProject><OutputType>Library</OutputType><GenerateLibraryLayout>true</GenerateLibraryLayout>
+  <UnoFeatures>SkiaRenderer;</UnoFeatures><IsPackable>true</IsPackable>
+  <Description>Reusable ArtSpace workbench, layers, inspector, tool palette, prototype and document workflows.</Description>
+ </PropertyGroup>
+ <ItemGroup><ProjectReference Include="../ArtSpace.Editor/ArtSpace.Editor.csproj" /></ItemGroup>
+</Project>
