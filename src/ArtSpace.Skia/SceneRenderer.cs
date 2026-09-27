@@ -26,7 +26,12 @@ public sealed partial class SceneRenderer : IDisposable
         foreach (var id in _textLayouts.Keys.Where(id => !retained.Contains(id)).ToArray())
         { _textLayouts[id].Font.Dispose(); _textLayouts.Remove(id); }
     }
-    public void SetTypeface(SKTypeface typeface) { ClearTextLayouts(); _customTypeface?.Dispose(); _customTypeface = typeface; }
+    public void SetTypeface(SKTypeface typeface)
+    {
+        ArgumentNullException.ThrowIfNull(typeface);
+        if (ReferenceEquals(typeface, _customTypeface)) return;
+        ClearTextLayouts(); _customTypeface?.Dispose(); _customTypeface = typeface;
+    }
     public void ClearCache()
     {
         foreach (var p in _paths.Values) p.Path.Dispose(); _paths.Clear(); ClearTextLayouts();
@@ -155,7 +160,8 @@ public sealed partial class SceneRenderer : IDisposable
             if (node.Kind == NodeKind.Frame && inside && node.Fills.Count > 0) return node;
             var path = Geometry(node);
             var pickBounds = path.TightBounds;
-            var pickOutset = Math.Max(tolerance, node.Strokes.Count == 0 ? 0 : node.Strokes.Max(s => s.Width) * .5);
+            // Include the miter reach of both the visible stroke and the tolerance-expanded picking stroke.
+            var pickOutset = Math.Max(tolerance * 4, node.Strokes.Count == 0 ? 0 : node.Strokes.Max(s => s.Width * .5 * Math.Max(4, s.MiterLimit)));
             pickBounds.Inflate((float)pickOutset + 1, (float)pickOutset + 1);
             if (!pickBounds.Contains((float)local.X, (float)local.Y)) continue;
             if (node.Fills.Any(f => f.Visible) && path.Contains((float)local.X, (float)local.Y)) return node;

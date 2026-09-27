@@ -12,13 +12,21 @@ public partial class ArtSpaceJsonContext : JsonSerializerContext;
 
 public static class DocumentJson
 {
+    public const int CurrentFormatVersion = 2;
     public const int MaxDocumentCharacters = 32 * 1024 * 1024;
     public const int MaxNodes = 100_000;
-    public static string Save(DesignDocument document) => JsonSerializer.Serialize(document, ArtSpaceJsonContext.Default.DesignDocument);
+    /// <summary>Save using schema 2. Legacy schema 1 is upgraded so older readers cannot silently discard clipping semantics.</summary>
+    public static string Save(DesignDocument document)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+        if (document.FormatVersion is < 1 or > CurrentFormatVersion) throw new InvalidDataException($"Unsupported ArtSpace format version {document.FormatVersion}.");
+        document.FormatVersion = CurrentFormatVersion;
+        return JsonSerializer.Serialize(document, ArtSpaceJsonContext.Default.DesignDocument);
+    }
     public static DesignDocument Load(string json)
     {
         if (json.Length > MaxDocumentCharacters) throw new InvalidDataException("The document exceeds the 32 MiB text limit.");
-        var document = JsonSerializer.Deserialize(json, ArtSpaceJsonContext.Default.DesignDocument) ?? throw new InvalidDataException("The file does not contain a ArtSpace document.");
+        var document = JsonSerializer.Deserialize(json, ArtSpaceJsonContext.Default.DesignDocument) ?? throw new InvalidDataException("The file does not contain an ArtSpace document.");
         Validate(document); document.RebuildParents(); return document;
     }
     public static DesignNode CloneNode(DesignNode node, bool newIds = false)
@@ -50,7 +58,7 @@ public static class DocumentJson
     }
     public static void Validate(DesignDocument document)
     {
-        if (document.FormatVersion != 1) throw new InvalidDataException($"Unsupported ArtSpace format version {document.FormatVersion}.");
+        if (document.FormatVersion is < 1 or > CurrentFormatVersion) throw new InvalidDataException($"Unsupported ArtSpace format version {document.FormatVersion}.");
         if (document.Pages is null || document.Pages.Count is < 1 or > 1000) throw new InvalidDataException("A document must have between 1 and 1000 pages.");
         var ids = new HashSet<string>(StringComparer.Ordinal); var count = 0;
         foreach (var page in document.Pages)

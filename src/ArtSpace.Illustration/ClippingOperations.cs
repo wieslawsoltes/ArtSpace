@@ -16,6 +16,8 @@ public static class ClippingOperations
         var parent = nodes[0].Parent;
         if (nodes.Any(n => n.Parent != parent || n.IsEffectivelyLocked) || existingGroup?.IsEffectivelyLocked == true)
             throw new InvalidOperationException("Clipping requires unlocked objects in the same parent.");
+        if (parent?.ClipPathId is { } activeMask && nodes.Any(n => n.Id == activeMask))
+            throw new InvalidOperationException("Release the existing clipping mask before regrouping its clipping path.");
         var siblings = parent?.Children ?? editor.Page.Nodes;
         nodes = nodes.OrderBy(siblings.IndexOf).ToArray(); var mask = nodes[^1];
         if (!IsVectorMask(mask)) throw new InvalidOperationException("The topmost object must be a vector shape or compound path. Outline text first.");
@@ -42,7 +44,7 @@ public static class ClippingOperations
         var groups = editor.SelectionRoots.Select(FindGroup).Where(n => n is not null).Distinct().Cast<DesignNode>().ToArray();
         if (groups.Length == 0) throw new InvalidOperationException("Select a clipping set or an object inside one.");
         if (groups.Any(g => g.IsEffectivelyLocked)) throw new InvalidOperationException("Unlock the clipping set first.");
-        // Keep the grouping and its appearance/transform intact. Only remove the clipping relation.
+        // Preserve grouping and appearance. Only remove the clipping relation.
         editor.Edit("Release clipping mask", () => { foreach (var group in groups) group.ClipPathId = null; editor.Select(groups.Select(g => g.Id)); });
     }
     public static void EditMask(EditorSession editor)

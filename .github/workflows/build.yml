@@ -2,7 +2,7 @@ name: Build
 on:
   push:
     branches: [main]
-    paths-ignore: ['docs/**', '**.md', 'eng/**', '.github/workflows/initialize.yml', '.github/workflows/integrate.yml', '.github/workflows/pages.yml', '.github/workflows/release.yml']
+    paths-ignore: ['docs/**', '**.md', '.github/workflows/pages.yml', '.github/workflows/release.yml']
   pull_request:
     paths-ignore: ['docs/**', '**.md']
   workflow_dispatch:
@@ -25,6 +25,15 @@ jobs:
           global-json-file: global.json
       - name: Geometry, document and transaction regressions
         run: dotnet run --project tests/ArtSpace.Tests -c Release
+      - name: CPU benchmarks with reference equivalence
+        run: |
+          mkdir -p artifacts/benchmarks
+          dotnet run --project tests/ArtSpace.Tests -c Release --no-build -- --benchmark > artifacts/benchmarks/cpu.json
+          cat artifacts/benchmarks/cpu.json
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ArtSpace-performance
+          path: artifacts/benchmarks
   desktop:
     strategy:
       fail-fast: false
@@ -73,7 +82,7 @@ jobs:
           npm ci
           npx playwright install --with-deps chromium
           python3 scripts/serve-site.py --directory artifacts/site --port 4173 > artifacts/server.log 2>&1 &
-          npx playwright test tests/browser/illustration.spec.mjs
+          npx playwright test
       - uses: actions/upload-artifact@v7
         if: always()
         with:

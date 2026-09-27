@@ -81,7 +81,7 @@ jobs:
           npm ci
           npx playwright install --with-deps chromium
           python3 scripts/serve-site.py --directory artifacts/site --port 4173 > artifacts/server.log 2>&1 &
-          npx playwright test tests/browser/illustration.spec.mjs
+          npx playwright test
       - name: Archive browser, packages and committed source
         run: |
           mkdir -p artifacts/release

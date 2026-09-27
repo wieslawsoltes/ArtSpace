@@ -121,7 +121,8 @@ public sealed class EditorSession
         if (_before is null) return;
         ComponentService.Synchronize(Document);
         foreach (var page in Document.Pages) LayoutEngine.Arrange(page.Nodes);
-        var before = _before; _before = null; var after = Capture();
+        // Retain the rollback snapshot until serialization has succeeded.
+        var before = _before; var after = Capture(); _before = null;
         if (before.Json != after.Json)
         {
             _undo.Add(new(_interactionLabel, before, after)); _redo.Clear();
@@ -216,6 +217,8 @@ public sealed class EditorSession
     {
         var nodes = SelectionRoots.Where(n => !n.IsEffectivelyLocked).ToArray(); if (nodes.Length == 0) return;
         var parent = nodes[0].Parent; if (nodes.Any(n => n.Parent != parent)) return;
+        if (nodes.Any(n => n.Parent?.ClipPathId == n.Id))
+            throw new InvalidOperationException("Release the clipping mask before grouping its clipping path.");
         Edit(asFrame ? "Frame selection" : "Group selection", () =>
         {
             var bounds = nodes.Select(n => n.LocalMatrix.Map(n.LocalBounds)).Aggregate(RectD.Union);
