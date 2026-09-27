@@ -43,7 +43,7 @@ jobs:
         with:
           name: ArtSpace-source
           path: /tmp/ArtSpace-source.zip
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
       - name: Verify current stable Uno SDK
