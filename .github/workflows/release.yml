@@ -1,0 +1,148 @@
+name: Release
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  desktop:
+    if: startsWith(github.ref, 'refs/tags/v')
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            rid: linux-x64
+          - os: windows-latest
+            rid: win-x64
+          - os: macos-latest
+            rid: osx-arm64
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+      - name: Publish self-contained native host
+        shell: bash
+        env:
+          RUNTIME: ${{ matrix.rid }}
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          python3 scripts/fetch-assets.py
+          dotnet publish src/ArtSpace.App -c Release -f net10.0-desktop -r "$RUNTIME" --self-contained true -p:ArtSpaceDesktopOnly=true -p:Version="$VERSION" -o artifacts/native
+          python3 - <<'PY'
+          import os,shutil
+          from pathlib import Path
+          version=os.environ['GITHUB_REF_NAME'][1:]
+          runtime=os.environ['RUNTIME']
+          Path('artifacts/release').mkdir(parents=True,exist_ok=True)
+          shutil.make_archive(f'artifacts/release/ArtSpace-{runtime}-{version}','zip','artifacts/native')
+          PY
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ArtSpace-release-${{ matrix.rid }}
+          path: artifacts/release/*.zip
+  browser:
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+      - name: Verify version and toolchain
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then exit 1; fi
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          dotnet workload install wasm-tools --skip-manifest-update
+          python3 scripts/fetch-assets.py
+      - run: dotnet run --project tests/ArtSpace.Tests -c Release
+      - name: Publish browser and package reusable libraries
+        run: |
+          dotnet publish src/ArtSpace.App -f net10.0-browserwasm -c Release -o artifacts/publish -p:Version="$VERSION" -p:WasmShellWebAppBasePath=/ArtSpace/
+          python3 scripts/collect-site.py artifacts/publish artifacts/site
+          for project in src/*/*.csproj; do
+            case "$project" in */ArtSpace.App/*) continue;; esac
+            dotnet pack "$project" -c Release -o artifacts/packages -p:Version="$VERSION"
+          done
+      - name: Browser acceptance
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+          python3 scripts/serve-site.py --directory artifacts/site --port 4173 > artifacts/server.log 2>&1 &
+          npx playwright test tests/browser/illustration.spec.mjs
+      - name: Archive browser, packages and committed source
+        run: |
+          mkdir -p artifacts/release
+          (cd artifacts/site && zip -qr ../release/ArtSpace-browser-$VERSION.zip .)
+          (cd artifacts/packages && zip -qr ../release/ArtSpace-packages-$VERSION.zip .)
+          git archive --format=zip --output=artifacts/release/ArtSpace-source-$VERSION.zip HEAD
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ArtSpace-release-browser
+          path: artifacts/release/*.zip
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ArtSpace-release-nuget
+          path: artifacts/packages/*
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: ArtSpace-release-validation
+          path: |
+            artifacts/screenshots
+            artifacts/test-results
+            artifacts/browser-results.xml
+          if-no-files-found: ignore
+  publish:
+    needs: [desktop, browser]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: ArtSpace-release-*
+          path: artifacts
+      - name: Collect release archives and checksums
+        run: |
+          mkdir release
+          find artifacts -name '*.zip' -type f -exec cp {} release/ \;
+          (cd release && sha256sum *.zip > SHA256SUMS.txt)
+      - name: Publish versioned GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          EXTRA=()
+          case "$GITHUB_REF_NAME" in *-*) EXTRA+=(--prerelease);; esac
+          gh release create "$GITHUB_REF_NAME" release/* --verify-tag --generate-notes --title "ArtSpace ${GITHUB_REF_NAME#v}" "${EXTRA[@]}"
+  nuget:
+    needs: [publish]
+    runs-on: ubuntu-latest
+    environment: nuget
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: ArtSpace-release-nuget
+          path: packages
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+      - name: Publish only when explicitly configured
+        env:
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+        run: |
+          if [ -z "$NUGET_API_KEY" ]; then echo 'NuGet publication skipped: NUGET_API_KEY is not configured.'; exit 0; fi
+          dotnet nuget push 'packages/*.nupkg' --api-key "$NUGET_API_KEY" --source https://api.nuget.org/v3/index.json --skip-duplicate
