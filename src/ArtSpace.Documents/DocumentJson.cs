@@ -67,6 +67,12 @@ public static class DocumentJson
             n.CornerRadius = Numbers.Clamp(n.CornerRadius, 0, 1e6); n.Sides = Math.Clamp(n.Sides, 3, 128);
             n.StarRatio = Numbers.Clamp(n.StarRatio, .01, 1); n.LineHeight = Numbers.Clamp(n.LineHeight, .2, 10);
             if (n.Points.Any(p => !p.Position.IsFinite || (p.ControlIn.HasValue && !p.ControlIn.Value.IsFinite) || (p.ControlOut.HasValue && !p.ControlOut.Value.IsFinite))) throw new InvalidDataException("A path contains invalid points.");
+            foreach (var stroke in n.Strokes)
+            {
+                if (stroke is null || !double.IsFinite(stroke.Width) || stroke.Width < 0 || stroke.Width > 1e6 || !double.IsFinite(stroke.MiterLimit) || stroke.MiterLimit < 1 || stroke.MiterLimit > 1e6 || !Enum.IsDefined(stroke.Cap) || !Enum.IsDefined(stroke.Join) || stroke.Dashes is null || stroke.Dashes.Count > 4096 || stroke.Dashes.Any(d => !double.IsFinite(d) || d <= 0))
+                    throw new InvalidDataException("Invalid stroke appearance.");
+            }
+            if (!double.IsFinite(n.PathWidth) || !double.IsFinite(n.PathHeight) || n.PathWidth < 0 || n.PathHeight < 0) throw new InvalidDataException("Invalid path dimensions.");
             foreach (var child in n.Children) Check(child, depth + 1);
         }
     }

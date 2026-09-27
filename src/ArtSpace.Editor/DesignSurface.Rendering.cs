@@ -25,7 +25,7 @@ public sealed partial class DesignSurface
                 if (guide.Horizontal) canvas.DrawLine((float)worldRect.X, (float)guide.Position, (float)worldRect.Right, (float)guide.Position, guidePaint);
                 else canvas.DrawLine((float)guide.Position, (float)worldRect.Y, (float)guide.Position, (float)worldRect.Bottom, guidePaint);
             }
-            using var selectionPaint = new SKPaint { Color = new(13, 153, 255), StrokeWidth = 1 / zoom, Style = SKPaintStyle.Stroke, IsAntialias = true };
+            using var selectionPaint = new SKPaint { Color = new(68, 124, 238), StrokeWidth = 1 / zoom, Style = SKPaintStyle.Stroke, IsAntialias = true };
             if (_hover is not null && !editor.SelectedIds.Contains(_hover.Id) && _gesture == Gesture.None)
             {
                 canvas.Save(); canvas.Concat(SceneRenderer.Matrix(_hover.WorldMatrix));
@@ -39,23 +39,24 @@ public sealed partial class DesignSurface
             }
             if (_marquee is { } box)
             {
-                using var fill = new SKPaint { Color = new(13, 153, 255, 22) }; canvas.DrawRect(SceneRenderer.Rect(box), fill); canvas.DrawRect(SceneRenderer.Rect(box), selectionPaint);
+                using var fill = new SKPaint { Color = new(68, 124, 238, 22) }; canvas.DrawRect(SceneRenderer.Rect(box), fill); canvas.DrawRect(SceneRenderer.Rect(box), selectionPaint);
             }
         }
         canvas.Restore();
         if (!IsPresenting)
         {
-            using var labelPaint = new SKPaint { IsAntialias = true, Color = new(110, 110, 110) }; using var font = new SKFont(SKTypeface.Default, 11);
+            using var labelPaint = new SKPaint { IsAntialias = true, Color = new(205, 205, 205) }; using var font = new SKFont(SKTypeface.Default, 11);
             foreach (var node in editor.Page.Nodes.Where(n => n.Visible && n.IsContainer))
             {
                 var p = viewport.WorldToScreen(new(node.WorldBounds.X, node.WorldBounds.Y)); canvas.DrawText(node.Name, (float)p.X, (float)p.Y - 9, font, labelPaint);
             }
             DrawSelection(canvas);
+            DrawGradientHandles(canvas);
             if (_vectorNode is not null) DrawVertices(canvas, _vectorNode);
             var comments = editor.Document.Comments.Where(c => c.PageId == editor.Page.Id && !c.Resolved).ToArray();
             for (var i = 0; i < comments.Length; i++)
             {
-                var p = viewport.WorldToScreen(comments[i].Anchor); using var pin = new SKPaint { Color = new(13, 153, 255), IsAntialias = true }; canvas.DrawCircle((float)p.X, (float)p.Y, 13, pin); pin.Color = SKColors.White; canvas.DrawText((i + 1).ToString(), (float)p.X - 3, (float)p.Y + 4, font, pin);
+                var p = viewport.WorldToScreen(comments[i].Anchor); using var pin = new SKPaint { Color = new(68, 124, 238), IsAntialias = true }; canvas.DrawCircle((float)p.X, (float)p.Y, 13, pin); pin.Color = SKColors.White; canvas.DrawText((i + 1).ToString(), (float)p.X - 3, (float)p.Y + 4, font, pin);
             }
             if (editor.RulersVisible) DrawRulers(canvas, size);
         }
@@ -83,7 +84,7 @@ public sealed partial class DesignSurface
     {
         if (Session is not { } editor || editor.SelectionRoots.Count == 0 || _textEditor is not null) return;
         var points = GetHandles(); if (points.Length < 8) return;
-        using var blue = new SKPaint { IsAntialias = true, Color = new(13, 153, 255), Style = SKPaintStyle.Stroke, StrokeWidth = 1 };
+        using var blue = new SKPaint { IsAntialias = true, Color = new(68, 124, 238), Style = SKPaintStyle.Stroke, StrokeWidth = 1 };
         using var fill = new SKPaint { IsAntialias = true, Color = SKColors.White };
         for (var i = 0; i < 8; i += 2) canvas.DrawLine(P(points[i]), P(points[(i + 2) % 8]), blue);
         if (editor.SelectionRoots.Any(n => n.IsEffectivelyLocked)) return;
@@ -98,7 +99,7 @@ public sealed partial class DesignSurface
     private void DrawVertices(SKCanvas canvas, DesignNode node)
     {
         if (Session is null) return;
-        using var stroke = new SKPaint { IsAntialias = true, Color = new(13, 153, 255), Style = SKPaintStyle.Stroke, StrokeWidth = 1 };
+        using var stroke = new SKPaint { IsAntialias = true, Color = new(68, 124, 238), Style = SKPaintStyle.Stroke, StrokeWidth = 1 };
         using var fill = new SKPaint { Color = SKColors.White, IsAntialias = true };
         Vec2 Screen(Vec2 p)
         {
@@ -115,7 +116,7 @@ public sealed partial class DesignSurface
     private void DrawRulers(SKCanvas canvas, Size size)
     {
         if (Session is null) return;
-        using var fill = new SKPaint { Color = new(250, 250, 250) }; canvas.DrawRect(new SKRect(0, 0, (float)size.Width, 20), fill); canvas.DrawRect(new SKRect(0, 0, 20, (float)size.Height), fill);
+        using var fill = new SKPaint { Color = new(53, 53, 53) }; canvas.DrawRect(new SKRect(0, 0, (float)size.Width, 20), fill); canvas.DrawRect(new SKRect(0, 0, 20, (float)size.Height), fill);
         using var paint = new SKPaint { Color = new(130, 130, 130), IsAntialias = true, StrokeWidth = 1 }; using var font = new SKFont(SKTypeface.Default, 8);
         var v = Session.Viewport; var step = Math.Pow(10, Math.Ceiling(Math.Log10(70 / v.Zoom))); if (step * v.Zoom > 180) step /= 2;
         for (var x = Math.Floor(-v.Pan.X / v.Zoom / step) * step; v.WorldToScreen(new(x, 0)).X < size.Width; x += step)

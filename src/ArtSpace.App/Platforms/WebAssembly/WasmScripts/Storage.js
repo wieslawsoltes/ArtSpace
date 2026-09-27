@@ -18,7 +18,7 @@
       tx.onerror = tx.onabort = () => reject(tx.error ?? new Error("Storage transaction failed."));
     });
   };
-  globalThis.vectorSpaceStorage = Object.freeze({
+  globalThis.artSpaceStorage = Object.freeze({
     load: () => transaction("readonly", store => store.get("autosave")),
     save: document => transaction("readwrite", store => store.put(document, "autosave")),
     open: () => new Promise((resolve, reject) => {
@@ -45,7 +45,7 @@
       return "";
     },
     isTestMode: () => new URLSearchParams(location.search).get("test") === "1",
-    publishDiagnostics: json => { if (new URLSearchParams(location.search).get("test") === "1") globalThis.__vectorSpaceState = Object.freeze(JSON.parse(json)); }
+    publishDiagnostics: json => { if (new URLSearchParams(location.search).get("test") === "1") globalThis.__artSpaceState = Object.freeze(JSON.parse(json)); }
   });
   document.addEventListener("contextmenu", e => { if (e.target instanceof HTMLCanvasElement) e.preventDefault(); });
   document.addEventListener("wheel", e => { if (e.ctrlKey && e.target instanceof HTMLCanvasElement) e.preventDefault(); }, { passive: false });

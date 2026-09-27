@@ -3,5 +3,5 @@
   <ItemGroup>
     <ProjectReference Include="../../src/ArtSpace.Skia/ArtSpace.Skia.csproj" />
     <PackageReference Include="SkiaSharp.NativeAssets.Linux" Version="$(ArtSpaceSkiaVersion)" Condition="$([MSBuild]::IsOSPlatform('Linux'))" />
-  </ItemGroup>
+  <ProjectReference Include="../../src/ArtSpace.Illustration/ArtSpace.Illustration.csproj" /></ItemGroup>
 </Project>

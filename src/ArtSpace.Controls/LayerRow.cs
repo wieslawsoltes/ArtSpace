@@ -29,7 +29,7 @@ public sealed class LayerRow : UserControl
     {
         if (DataContext is not LayerEntry entry) return;
         var expander = new IconButton(entry.Expanded ? "chevron-down" : "chevron-right", "Expand " + entry.Name, () => entry.ToggleExpanded?.Invoke()) { Width = 20, Height = 28, Padding = new(3), Opacity = entry.HasChildren ? 1 : 0, IsHitTestVisible = entry.HasChildren, IsTabStop = false };
-        var icon = new IconView { Glyph = entry.Glyph, Width = 14, Height = 14, Color = entry.IsComponent ? "#9747FF" : "#777777", VerticalAlignment = VerticalAlignment.Center };
+        var icon = new IconView { Glyph = entry.Glyph, Width = 14, Height = 14, Color = entry.IsComponent ? "#9747FF" : "#A7A7A7", VerticalAlignment = VerticalAlignment.Center };
         var title = Studio.Text(entry.Name, 11, entry.IsComponent ? "#9747FF" : Studio.Ink);
         title.Opacity = entry.Visible ? 1 : .4;
         var visibility = new IconButton(entry.Visible ? "eye" : "eye-off", entry.Visible ? "Hide " + entry.Name : "Show " + entry.Name, () => entry.ToggleVisibility?.Invoke()) { Width = 22, Height = 28, Padding = new(4), Opacity = entry.Visible ? 0 : .7, IsTabStop = false };

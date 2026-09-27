@@ -44,7 +44,7 @@ public sealed partial class StudioWorkbench
         AddMenu(menu, "New document", () => RunAsync(NewDocumentAsync));
         AddMenu(menu, "Open…                         Ctrl O", () => RunAsync(OpenAsync));
         AddMenu(menu, "Save a local copy…        Ctrl S", () => RunAsync(SaveAsync));
-        AddMenu(menu, "Reset to sample", () => RunAsync(async () => { if (await ConfirmAsync("Replace document?", "This restores the editable Aether sample. Download a copy first to keep your current document.")) { Session.Load(SampleDocument.Create()); Surface.Fit(firstFrame: true); } }));
+        AddMenu(menu, "Reset to sample", () => RunAsync(async () => { if (await ConfirmAsync("Replace document?", "This restores the editable Alpine Echoes sample. Download a copy first to keep your current document.")) { Session.Load(IllustrationSample.Create()); Surface.Fit(firstFrame: true); } }));
         menu.Items.Add(new MenuFlyoutSeparator());
         AddMenu(menu, "Undo " + Session.UndoLabel, () => Run(Session.Undo), Session.CanUndo);
         AddMenu(menu, "Redo " + Session.RedoLabel, () => Run(Session.Redo), Session.CanRedo);
@@ -102,7 +102,11 @@ public sealed partial class StudioWorkbench
             action = e.Key switch
             {
                 VirtualKey.Z => shift ? Session.Redo : Session.Undo,
-                VirtualKey.Y => Session.Redo,
+                VirtualKey.Y => () => { Session.OutlinesVisible = !Session.OutlinesVisible; Surface.Invalidate(); },
+                VirtualKey.R => () => { Session.RulersVisible = !Session.RulersVisible; Surface.Invalidate(); },
+                VirtualKey.N => () => RunAsync(NewDocumentAsync),
+                VirtualKey.Number0 => () => Surface.Fit(firstFrame: true),
+                VirtualKey.Number1 => () => Surface.ZoomTo(1),
                 VirtualKey.A => Session.SelectAll,
                 VirtualKey.D => () => Session.DuplicateSelection(),
                 VirtualKey.C => () => RunAsync(() => CopyAsync(false)),
@@ -135,15 +139,20 @@ public sealed partial class StudioWorkbench
                 VirtualKey.K => () => Session.Tool = EditorTool.Scale,
                 VirtualKey.F => () => Session.Tool = EditorTool.Frame,
                 VirtualKey.R when shift => () => { Session.RulersVisible = !Session.RulersVisible; Surface.Invalidate(); },
-                VirtualKey.R => () => Session.Tool = EditorTool.Rectangle,
-                VirtualKey.O => () => Session.Tool = EditorTool.Ellipse,
-                VirtualKey.L => () => Session.Tool = shift ? EditorTool.Arrow : EditorTool.Line,
+                VirtualKey.M => () => Session.Tool = EditorTool.Rectangle,
+                VirtualKey.A => () => Session.Tool = EditorTool.DirectSelect,
+                VirtualKey.B => () => Session.Tool = EditorTool.Brush,
+                VirtualKey.N => () => Session.Tool = EditorTool.Pencil,
+                VirtualKey.G => () => Session.Tool = EditorTool.Gradient,
+                VirtualKey.I => () => Session.Tool = EditorTool.Eyedropper,
+                VirtualKey.Z => () => Session.Tool = EditorTool.Zoom,
+                VirtualKey.O when shift => () => Session.Tool = EditorTool.Frame,
+                VirtualKey.L => () => Session.Tool = EditorTool.Ellipse,
                 VirtualKey.P => () => Session.Tool = shift ? EditorTool.Pencil : EditorTool.Pen,
                 VirtualKey.T => () => Session.Tool = EditorTool.Text,
                 VirtualKey.H => () => Session.Tool = EditorTool.Hand,
                 VirtualKey.C => () => Session.Tool = EditorTool.Comment,
-                VirtualKey.S => () => Session.Tool = shift ? EditorTool.Section : EditorTool.Slice,
-                VirtualKey.A when shift => AddAutoLayout,
+                VirtualKey.S => () => Session.Tool = EditorTool.Scale,
                 VirtualKey.Number1 when shift => () => Surface.Fit(),
                 VirtualKey.Number2 when shift => () => Surface.Fit(true),
                 VirtualKey.Number0 => () => Surface.ZoomTo(1),
@@ -154,6 +163,7 @@ public sealed partial class StudioWorkbench
                 VirtualKey.Space => () => Surface.IsSpaceDown = true,
                 _ => null
             };
+            if ((int)e.Key == 220) action = () => Session.Tool = EditorTool.Line;
             if ((int)e.Key is 187 or 107) action = () => Surface.ZoomTo(Session.Viewport.Zoom * 1.25);
             if ((int)e.Key is 189 or 109) action = () => Surface.ZoomTo(Session.Viewport.Zoom / 1.25);
             if ((int)e.Key == 191) action = () => RunAsync(shift ? ShowHelpAsync : ShowQuickActionsAsync);
@@ -204,7 +214,7 @@ public sealed partial class StudioWorkbench
     private async Task NewDocumentAsync()
     {
         if (Session.IsDirty && !await ConfirmAsync("Create a new document?", "Download a copy first to keep your current work. The local autosave will be replaced.")) return;
-        Session.Load(new()); Surface.Fit();
+        Session.Load(new()); AddArtboard();
     }
     private async Task OpenAsync()
     {
@@ -289,10 +299,10 @@ public sealed partial class StudioWorkbench
     private async Task ShowHelpAsync()
     {
         var root = new StackPanel { Spacing = 12, Width = 410 };
-        root.Children.Add(Studio.Text("ArtSpace", 24, Studio.Ink, true)); root.Children.Add(Wrapped("An independent, local-first vector design editor built with Uno Platform and SkiaSharp. Original implementation and assets; not affiliated with Figma.", 12, Studio.Ink));
-        foreach (var (name, shortcut) in new[] { ("Move / Frame / Rectangle / Ellipse", "V / F / R / O"), ("Pen / Pencil / Text / Comment", "P / Shift P / T / C"), ("Pan / Zoom", "Space-drag / Ctrl-wheel"), ("Select multiple / Deep-select", "Shift-click / Ctrl-click"), ("Constrain / Duplicate while dragging", "Shift / Alt"), ("Undo / Redo", "Ctrl Z / Ctrl Shift Z"), ("Group / Ungroup", "Ctrl G / Ctrl Shift G"), ("Nudge / Large nudge", "Arrows / Shift-arrows"), ("Fit all / Fit selection", "Shift 1 / Shift 2"), ("Save / Open / Quick actions", "Ctrl S / Ctrl O / Ctrl K"), ("Finish path / Close path", "Enter / Click first point"), ("Hide panels / Cancel / Rename", "Tab / Esc / F2") })
+        root.Children.Add(Studio.Text("ArtSpace", 24, Studio.Ink, true)); root.Children.Add(Wrapped("An independent, local-first vector design editor built with Uno Platform and SkiaSharp. Original implementation and assets; not affiliated with Adobe.", 12, Studio.Ink));
+        foreach (var (name, shortcut) in new[] { ("Selection / Direct / Rectangle / Ellipse", "V / A / M / L"), ("Pen / Pencil / Brush / Type", "P / N / B / T"), ("Pan / Zoom", "Space-drag / Ctrl-wheel"), ("Select multiple / Deep-select", "Shift-click / Ctrl-click"), ("Constrain / Duplicate while dragging", "Shift / Alt"), ("Undo / Redo", "Ctrl Z / Ctrl Shift Z"), ("Group / Ungroup", "Ctrl G / Ctrl Shift G"), ("Nudge / Large nudge", "Arrows / Shift-arrows"), ("Fit all / Fit selection", "Shift 1 / Shift 2"), ("Save / Open / Quick actions", "Ctrl S / Ctrl O / Ctrl K"), ("Finish path / Close path", "Enter / Click first point"), ("Hide panels / Cancel / Rename", "Tab / Esc / F2") })
             root.Children.Add(Studio.Columns((Wrapped(name, 11, Studio.Ink), -1), (Wrapped(shortcut, 10, Studio.Muted), 165)));
-        root.Children.Add(Studio.Rule()); root.Children.Add(Wrapped("This alpha does not provide complete Figma compatibility: .fig files, multiplayer, variables/variants, plugin execution and advanced prototyping are not implemented. SVG import reports unsupported elements instead of executing them.", 10));
+        root.Children.Add(Studio.Rule()); root.Children.Add(Wrapped("Independent illustration editor, not full Illustrator parity. Native .ai/.eps, CMYK/ICC print production, gradient meshes, perspective tools, image tracing, advanced typography and Adobe plugins are not implemented. Work is saved locally; download a copy for backup. SVG import reports unsupported elements instead of executing them.", 10));
         await Dialog("Keyboard shortcuts & about", Studio.Scroll(root)).ShowAsync();
     }
     private async Task ShowQuickActionsAsync()

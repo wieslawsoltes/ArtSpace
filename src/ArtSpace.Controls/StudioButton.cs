@@ -21,7 +21,7 @@ public class StudioButton : Button
     }
     protected virtual void Refresh()
     {
-        Background = Studio.Brush(_selected || _primary ? Studio.Accent : _hover ? "#EEEEEE" : RestBackground);
+        Background = Studio.Brush(_selected || _primary ? Studio.Accent : _hover ? "#494949" : RestBackground);
         Foreground = Studio.Brush(_selected || _primary ? "#FFFFFF" : Studio.Ink);
         if (Content is IconView icon) icon.Color = _selected || _primary ? "#FFFFFF" : Studio.Ink;
     }
@@ -46,7 +46,7 @@ public sealed class SegmentedControl : UserControl
     public int SelectedIndex
     {
         get => _selected;
-        set { _selected = Math.Clamp(value, 0, Math.Max(0, _buttons.Count - 1)); for (var i = 0; i < _buttons.Count; i++) { _buttons[i].IsSelected = false; _buttons[i].Background = Studio.Brush(i == _selected ? "#FFFFFF" : "#00FFFFFF"); _buttons[i].FontWeight = new() { Weight = (ushort)(i == _selected ? 600 : 400) }; } }
+        set { _selected = Math.Clamp(value, 0, Math.Max(0, _buttons.Count - 1)); for (var i = 0; i < _buttons.Count; i++) { _buttons[i].IsSelected = false; _buttons[i].Background = Studio.Brush(i == _selected ? "#555555" : "#00FFFFFF"); _buttons[i].FontWeight = new() { Weight = (ushort)(i == _selected ? 600 : 400) }; } }
     }
     public SegmentedControl(IEnumerable<string> labels, int selected = 0)
     {

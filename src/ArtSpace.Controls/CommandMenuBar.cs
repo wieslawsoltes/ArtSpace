@@ -44,7 +44,7 @@ public sealed class CommandMenuBar : UserControl
             button.Click += (_, _) => { Close(); command.Execute?.Invoke(); };
             button.KeyDown += (_, e) =>
             {
-                if (e.Key == VirtualKey.Escape) { Close(); anchor.Focus(FocusState.Programmatic); e.Handled = true; }
+                if (e.Key == VirtualKey.Escape) { Close(); (anchor as Control)?.Focus(FocusState.Programmatic); e.Handled = true; }
                 if (e.Key is VirtualKey.Down or VirtualKey.Up)
                 {
                     var index = buttons.IndexOf(button); var direction = e.Key == VirtualKey.Down ? 1 : -1;

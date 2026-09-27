@@ -15,7 +15,7 @@ public sealed partial class DesignSurface : UserControl, IDisposable
         public Action<SKCanvas, Size>? Draw { get; set; }
         protected override void RenderOverride(SKCanvas canvas, Size area) => Draw?.Invoke(canvas, area);
     }
-    private enum Gesture { None, Move, Resize, Rotate, Create, Marquee, Pan, PenControl, Pencil, Guide, Pinch, Vertex }
+    private enum Gesture { None, Move, Resize, Rotate, Create, Marquee, Pan, PenControl, Pencil, Guide, Pinch, Vertex, Gradient }
     private readonly DrawingCanvas _canvas = new();
     private readonly Canvas _overlay = new();
     private EditorSession? _session;
@@ -141,18 +141,19 @@ public sealed partial class DesignSurface : UserControl, IDisposable
             var comment = editor.Document.Comments.FirstOrDefault(c => c.PageId == editor.Page.Id && !c.Resolved && c.Anchor.DistanceTo(world) * editor.Viewport.Zoom < 16);
             CommentRequested?.Invoke(world, comment); return;
         }
+        if (IllustrationPressed(world, screen, e)) return;
         if (_vectorNode is not null && editor.Tool == EditorTool.Move)
         {
             for (var i = 0; i < _vectorNode.Points.Count; i++)
             {
                 if (editor.Viewport.WorldToScreen(_vectorNode.WorldMatrix.Map(VectorPointPosition(_vectorNode, _vectorNode.Points[i].Position))).DistanceTo(screen) < 9)
                 {
-                    editor.BeginInteraction("Move vector point"); _gesture = Gesture.Vertex; _vertexIndex = i; return;
+                    editor.BeginInteraction("Move vector point"); _gesture = Gesture.Vertex; _vertexIndex = i; _anchorHandle = 0; return;
                 }
             }
             _vectorNode = null;
         }
-        if (editor.Tool is EditorTool.Pen or EditorTool.Pencil) { StartPath(world, editor.Tool == EditorTool.Pencil); return; }
+        if (editor.Tool is EditorTool.Pen or EditorTool.Pencil or EditorTool.Brush) { StartPath(world, editor.Tool is EditorTool.Pencil or EditorTool.Brush); return; }
         if (editor.Tool is not EditorTool.Move and not EditorTool.Scale)
         {
             editor.BeginInteraction("Draw " + editor.Tool); _created = NewNode(editor.Tool, world);
@@ -262,10 +263,9 @@ public sealed partial class DesignSurface : UserControl, IDisposable
                 if (_penNode is null || screen.DistanceTo(_startScreen) < 3) break;
                 var control = _penNode.WorldMatrix.Inverse.Map(world); var last = _penNode.Points[^1]; last.ControlOut = control; last.ControlIn = last.Position * 2 - control; editor.Preview(); break;
             case Gesture.Vertex:
-                if (_vectorNode is null) break;
-                var vertex = _vectorNode.Points[_vertexIndex]; var position = _vectorNode.WorldMatrix.Inverse.Map(world);
-                if (_vectorNode.PathWidth > 0 && _vectorNode.PathHeight > 0) position = new(position.X * _vectorNode.PathWidth / _vectorNode.Width, position.Y * _vectorNode.PathHeight / _vectorNode.Height);
-                var change = position - vertex.Position; vertex.Position = position; if (vertex.ControlIn.HasValue) vertex.ControlIn += change; if (vertex.ControlOut.HasValue) vertex.ControlOut += change; editor.Preview(); break;
+                MoveIllustrationAnchor(world, e.KeyModifiers.HasFlag(VirtualKeyModifiers.Menu)); break;
+            case Gesture.Gradient:
+                MoveGradient(world); break;
             default:
                 if (editor.Tool is EditorTool.Move or EditorTool.Scale) { var hover = Hit(world, screen, e.KeyModifiers.HasFlag(VirtualKeyModifiers.Control)); if (_hover != hover) { _hover = hover; _canvas.Invalidate(); } }
                 break;
@@ -338,7 +338,7 @@ public sealed partial class DesignSurface : UserControl, IDisposable
         _gesture = Gesture.None; _created = null; _marquee = null; _snapLines = []; _guide = null; _penNode = null; _vectorNode = null;
         Session?.CancelInteraction(); _canvas.Invalidate();
     }
-    private static DesignNode NewNode(EditorTool tool, Vec2 point)
+    private DesignNode NewNode(EditorTool tool, Vec2 point)
     {
         var kind = Enum.TryParse<NodeKind>(tool.ToString(), out var k) ? k : NodeKind.Rectangle;
         var node = new DesignNode { Kind = kind, Name = kind.ToString(), X = point.X, Y = point.Y, Width = 1, Height = 1 };
@@ -346,6 +346,11 @@ public sealed partial class DesignSurface : UserControl, IDisposable
         else if (kind == NodeKind.Section) { node.Fill = "#D3D3D3"; node.CornerRadius = 8; }
         else if (kind is NodeKind.Line or NodeKind.Arrow or NodeKind.Slice) { node.Fills.Clear(); node.Strokes.Add(new() { Width = kind == NodeKind.Slice ? 1 : 2, Color = kind == NodeKind.Slice ? "#9747FF" : "#333333" }); }
         else if (kind == NodeKind.Text) { node.Fill = "#242424"; node.FontSize = 24; }
+        if (kind is not NodeKind.Frame and not NodeKind.Section and not NodeKind.Slice and not NodeKind.Text)
+        {
+            if (kind is not NodeKind.Line and not NodeKind.Arrow) node.Fill = FillColor;
+            node.Strokes = StrokeWidth > 0 ? [new() { Color = StrokeColor, Width = StrokeWidth }] : [];
+        }
         return node;
     }
     private void StartPath(Vec2 world, bool pencil)
@@ -353,7 +358,7 @@ public sealed partial class DesignSurface : UserControl, IDisposable
         if (Session is not { } editor) return;
         if (_penNode is null)
         {
-            editor.BeginInteraction(pencil ? "Draw freehand path" : "Draw vector path"); _penNode = new() { Kind = NodeKind.Path, Name = pencil ? "Pencil" : "Vector", X = world.X, Y = world.Y, Width = 1, Height = 1, Fills = [], Strokes = [new() { Color = "#333333", Width = 2 }] }; editor.AddNode(_penNode); editor.Select(_penNode);
+            editor.BeginInteraction(pencil ? "Draw freehand path" : "Draw vector path"); _penNode = new() { Kind = NodeKind.Path, Name = editor.Tool == EditorTool.Brush ? "Brush" : pencil ? "Pencil" : "Path", X = world.X, Y = world.Y, Width = 1, Height = 1, Fills = [], Strokes = [new() { Color = StrokeColor, Width = editor.Tool == EditorTool.Brush ? Math.Max(4, StrokeWidth) : Math.Max(1, StrokeWidth) }] }; editor.AddNode(_penNode); editor.Select(_penNode);
         }
         var local = _penNode.WorldMatrix.Inverse.Map(world);
         if (!pencil && _penNode.Points.Count >= 3 && _penNode.Points[0].Position.DistanceTo(local) * editor.Viewport.Zoom < 8) { FinishPath(true); return; }

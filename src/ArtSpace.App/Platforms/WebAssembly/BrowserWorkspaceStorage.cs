@@ -23,21 +23,21 @@ internal sealed class BrowserWorkspaceStorage : IWorkspaceStorage
 }
 internal static partial class BrowserFiles
 {
-    [JSImport("globalThis.vectorSpaceStorage.load")]
+    [JSImport("globalThis.artSpaceStorage.load")]
     [return: JSMarshalAs<JSType.Promise<JSType.String>>]
     internal static partial Task<string> Load();
-    [JSImport("globalThis.vectorSpaceStorage.save")]
+    [JSImport("globalThis.artSpaceStorage.save")]
     [return: JSMarshalAs<JSType.Promise<JSType.String>>]
     internal static partial Task<string> Save(string document);
-    [JSImport("globalThis.vectorSpaceStorage.open")]
+    [JSImport("globalThis.artSpaceStorage.open")]
     [return: JSMarshalAs<JSType.Promise<JSType.String>>]
     internal static partial Task<string> Open();
-    [JSImport("globalThis.vectorSpaceStorage.download")]
+    [JSImport("globalThis.artSpaceStorage.download")]
     [return: JSMarshalAs<JSType.Promise<JSType.String>>]
     internal static partial Task<string> Download(string name, string base64, string contentType);
-    [JSImport("globalThis.vectorSpaceStorage.isTestMode")]
+    [JSImport("globalThis.artSpaceStorage.isTestMode")]
     internal static partial bool IsTestMode();
-    [JSImport("globalThis.vectorSpaceStorage.publishDiagnostics")]
+    [JSImport("globalThis.artSpaceStorage.publishDiagnostics")]
     internal static partial void PublishDiagnostics(string json);
 }
 internal static class BrowserDiagnostics

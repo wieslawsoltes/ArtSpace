@@ -7,7 +7,7 @@
   <Setter Property="MinWidth" Value="0" />
   <Setter Property="MinHeight" Value="0" />
   <Setter Property="Padding" Value="10,6" />
-  <Setter Property="CornerRadius" Value="6" />
+  <Setter Property="CornerRadius" Value="1" />
   <Setter Property="BorderThickness" Value="0" />
   <Setter Property="HorizontalContentAlignment" Value="Center" />
   <Setter Property="VerticalContentAlignment" Value="Center" />
@@ -37,9 +37,9 @@
   <Setter Property="Padding" Value="8,4" />
   <Setter Property="BorderThickness" Value="1" />
   <Setter Property="BorderBrush" Value="Transparent" />
-  <Setter Property="Background" Value="#F3F3F3" />
-  <Setter Property="Foreground" Value="#262626" />
-  <Setter Property="CornerRadius" Value="5" />
+  <Setter Property="Background" Value="#292929" />
+  <Setter Property="Foreground" Value="#D7D7D7" />
+  <Setter Property="CornerRadius" Value="1" />
   <Setter Property="SelectionHighlightColor" Value="#BDE3FF" />
  </Style>
  <Style x:Key="VS.ComboBox" TargetType="ComboBox">
@@ -48,8 +48,8 @@
   <Setter Property="MinHeight" Value="0" />
   <Setter Property="Padding" Value="8,4" />
   <Setter Property="BorderThickness" Value="0" />
-  <Setter Property="Background" Value="#F3F3F3" />
-  <Setter Property="CornerRadius" Value="5" />
+  <Setter Property="Background" Value="#292929" />
+  <Setter Property="CornerRadius" Value="1" />
   <Setter Property="HorizontalAlignment" Value="Stretch" />
  </Style>
  <DataTemplate x:Key="VS.LayerRow"><local:LayerRow /></DataTemplate>
@@ -61,15 +61,15 @@
   <Setter Property="Template">
    <Setter.Value>
     <ControlTemplate TargetType="ListViewItem">
-     <Border x:Name="Root" CornerRadius="4" Background="Transparent">
+     <Border x:Name="Root" CornerRadius="0" Background="Transparent">
       <VisualStateManager.VisualStateGroups>
        <VisualStateGroup x:Name="CommonStates">
         <VisualState x:Name="Normal" />
-        <VisualState x:Name="PointerOver"><VisualState.Setters><Setter Target="Root.Background" Value="#F3F3F3" /></VisualState.Setters></VisualState>
-        <VisualState x:Name="Selected"><VisualState.Setters><Setter Target="Root.Background" Value="#E5F4FF" /></VisualState.Setters></VisualState>
-        <VisualState x:Name="PointerOverSelected"><VisualState.Setters><Setter Target="Root.Background" Value="#DCEFFF" /></VisualState.Setters></VisualState>
-        <VisualState x:Name="Pressed"><VisualState.Setters><Setter Target="Root.Background" Value="#E5F4FF" /></VisualState.Setters></VisualState>
-        <VisualState x:Name="PressedSelected"><VisualState.Setters><Setter Target="Root.Background" Value="#DCEFFF" /></VisualState.Setters></VisualState>
+        <VisualState x:Name="PointerOver"><VisualState.Setters><Setter Target="Root.Background" Value="#292929" /></VisualState.Setters></VisualState>
+        <VisualState x:Name="Selected"><VisualState.Setters><Setter Target="Root.Background" Value="#40536D" /></VisualState.Setters></VisualState>
+        <VisualState x:Name="PointerOverSelected"><VisualState.Setters><Setter Target="Root.Background" Value="#465F83" /></VisualState.Setters></VisualState>
+        <VisualState x:Name="Pressed"><VisualState.Setters><Setter Target="Root.Background" Value="#40536D" /></VisualState.Setters></VisualState>
+        <VisualState x:Name="PressedSelected"><VisualState.Setters><Setter Target="Root.Background" Value="#465F83" /></VisualState.Setters></VisualState>
        </VisualStateGroup>
       </VisualStateManager.VisualStateGroups>
       <ContentPresenter Content="{TemplateBinding Content}" ContentTemplate="{TemplateBinding ContentTemplate}" HorizontalContentAlignment="Stretch" />

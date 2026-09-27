@@ -14,7 +14,7 @@ public partial class App : Application
 {
     private Window? _window;
     private StudioWorkbench? _workbench;
-    public App() { InitializeComponent(); RequestedTheme = ApplicationTheme.Light; }
+    public App() { InitializeComponent(); RequestedTheme = ApplicationTheme.Dark; }
     protected override async void OnLaunched(LaunchActivatedEventArgs args)
     {
         _window = new Window { Title = "ArtSpace" };
@@ -27,7 +27,7 @@ public partial class App : Application
 #else
             IWorkspaceStorage storage = new DesktopWorkspaceStorage();
 #endif
-            var document = SampleDocument.Create(); string? warning = null;
+            var document = IllustrationSample.Create(); string? warning = null;
             try { var saved = await storage.ReadAutosaveAsync(); if (!string.IsNullOrWhiteSpace(saved)) document = DocumentJson.Load(saved); }
             catch (Exception ex) { warning = "The recovery copy could not be opened: " + ex.Message; }
             Studio.Font = new FontFamily("ms-appx:///Assets/Fonts/Inter.ttf#Inter");

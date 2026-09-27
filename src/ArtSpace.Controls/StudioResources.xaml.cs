@@ -10,11 +10,11 @@ public sealed partial class StudioResources : ResourceDictionary
 /// <summary>Shared design tokens and layout helpers. No editor or document dependency.</summary>
 public static class Studio
 {
-    public const string Accent = "#0D99FF";
-    public const string Ink = "#242424";
-    public const string Muted = "#777777";
-    public const string Line = "#E7E7E7";
-    public const string Field = "#F3F3F3";
+    public const string Accent = "#477BDA";
+    public const string Ink = "#D7D7D7";
+    public const string Muted = "#A7A7A7";
+    public const string Line = "#272727";
+    public const string Field = "#292929";
     public static FontFamily Font { get; set; } = new("Arial");
     public static SolidColorBrush Brush(string hex)
     {
@@ -49,6 +49,6 @@ public static class Studio
         return grid;
     }
     public static Border Rule() => new() { Height = 1, Background = Brush(Line) };
-    public static Border Surface(UIElement content, double radius = 12) => new() { Background = Brush("#FFFFFF"), BorderBrush = Brush("#DADADA"), BorderThickness = new(1), CornerRadius = new(radius), Child = content };
+    public static Border Surface(UIElement content, double radius = 12) => new() { Background = Brush("#383838"), BorderBrush = Brush("#252525"), BorderThickness = new(1), CornerRadius = new(radius), Child = content };
     public static ScrollViewer Scroll(UIElement content) => new() { Content = content, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollMode = ScrollMode.Disabled };
 }

@@ -28,7 +28,7 @@ public sealed class ColorField : UserControl
             var flyout = new Flyout(); var root = new StackPanel { Spacing = 12 };
             root.Children.Add(Studio.Text("Custom color", 12, Studio.Ink, true)); root.Children.Add(spectrum);
             var palette = new Grid { ColumnSpacing = 6 };
-            var colors = new[] { "#FFFFFF", "#1E1E1E", "#0D99FF", "#7B61FF", "#F24822", "#FFCD29", "#14AE5C", "#FFA6D5" };
+            var colors = new[] { "#FFFFFF", "#1E1E1E", "#477BDA", "#7B61FF", "#F24822", "#FFCD29", "#14AE5C", "#FFA6D5" };
             for (var i = 0; i < colors.Length; i++)
             {
                 var c = colors[i]; var b = new StudioButton("", () => { Set(c); flyout.Hide(); }) { Width = 25, Height = 25, RestBackground = c, Background = Studio.Brush(c), BorderThickness = new(1), BorderBrush = Studio.Brush("#22000000") };

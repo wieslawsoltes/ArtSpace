@@ -14,28 +14,19 @@ public sealed partial class StudioWorkbench
         var node = Session.Primary;
         if (node is null)
         {
-            var page = AddSection("Page"); page.Body.Children.Add(Studio.Columns((new ColorField(Session.Page.Background, c => Run(() => Session.Edit("Canvas background", () => Session.Page.Background = c))), -1), (Studio.Text("100%", 11, Studio.Muted), 42)));
-            var styles = AddSection("Local styles");
-            foreach (var (name, color) in Session.Document.ColorStyles)
-            {
-                var swatch = new Border { Width = 18, Height = 18, CornerRadius = new(4), Background = Studio.Brush(color), BorderBrush = Studio.Brush("#22000000"), BorderThickness = new(1) };
-                styles.Body.Children.Add(Studio.Columns((swatch, 18), (Studio.Text(name, 11), -1), (Studio.Text(color.TrimStart('#'), 10, Studio.Muted), 58)));
-            }
-            var start = AddSection("Make space for your ideas");
-            start.Body.Children.Add(Wrapped("Select a layer to inspect its properties, or choose a tool from the floating toolbar to start drawing."));
-            start.Body.Children.Add(new StudioButton("Frame presets", () => RunAsync(ShowFramePresetsAsync)) { RestBackground = Studio.Field, Background = Studio.Brush(Studio.Field), HorizontalAlignment = HorizontalAlignment.Stretch });
-            var comments = AddSection("Comments", "comment", () => { Session.Tool = EditorTool.Comment; });
-            var threads = Session.Document.Comments.Where(c => c.PageId == Session.Page.Id && !c.Resolved).ToArray();
-            if (threads.Length == 0) comments.Body.Children.Add(Wrapped("Press C and click the canvas to leave a local comment."));
-            foreach (var thread in threads) comments.Body.Children.Add(new StudioButton(thread.Text, () => RunAsync(() => EditCommentAsync(thread.Anchor, thread))) { HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Left });
-            AddExportSection(); return;
+            var document = AddSection("Document");
+            document.Body.Children.Add(Studio.Text("RGB artwork · pixels", 11));
+            document.Body.Children.Add(Wrapped("Use the tools at left to draw. Select artwork to edit appearance and transform. A edits anchors; Alt-drag breaks tangent symmetry."));
+            document.Body.Children.Add(new StudioButton("New artboard", () => Run(AddArtboard)) { RestBackground = Studio.Field });
+            AddIllustrationSections(); AddExportSection(); return;
         }
+        AddIllustrationSections();
         var summary = new StackPanel { Spacing = 5, Margin = new(16, 14, 16, 14) };
         var heading = Session.Selection.Count == 1 ? node.Name : Session.Selection.Count + " layers selected";
         summary.Children.Add(Studio.Columns((new IconView { Glyph = Glyph(node.Kind), Color = node.Kind is NodeKind.Component or NodeKind.Instance ? "#9747FF" : Studio.Ink, Width = 16, Height = 16, VerticalAlignment = VerticalAlignment.Center }, 16), (Studio.Text(heading, 12, Studio.Ink, true), -1), (new IconButton("more", "Layer actions", () => ShowCanvasMenu(new Point(20, 20))), 24)));
         summary.Children.Add(Studio.Text(node.Kind.ToString() + (node.Parent is null ? " · Canvas" : " · " + node.Parent.Name), 10, Studio.Muted));
         _inspector.Children.Add(summary);
-        var position = AddSection("Position");
+        var position = AddSection("Transform");
         var align = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 7 };
         foreach (var name in new[] { "left", "center", "right", "top", "middle", "bottom" }) align.Children.Add(new IconButton(name, "Align " + name, () => Run(() => Session.Align(name))) { Width = 30, Height = 26 });
         position.Body.Children.Add(align);

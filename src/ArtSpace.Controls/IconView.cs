@@ -21,6 +21,11 @@ public sealed class IconView : SKCanvasElement
     }
     public static readonly IReadOnlyDictionary<string, string> Paths = new Dictionary<string, string>
     {
+        ["directselect"] = "M5 3L18 13L12 14L9 21Z",
+        ["brush"] = "M20 3L10 14L7 11ZM9 14C10 20 4 22 2 20C6 19 3 15 6 13Z",
+        ["gradient"] = "M3 4H21V20H3ZM7 5V19M10 5V19M13 5V19M16 5V19M19 5V19",
+        ["eyedropper"] = "M16 3L21 8L17 12L12 7ZM13 8L4 17L3 21L7 20L16 11M5 16L8 19",
+        ["zoom"] = "M10 3A7 7 0 1 0 10 17A7 7 0 1 0 10 3M15 15L21 21M6 10H14M10 6V14",
         ["move"] = "M5 3 L19 13 L12 14 L9 21 Z M12 14 L17 21",
         ["scale"] = "M4 4 H13 M4 4 V13 M4 4 L20 20 M13 20 H20 V13",
         ["frame"] = "M8 3 V21 M16 3 V21 M3 8 H21 M3 16 H21",

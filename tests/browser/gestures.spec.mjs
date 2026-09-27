@@ -1,11 +1,11 @@
 import { test, expect } from '@playwright/test';
-const state = page => page.evaluate(() => globalThis.__vectorSpaceState);
+const state = page => page.evaluate(() => globalThis.__artSpaceState);
 
 test('resize handles and cancelling an unfinished pen path remain undoable', async ({ page }) => {
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.goto('?test=1');
-  await page.waitForFunction(() => globalThis.__vectorSpaceState?.ready, null, { timeout: 150_000 });
+  await page.waitForFunction(() => globalThis.__artSpaceState?.ready, null, { timeout: 150_000 });
   await page.waitForTimeout(1000);
   await page.mouse.click(650, 240);
   const initial = await state(page);

@@ -71,6 +71,7 @@ public sealed partial class StudioWorkbench : UserControl, IDisposable
         Loaded += (_, _) => { RefreshAll(); if (!_initialFit && Surface.ActualWidth > 200) { _initialFit = true; Surface.Fit(firstFrame: true); } };
         _autosaveTimer.Tick += async (_, _) => { _autosaveTimer.Stop(); await AutosaveAsync(); };
         _toastTimer.Tick += (_, _) => { _toastTimer.Stop(); _toastBorder.Visibility = Visibility.Collapsed; };
+        ConfigureIllustrationWorkspace();
         RefreshAll();
     }
     private UIElement BuildLeftPanel()
@@ -154,15 +155,14 @@ public sealed partial class StudioWorkbench : UserControl, IDisposable
     private void RefreshAll()
     {
         _title.Content = Session.Document.Name; AutomationProperties.SetName(_title, "Rename document"); _zoom.Content = Numbers.Format(Session.Viewport.Zoom * 100) + "%⌄";
-        RefreshPages(); RefreshLayers(); RefreshInspector(); RefreshTools();
+        RefreshPages(); RefreshLayers(); RefreshInspector(); RefreshTools(); RefreshIllustrationPanels();
         if (_assets) RefreshLeftContent();
     }
     private void RefreshTools()
     {
         foreach (var (tool, button) in _toolButtons)
         {
-            var active = tool == Session.Tool || tool == EditorTool.Move && Session.Tool == EditorTool.Scale || tool == EditorTool.Frame && Session.Tool is EditorTool.Section or EditorTool.Slice || tool == EditorTool.Rectangle && Session.Tool is EditorTool.Ellipse or EditorTool.Line or EditorTool.Arrow or EditorTool.Polygon or EditorTool.Star || tool == EditorTool.Pen && Session.Tool == EditorTool.Pencil;
-            button.IsSelected = active; button.Glyph = active ? Session.Tool.ToString().ToLowerInvariant() : tool.ToString().ToLowerInvariant();
+            button.IsSelected = tool == Session.Tool;
         }
     }
     private void RefreshPages()
@@ -231,9 +231,7 @@ public sealed partial class StudioWorkbench : UserControl, IDisposable
     }
     private void TogglePanels()
     {
-        _uiVisible = !_uiVisible;
-        _leftPanel.Visibility = _rightPanel.Visibility = _palette.Visibility = _uiVisible ? Visibility.Visible : Visibility.Collapsed;
-        _leftColumn.Width = new(_uiVisible ? 248 : 0); _rightColumn.Width = new(_uiVisible ? 288 : 0); Surface.FocusCanvas();
+        _uiVisible = !_uiVisible; ResizeIllustrationWorkspace(); Surface.FocusCanvas();
     }
     public void ShowStatus(string message, bool error = false)
     {

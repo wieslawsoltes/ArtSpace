@@ -6,5 +6,5 @@
   <UnoFeatures>SkiaRenderer;</UnoFeatures><IsPackable>true</IsPackable>
   <Description>Reusable ArtSpace workbench, layers, inspector, tool palette, prototype and document workflows.</Description>
  </PropertyGroup>
- <ItemGroup><ProjectReference Include="../ArtSpace.Editor/ArtSpace.Editor.csproj" /></ItemGroup>
+ <ItemGroup><ProjectReference Include="../ArtSpace.Editor/ArtSpace.Editor.csproj" /><ProjectReference Include="../ArtSpace.Illustration/ArtSpace.Illustration.csproj" /></ItemGroup>
 </Project>

@@ -11,4 +11,5 @@
  </Folder>
  <Project Path="src/ArtSpace.App/ArtSpace.App.csproj" />
  <Folder Name="/Tests/"><Project Path="tests/ArtSpace.Tests/ArtSpace.Tests.csproj" /></Folder>
+  <Project Path="src/ArtSpace.Illustration/ArtSpace.Illustration.csproj" />
 </Solution>

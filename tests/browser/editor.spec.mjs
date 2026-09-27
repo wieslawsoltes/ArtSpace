@@ -1,10 +1,10 @@
 import { test, expect } from '@playwright/test';
 import fs from 'node:fs/promises';
-const state = page => page.evaluate(() => globalThis.__vectorSpaceState);
+const state = page => page.evaluate(() => globalThis.__artSpaceState);
 
 async function ready(page) {
   await page.goto('?test=1');
-  await page.waitForFunction(() => globalThis.__vectorSpaceState?.ready, null, { timeout: 150_000 });
+  await page.waitForFunction(() => globalThis.__artSpaceState?.ready, null, { timeout: 150_000 });
   await expect.poll(async () => (await state(page)).canvasWidth).toBeGreaterThan(100);
   await page.waitForTimeout(1200);
 }
@@ -53,10 +53,10 @@ test('real Uno canvas: draw, nudge, undo, redo, delete, save and recover', async
   expect(saved.formatVersion).toBe(1); expect(saved.pages.length).toBe(3);
   const beforeReload = await state(page);
   await page.waitForFunction(async () => {
-    const stored = await globalThis.vectorSpaceStorage.load(); return !!stored;
+    const stored = await globalThis.artSpaceStorage.load(); return !!stored;
   });
   await page.waitForTimeout(1300);
-  await page.reload(); await page.waitForFunction(() => globalThis.__vectorSpaceState?.ready);
+  await page.reload(); await page.waitForFunction(() => globalThis.__artSpaceState?.ready);
   expect((await state(page)).nodes).toBe(beforeReload.nodes);
   expect(errors).toEqual([]);
 });

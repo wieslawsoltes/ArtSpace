@@ -3,6 +3,8 @@ using System.Text.Json.Serialization;
 namespace ArtSpace.Core;
 
 public enum NodeKind { Frame, Group, Rectangle, Ellipse, Line, Arrow, Polygon, Star, Path, Text, Component, Instance, Section, Slice }
+public enum StrokeCap { Butt, Round, Square }
+public enum StrokeJoin { Miter, Round, Bevel }
 public enum FillKind { Solid, LinearGradient, RadialGradient }
 public enum BlendKind { Normal, Multiply, Screen, Overlay, Darken, Lighten, Difference }
 public enum LayoutDirection { None, Horizontal, Vertical }
@@ -27,6 +29,9 @@ public sealed class FillStyle
 }
 public sealed class StrokeStyle
 {
+    public StrokeCap Cap { get; set; } = StrokeCap.Round;
+    public StrokeJoin Join { get; set; } = StrokeJoin.Round;
+    public double MiterLimit { get; set; } = 4;
     public string Color { get; set; } = "#1E1E1E";
     public double Width { get; set; } = 1;
     public double Opacity { get; set; } = 1;
@@ -146,7 +151,7 @@ public sealed class DesignPage
 {
     public string Id { get; set; } = Guid.NewGuid().ToString("N");
     public string Name { get; set; } = "Page 1";
-    public string Background { get; set; } = "#E5E5E5";
+    public string Background { get; set; } = "#565656";
     public List<DesignNode> Nodes { get; set; } = [];
     public List<Guide> Guides { get; set; } = [];
     public IEnumerable<DesignNode> AllNodes() => Nodes.SelectMany(n => n.DescendantsAndSelf());

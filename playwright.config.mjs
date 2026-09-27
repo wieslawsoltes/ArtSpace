@@ -4,7 +4,7 @@ export default defineConfig({
   fullyParallel: false, workers: 1, retries: 0,
   reporter: [['list'], ['html', { outputFolder: 'artifacts/playwright-report', open: 'never' }], ['junit', { outputFile: 'artifacts/browser-results.xml' }]],
   use: {
-    baseURL: process.env.VECTORSPACE_URL || 'http://127.0.0.1:4173/ArtSpace/',
+    baseURL: process.env.ARTSPACE_URL || 'http://127.0.0.1:4173/ArtSpace/',
     viewport: { width: 1680, height: 1000 },
     trace: 'retain-on-failure', screenshot: 'only-on-failure',
     launchOptions: { args: ['--enable-unsafe-swiftshader', '--use-gl=angle', '--use-angle=swiftshader'] }

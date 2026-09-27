@@ -205,7 +205,7 @@ public sealed partial class StudioWorkbench
                 yield return Async("Save a Copy…", SaveAsync, "Ctrl S"); yield return separator;
                 yield return Async("Export SVG…", () => ExportAsync(true)); yield return Async("Export PNG…", () => ExportAsync(false));
                 yield return Item("New Artboard", AddArtboard, "Shift O");
-                yield return Item("Open Alpine sample", () => { Session.Load(SampleDocument.Create()); Surface.Fit(firstFrame: true); });
+                yield return Item("Open Alpine sample", () => { Session.Load(IllustrationSample.Create()); Surface.Fit(firstFrame: true); });
                 break;
             case "Edit":
                 yield return Item("Undo " + Session.UndoLabel, Session.Undo, "Ctrl Z", Session.CanUndo);
