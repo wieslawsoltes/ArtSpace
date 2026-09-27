@@ -94,6 +94,8 @@ Test("offset normalizes expanded selection bounds", () => { var n=Node(20,30); v
 Test("offset preserves rotated center", () => { var n=Node(20,30); n.Rotation=37; var center=n.WorldBounds.Center; var e=Editor(n); e.Select(n); using var r=new SceneRenderer(); IllustrationOperations.OffsetPaths(e,r,10); Equal(e.Primary!.WorldBounds.Center.X,center.X); Equal(e.Primary.WorldBounds.Center.Y,center.Y); });
 Test("inset normalizes reduced selection bounds", () => { var n=Node(20,30); var e=Editor(n); e.Select(n); using var r=new SceneRenderer(); IllustrationOperations.OffsetPaths(e,r,-10); Equal(e.Primary!.X,30); Equal(e.Primary.Y,40); Equal(e.Primary.Width,80); Equal(e.Primary.Height,80); });
 
+PathEditingTests.Register(Test);
+
 var failed = 0;
 foreach (var (name, test) in tests) { try { test(); Console.WriteLine("PASS " + name); } catch (Exception ex) { failed++; Console.WriteLine("FAIL " + name + "\n" + ex); } }
 Console.WriteLine($"RESULT: {tests.Count - failed}/{tests.Count} passed");

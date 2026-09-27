@@ -4,7 +4,7 @@ using ArtSpace.Core;
 namespace ArtSpace.Skia;
 
 /// <summary>Retained geometry cache with explicit native-resource ownership. No Uno dependency.</summary>
-public sealed class SceneRenderer : IDisposable
+public sealed partial class SceneRenderer : IDisposable
 {
     private sealed record CachedPath(string Signature, SKPath Path);
     private readonly Dictionary<string, CachedPath> _paths = [];
@@ -26,11 +26,12 @@ public sealed class SceneRenderer : IDisposable
     public static SKRect Rect(RectD r) => new((float)r.X, (float)r.Y, (float)r.Right, (float)r.Bottom);
     public SKPath Geometry(DesignNode node)
     {
-        var signature = VectorPath.Build(node);
+        var signature = VectorPath.Build(node) + "|" + node.FillRule;
         if (node.Kind == NodeKind.Path && node.PathWidth > 0 && node.PathHeight > 0) signature += $"|{node.Width:R}|{node.Height:R}|{node.PathWidth:R}|{node.PathHeight:R}";
         if (_paths.TryGetValue(node.Id, out var cache) && cache.Signature == signature) return cache.Path;
         var path = SKPath.ParseSvgPathData(VectorPath.Build(node)) ?? new SKPath();
         if (node.Kind == NodeKind.Path && node.PathWidth > 0 && node.PathHeight > 0) path.Transform(SKMatrix.CreateScale((float)(node.Width / node.PathWidth), (float)(node.Height / node.PathHeight)));
+        path.FillType = node.FillRule == PathFillRule.EvenOdd ? SKPathFillType.EvenOdd : SKPathFillType.Winding;
         if (cache is not null) cache.Path.Dispose();
         if (_paths.Count > 100_000) ClearCache();
         _paths[node.Id] = new(signature, path); return path;
@@ -101,34 +102,6 @@ public sealed class SceneRenderer : IDisposable
         var key = node.FontFamily + "|" + node.FontWeight;
         if (!_typefaces.TryGetValue(key, out var typeface)) _typefaces[key] = typeface = SKTypeface.FromFamilyName(node.FontFamily, new SKFontStyle(node.FontWeight, 5, SKFontStyleSlant.Upright)) ?? SKTypeface.Default;
         return typeface;
-    }
-    public void DrawText(SKCanvas canvas, DesignNode node, SKPaint paint)
-    {
-        using var font = new SKFont(Typeface(node), (float)node.FontSize) { Edging = SKFontEdging.SubpixelAntialias, Subpixel = true, Embolden = _customTypeface is not null && node.FontWeight >= 600 };
-        var y = (float)node.FontSize;
-        foreach (var line in Wrap(node.Text, font, (float)node.Width, paint))
-        {
-            var length = font.MeasureText(line, paint) + Math.Max(0, line.Length - 1) * (float)node.LetterSpacing;
-            var x = node.TextAlign == TextAlignment.Center ? ((float)node.Width - length) / 2 : node.TextAlign == TextAlignment.Right ? (float)node.Width - length : 0;
-            if (Math.Abs(node.LetterSpacing) < .001) canvas.DrawText(line, x, y, font, paint);
-            else foreach (var rune in line.EnumerateRunes()) { var text = rune.ToString(); canvas.DrawText(text, x, y, font, paint); x += font.MeasureText(text, paint) + (float)node.LetterSpacing; }
-            y += (float)(node.FontSize * node.LineHeight);
-        }
-    }
-    private static IEnumerable<string> Wrap(string text, SKFont font, float width, SKPaint paint)
-    {
-        foreach (var paragraph in text.Replace("\r", "").Split('\n'))
-        {
-            if (font.MeasureText(paragraph, paint) <= width || !paragraph.Contains(' ')) { yield return paragraph; continue; }
-            var line = "";
-            foreach (var word in paragraph.Split(' '))
-            {
-                var candidate = line.Length == 0 ? word : line + " " + word;
-                if (line.Length > 0 && font.MeasureText(candidate, paint) > width) { yield return line; line = word; }
-                else line = candidate;
-            }
-            yield return line;
-        }
     }
     public DesignNode? HitTest(IEnumerable<DesignNode> roots, Vec2 point, bool deep = false, double tolerance = 4)
     {

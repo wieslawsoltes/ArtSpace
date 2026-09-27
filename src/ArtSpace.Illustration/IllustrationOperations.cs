@@ -123,6 +123,7 @@ public static class IllustrationOperations
                 output.Width = output.PathWidth = Math.Max(.001, bounds.Width);
                 output.Height = output.PathHeight = Math.Max(.001, bounds.Height);
                 output.PathData = normalized.ToSvgPathData();
+                output.FillRule = normalized.FillType == SKPathFillType.EvenOdd ? PathFillRule.EvenOdd : PathFillRule.NonZero;
                 NodeGeometry.SetLocalMatrix(output, Matrix2D.Translation(bounds.Left, bounds.Top) * node.LocalMatrix);
                 output.Points.Clear();
                 editor.AddNode(output, node.Parent); selected.Add(output.Id);
@@ -259,7 +260,7 @@ public static class IllustrationOperations
     {
         var bounds = path.TightBounds;
         using var normalized = new SKPath(path); normalized.Transform(SKMatrix.CreateTranslation(-bounds.Left, -bounds.Top));
-        return new() { Kind = NodeKind.Path, Name = name, X = bounds.Left, Y = bounds.Top, Width = Math.Max(.001, bounds.Width), Height = Math.Max(.001, bounds.Height), PathWidth = Math.Max(.001, bounds.Width), PathHeight = Math.Max(.001, bounds.Height), PathData = normalized.ToSvgPathData(), Fill = fill };
+        return new() { Kind = NodeKind.Path, Name = name, X = bounds.Left, Y = bounds.Top, Width = Math.Max(.001, bounds.Width), Height = Math.Max(.001, bounds.Height), PathWidth = Math.Max(.001, bounds.Width), PathHeight = Math.Max(.001, bounds.Height), PathData = normalized.ToSvgPathData(), FillRule = normalized.FillType == SKPathFillType.EvenOdd ? PathFillRule.EvenOdd : PathFillRule.NonZero, Fill = fill };
     }
     private static double Lerp(double a, double b, double t) => a + (b - a) * t;
     private static Vec2 Mix(Vec2 a, Vec2 b, double t) => a + (b - a) * t;

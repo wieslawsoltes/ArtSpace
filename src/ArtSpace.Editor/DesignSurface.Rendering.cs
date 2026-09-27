@@ -82,7 +82,7 @@ public sealed partial class DesignSurface
     }
     private void DrawSelection(SKCanvas canvas)
     {
-        if (Session is not { } editor || editor.SelectionRoots.Count == 0 || _textEditor is not null) return;
+        if (Session is not { } editor || editor.SelectionRoots.Count == 0 || _textEditor is not null || IsPathTool) return;
         var points = GetHandles(); if (points.Length < 8) return;
         using var blue = new SKPaint { IsAntialias = true, Color = new(68, 124, 238), Style = SKPaintStyle.Stroke, StrokeWidth = 1 };
         using var fill = new SKPaint { IsAntialias = true, Color = SKColors.White };
