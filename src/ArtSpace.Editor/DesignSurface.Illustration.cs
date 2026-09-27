@@ -114,7 +114,7 @@ public sealed partial class DesignSurface
     private void DrawGradientHandles(SKCanvas canvas)
     {
         if (Session is not { Tool: EditorTool.Gradient, Primary: { } node } editor || node.Fills.FirstOrDefault() is not { Kind: not FillKind.Solid } fill) return;
-        Vec2 Screen(Vec2 p) => editor.Viewport.WorldToScreen(node.WorldMatrix.Map(new(p.X * node.Width, p.Y * node.Height)));
+        Vec2 Screen(Vec2 p) => editor.Viewport.WorldToScreen(node.WorldMatrix.Map(new Vec2(p.X * node.Width, p.Y * node.Height)));
         var start = Screen(fill.Start); var end = Screen(fill.End);
         using var paint = new SKPaint { IsAntialias = true, Color = SKColors.White, StrokeWidth = 2 };
         canvas.DrawLine(P(start), P(end), paint); canvas.DrawCircle(P(start), 5, paint); canvas.DrawCircle(P(end), 5, paint);

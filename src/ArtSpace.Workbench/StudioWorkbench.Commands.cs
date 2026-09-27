@@ -255,7 +255,7 @@ public sealed partial class StudioWorkbench
     private ContentDialog Dialog(string title, UIElement content, string primary = "", string close = "Close") => new()
     {
         Title = title, Content = content, PrimaryButtonText = primary, CloseButtonText = close, XamlRoot = XamlRoot,
-        FontFamily = Studio.Font, RequestedTheme = ElementTheme.Light, DefaultButton = string.IsNullOrEmpty(primary) ? ContentDialogButton.Close : ContentDialogButton.Primary,
+        FontFamily = Studio.Font, RequestedTheme = ElementTheme.Dark, DefaultButton = string.IsNullOrEmpty(primary) ? ContentDialogButton.Close : ContentDialogButton.Primary,
         MinWidth = 320, MaxWidth = 560
     };
     private async Task<string?> PromptAsync(string title, string value, bool multiline = false)
