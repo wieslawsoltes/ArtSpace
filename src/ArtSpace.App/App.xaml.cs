@@ -48,6 +48,7 @@ public partial class App : Application
             }
             catch (Exception ex) { Console.WriteLine("Optional Inter font unavailable: " + ex.Message); }
 #if __WASM__
+            BrowserKeyboard.Attach(_workbench);
             BrowserDiagnostics.Attach(session, _workbench);
 #endif
         }
