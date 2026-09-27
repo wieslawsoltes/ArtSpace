@@ -1,1 +1,0 @@
-Illustration integration applied. Generated edits are committed as ordinary source files.
