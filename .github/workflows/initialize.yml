@@ -19,25 +19,30 @@ jobs:
           git -C /tmp/vector-source checkout 587f780f2803f6b3aa59dfb5411da2c2fe601dfa
           python3 - <<'PY'
           from pathlib import Path
-          import shutil
           source=Path('/tmp/vector-source')
           for p in source.rglob('*'):
               if not p.is_file() or '.git' in p.relative_to(source).parts: continue
               rel=p.relative_to(source).as_posix()
-              if rel in ['README.md','CHANGELOG.md'] or rel.startswith('docs/'): continue
+              if rel in ['README.md','CHANGELOG.md'] or rel.startswith(('docs/','.github/workflows/')): continue
               if p.suffix.lower() in ['.png','.ttf','.otf','.woff','.woff2']: continue
               dest=Path(rel.replace('VectorSpace','ArtSpace').replace('vectorspace','artspace'))
               dest.parent.mkdir(parents=True,exist_ok=True)
               try: text=p.read_text().replace('VectorSpace','ArtSpace').replace('vectorspace','artspace')
               except UnicodeDecodeError: continue
               dest.write_text(text)
-          Path('THIRD-PARTY-NOTICES.md').write_text('# Third-party notices\n\nArtSpace contains an MIT-licensed adaptation of VectorSpace by Wiesław Šoltés.\nSource snapshot: https://github.com/wieslawsoltes/VectorSpace/commit/587f780f2803f6b3aa59dfb5411da2c2fe601dfa\nOriginal copyright and MIT terms are retained in LICENSE.\n\nUno Platform and SkiaSharp: Apache-2.0 and MIT respectively. Skia: BSD-3-Clause. Inter: SIL OFL 1.1; fetched with its license during builds, no font binaries are committed.\n')
+          Path('THIRD-PARTY-NOTICES.md').write_text('# Third-party notices\n\nArtSpace contains an MIT-licensed adaptation of VectorSpace by Wiesław Šoltés.\nSource snapshot: https://github.com/wieslawsoltes/VectorSpace/commit/587f780f2803f6b3aa59dfb5411da2c2fe601dfa\nOriginal copyright and MIT terms are retained in LICENSE.\n\nUno Platform: Apache-2.0. SkiaSharp: MIT. Skia: BSD-3-Clause. Inter: SIL OFL 1.1; fetched with its license during builds, no font binaries are committed.\n')
           PY
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add .
           git commit -m 'Import reusable vector engine from pinned MIT VectorSpace snapshot'
           git push origin HEAD:main
+      - name: Collect source snapshot
+        run: git archive --format=zip HEAD -o /tmp/ArtSpace-source.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ArtSpace-source
+          path: /tmp/ArtSpace-source.zip
       - uses: actions/setup-dotnet@v4
         with:
           global-json-file: global.json
