@@ -12,6 +12,7 @@ public sealed class CommandMenuBar : UserControl
     private Popup? _popup;
     private Control? _anchor;
     private int _activeIndex = -1;
+    private bool _userNavigated;
     public bool IsOpen => _popup?.IsOpen == true;
 
     public CommandMenuBar()
@@ -46,10 +47,12 @@ public sealed class CommandMenuBar : UserControl
         }
         if (key == VirtualKey.Enter || key == VirtualKey.Space)
         {
+            _userNavigated = true;
             if (_activeIndex >= 0 && _activeIndex < _items.Count) Execute(_items[_activeIndex].Command);
             return true;
         }
         if (key is not VirtualKey.Down and not VirtualKey.Up and not VirtualKey.Home and not VirtualKey.End) return false;
+        _userNavigated = true;
         var direction = key is VirtualKey.Up or VirtualKey.End ? -1 : 1;
         var index = key == VirtualKey.Home ? -1 : key == VirtualKey.End ? 0 : _activeIndex;
         for (var count = 0; count < _items.Count; count++)
@@ -76,7 +79,7 @@ public sealed class CommandMenuBar : UserControl
 
     private void Open(Control anchor, IEnumerable<MenuCommand> commands)
     {
-        Close(); _anchor = anchor;
+        Close(); _anchor = anchor; _userNavigated = false;
         var items = new StackPanel { Spacing = 1, Padding = new(4) };
         foreach (var command in commands)
         {
@@ -100,7 +103,7 @@ public sealed class CommandMenuBar : UserControl
             button.Click += (_, _) => Execute(command);
             button.KeyDown += (_, e) => { if (HandleNavigationKey(e.Key)) e.Handled = true; };
             var index = _items.Count;
-            button.PointerEntered += (_, _) => { if (command.Enabled) Activate(index); };
+            button.PointerEntered += (_, _) => { if (command.Enabled) { _userNavigated = true; Activate(index); } };
             _items.Add((button, command)); items.Children.Add(button);
         }
         var position = anchor.TransformToVisual(null).TransformPoint(new(0, anchor.ActualHeight));
@@ -115,7 +118,8 @@ public sealed class CommandMenuBar : UserControl
         popup.Closed += (_, _) => { if (ReferenceEquals(_popup, popup)) Close(); };
         void InitialFocus()
         {
-            if (!ReferenceEquals(_popup, popup)) return;
+            // Loading may finish after keyboard/pointer navigation. Never reset that explicit selection.
+            if (!ReferenceEquals(_popup, popup) || _userNavigated) return;
             var first = _items.FindIndex(item => item.Command.Enabled); Activate(first);
         }
         items.Loaded += (_, _) => DispatcherQueue.TryEnqueue(InitialFocus);
