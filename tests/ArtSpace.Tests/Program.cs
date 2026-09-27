@@ -7,6 +7,8 @@ using ArtSpace.Editing;
 using ArtSpace.Layout;
 using ArtSpace.Skia;
 
+if (args.Contains("--benchmark")) return PerformanceBenchmarks.Run();
+
 var tests = new List<(string Name, Action Test)>();
 void Test(string name, Action action) => tests.Add((name, action));
 void Equal(double actual, double expected, double epsilon = .0001) { if (Math.Abs(actual - expected) > epsilon) throw new Exception($"Expected {expected}; got {actual}."); }
@@ -95,6 +97,7 @@ Test("offset preserves rotated center", () => { var n=Node(20,30); n.Rotation=37
 Test("inset normalizes reduced selection bounds", () => { var n=Node(20,30); var e=Editor(n); e.Select(n); using var r=new SceneRenderer(); IllustrationOperations.OffsetPaths(e,r,-10); Equal(e.Primary!.X,30); Equal(e.Primary.Y,40); Equal(e.Primary.Width,80); Equal(e.Primary.Height,80); });
 
 PathEditingTests.Register(Test);
+ClippingPerformanceTests.Register(Test);
 
 var failed = 0;
 foreach (var (name, test) in tests) { try { test(); Console.WriteLine("PASS " + name); } catch (Exception ex) { failed++; Console.WriteLine("FAIL " + name + "\n" + ex); } }

@@ -29,6 +29,13 @@ public sealed partial class DesignSurface : UserControl, IDisposable
     private Guide? _guide;
     private RectD? _marquee;
     private IReadOnlyList<SnapLine> _snapLines = [];
+    private SnapIndex? _snapIndex;
+    private bool _dynamicSnapTargets;
+    private SnapIndex BuildSnapIndex()
+    {
+        var editor = Session!; var roots = editor.SelectionRoots;
+        return new SnapIndex(editor.Page.AllNodes().Where(n => n.IsEffectivelyVisible && n.Parent?.ClipPathId != n.Id && !editor.SelectedIds.Contains(n.Id) && !roots.Any(n.IsDescendantOf)).Select(n => n.WorldBounds));
+    }
     private TextBox? _textEditor;
     private DesignNode? _textNode;
     private bool _finishingText, _disposed;
@@ -94,7 +101,7 @@ public sealed partial class DesignSurface : UserControl, IDisposable
                 _marquee = null; _guide = null; _snapLines = []; _originals.Clear();
                 _canvas.ReleasePointerCaptures();
             }
-            Renderer.ClearCache(); _hover = null;
+            if (Session is not null) Renderer.PruneCache(Session.Document.Pages.SelectMany(p => p.Nodes)); _snapIndex = null; _hover = null;
             if (_vectorNode is not null) _vectorNode = Session?.Document.Find(_vectorNode.Id);
         }
         if (e.Kind == EditorChangeKind.Tool && _penNode is not null) FinishPath(false);
@@ -196,6 +203,8 @@ public sealed partial class DesignSurface : UserControl, IDisposable
         _originals.Clear(); if (Session is null) return;
         foreach (var node in Session.SelectionRoots) _originals[node.Id] = DocumentJson.CloneNode(node);
         _startBounds = Session.SelectionBounds();
+        _dynamicSnapTargets = Session.Page.AllNodes().Any(n => n.Layout.Direction != LayoutDirection.None);
+        _snapIndex = BuildSnapIndex();
     }
     private void Moved(object sender, PointerRoutedEventArgs e)
     {
@@ -217,10 +226,9 @@ public sealed partial class DesignSurface : UserControl, IDisposable
                 _snapLines = [];
                 if (editor.SnapEnabled && !e.KeyModifiers.HasFlag(VirtualKeyModifiers.Control))
                 {
-                    var roots = editor.SelectionRoots;
-                    var targets = editor.Page.AllNodes().Where(n => n.IsEffectivelyVisible && !editor.SelectedIds.Contains(n.Id) && !roots.Any(n.IsDescendantOf)).Select(n => n.WorldBounds);
+                    if (_dynamicSnapTargets || _snapIndex is null) _snapIndex = BuildSnapIndex();
                     var moving = _startBounds with { X = _startBounds.X + delta.X, Y = _startBounds.Y + delta.Y };
-                    var snap = SnapEngine.Snap(moving, targets, 5 / editor.Viewport.Zoom, editor.Page.Guides); delta += snap.Correction; _snapLines = snap.Lines;
+                    var snap = _snapIndex.Snap(moving, 5 / editor.Viewport.Zoom, editor.Page.Guides); delta += snap.Correction; _snapLines = snap.Lines;
                 }
                 foreach (var node in editor.SelectionRoots)
                 {

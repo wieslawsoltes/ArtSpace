@@ -65,6 +65,10 @@ internal static class BrowserDiagnostics
                 var origin = workbench.Surface.TransformToVisual(null).TransformPoint(new Windows.Foundation.Point(0, 0));
                 json.WriteNumber("canvasX", origin.X); json.WriteNumber("canvasY", origin.Y);
                 json.WriteString("fillRule", primary?.FillRule.ToString());
+                json.WriteString("clipPathId", primary?.ClipPathId);
+                json.WriteNumber("clipGroups", session.Page.AllNodes().Count(n => n.ClipPathId is not null));
+                json.WriteNumber("geometryBuilds", workbench.Surface.Renderer.GeometryBuilds);
+                json.WriteNumber("culledNodes", workbench.Surface.Renderer.CulledNodes);
                 json.WriteStartArray("anchors");
                 foreach (var anchor in workbench.Surface.GetPathAnchors())
                 {

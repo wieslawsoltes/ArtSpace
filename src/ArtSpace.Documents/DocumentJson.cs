@@ -43,6 +43,7 @@ public static class DocumentJson
         foreach (var node in nodes)
         {
             node.Id = ids[node.Id];
+            if (node.ClipPathId is { } clip && ids.TryGetValue(clip, out var clipReplacement)) node.ClipPathId = clipReplacement;
             if (node.PrototypeTargetId is { } target && ids.TryGetValue(target, out var replacement)) node.PrototypeTargetId = replacement;
             if (node.ComponentId is { } component && ids.TryGetValue(component, out replacement)) node.ComponentId = replacement;
         }
@@ -63,6 +64,12 @@ public static class DocumentJson
             if (n is null || string.IsNullOrWhiteSpace(n.Id) || !ids.Add(n.Id)) throw new InvalidDataException("Invalid or duplicate layer identifier.");
             if (!double.IsFinite(n.X) || !double.IsFinite(n.Y) || !double.IsFinite(n.Width) || !double.IsFinite(n.Height) || !double.IsFinite(n.Rotation) || n.Width < 0 || n.Height < 0 || n.Width > 1e7 || n.Height > 1e7 || Math.Abs(n.X) > 1e9 || Math.Abs(n.Y) > 1e9) throw new InvalidDataException("A layer has invalid geometry.");
             if (n.Children is null || n.Fills is null || n.Strokes is null || n.Shadows is null || n.Layout is null || n.Points is null || n.Overrides is null) throw new InvalidDataException("A layer is missing required data.");
+            if (n.ClipPathId is { } clip)
+            {
+                var mask = n.Children.Find(child => child?.Id == clip);
+                if (!n.IsContainer || mask is null || mask.IsContainer || mask.Children is null || mask.Children.Count != 0 || mask.Kind is NodeKind.Text or NodeKind.Slice)
+                    throw new InvalidDataException("A clipping path must reference a direct vector child of its container.");
+            }
             if (!Enum.IsDefined(n.FillRule)) throw new InvalidDataException("Invalid path fill rule.");
             n.Opacity = Numbers.Clamp(n.Opacity, 0, 1); n.FontSize = Numbers.Clamp(n.FontSize, 1, 4096);
             n.CornerRadius = Numbers.Clamp(n.CornerRadius, 0, 1e6); n.Sides = Math.Clamp(n.Sides, 3, 128);

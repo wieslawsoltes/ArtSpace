@@ -6,6 +6,29 @@ namespace ArtSpace.Skia;
 public sealed partial class SceneRenderer
 {
     private readonly record struct TextRun(string Text, float X, float Baseline);
+    private readonly record struct TextKey(string Text, string Family, int Weight, double Size, double Width, double LineHeight, double Tracking, TextAlignment Alignment);
+    private sealed record CachedText(TextKey Key, SKFont Font, TextRun[] Runs);
+    private readonly Dictionary<string, CachedText> _textLayouts = [];
+    public long TextLayoutBuilds { get; private set; }
+    public int CachedTextCount => _textLayouts.Count;
+    private void ClearTextLayouts()
+    {
+        foreach (var entry in _textLayouts.Values) entry.Font.Dispose(); _textLayouts.Clear();
+    }
+    private CachedText TextLayout(DesignNode node)
+    {
+        var key = new TextKey(node.Text, node.FontFamily, node.FontWeight, node.FontSize, node.Width, node.LineHeight, node.LetterSpacing, node.TextAlign);
+        if (_textLayouts.TryGetValue(node.Id, out var entry) && entry.Key == key) return entry;
+        var font = CreateTextFont(node);
+        try
+        {
+            var runs = TextRuns(node, font).ToArray();
+            entry?.Font.Dispose();
+            if (_textLayouts.Count >= 4096) ClearTextLayouts();
+            var result = new CachedText(key, font, runs); _textLayouts[node.Id] = result; TextLayoutBuilds++; return result;
+        }
+        catch { font.Dispose(); throw; }
+    }
 
     private SKFont CreateTextFont(DesignNode node) => new(Typeface(node), (float)node.FontSize)
     {
@@ -21,10 +44,10 @@ public sealed partial class SceneRenderer
         var path = new SKPath();
         try
         {
-            using var font = CreateTextFont(node);
-            foreach (var run in TextRuns(node, font))
+            var layout = TextLayout(node);
+            foreach (var run in layout.Runs)
             {
-                using var glyphs = font.GetTextPath(run.Text, new SKPoint(run.X, run.Baseline));
+                using var glyphs = layout.Font.GetTextPath(run.Text, new SKPoint(run.X, run.Baseline));
                 path.AddPath(glyphs);
             }
             return path;
@@ -34,8 +57,8 @@ public sealed partial class SceneRenderer
 
     public void DrawText(SKCanvas canvas, DesignNode node, SKPaint paint)
     {
-        using var font = CreateTextFont(node);
-        foreach (var run in TextRuns(node, font)) canvas.DrawText(run.Text, run.X, run.Baseline, font, paint);
+        var layout = TextLayout(node);
+        foreach (var run in layout.Runs) canvas.DrawText(run.Text, run.X, run.Baseline, layout.Font, paint);
     }
 
     // Basic, deterministic Latin-oriented layout. Advanced shaping/bidi and font fallback are not claimed.
