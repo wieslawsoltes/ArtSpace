@@ -7,6 +7,11 @@ namespace ArtSpace.Editor;
 
 public sealed partial class DesignSurface
 {
+    /// <summary>Optional host snapshot for modifiers omitted from some pointer backends.</summary>
+    public VirtualKeyModifiers? HostModifiers { get; set; }
+    private bool AltPressed(PointerRoutedEventArgs e) => HostModifiers?.HasFlag(VirtualKeyModifiers.Menu)
+        ?? (e.KeyModifiers.HasFlag(VirtualKeyModifiers.Menu) || Keyboard.Alt);
+
     private DesignNode? _pathNode, _pathDragBasis;
     private EditablePath? _editablePath, _pathDragOriginal;
     private string? _pathSignature;
@@ -102,7 +107,7 @@ public sealed partial class DesignSurface
             // A selected contour can be edited where its fill is absent or its handles extend beyond its bounds.
             if (editor.Primary is { } selected && EnsureEditablePath(selected) && TrySegment(selected, world) is { } near)
             {
-                if (editor.Tool == EditorTool.AddAnchor || (editor.Tool == EditorTool.DirectSelect && e.KeyModifiers.HasFlag(VirtualKeyModifiers.Menu)))
+                if (editor.Tool == EditorTool.AddAnchor || (editor.Tool == EditorTool.DirectSelect && AltPressed(e)))
                 {
                     InsertAnchor(selected, near); return true;
                 }
@@ -145,7 +150,6 @@ public sealed partial class DesignSurface
     {
         if (Session is null || _editablePath is null) return null;
         Vec2 Screen(Vec2 p) => Session.Viewport.WorldToScreen(node.WorldMatrix.Map(p));
-        // Anchors take precedence over coincident tangent controls.
         foreach (var address in _editablePath.Addresses)
             if (Screen(_editablePath[address].Position).DistanceTo(screen) <= 7) return (address, 0);
         foreach (var address in _editablePath.Addresses)
@@ -182,6 +186,7 @@ public sealed partial class DesignSurface
 
     private void MovePathAnchor(Vec2 world, bool independent)
     {
+        independent = HostModifiers?.HasFlag(VirtualKeyModifiers.Menu) ?? (independent || Keyboard.Alt);
         if (Session is not { } editor || _pathNode is not { } node || _pathDragOriginal is not { } original || _pathDragBasis is null) return;
         if (!_pathDragMoved && screenDelta(world).DistanceTo(Vec2.Zero) < .25) return;
         _pathDragMoved = true;

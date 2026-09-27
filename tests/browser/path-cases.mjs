@@ -34,12 +34,15 @@ test('imported compound SVG supports direct anchors, insertion, persistence and 
   expect((await state(page)).fillRule).toBe('EvenOdd');
   const selected = await state(page);
   const first = selected.anchors[0];
+  await page.keyboard.press('Escape');
   await page.mouse.click(first.x, first.y);
+  await expect.poll(async () => (await state(page)).anchors.filter(a => a.selected).length).toBe(1);
   const beforeDrag = await state(page);
   await page.mouse.move(first.x, first.y); await page.mouse.down();
   await page.mouse.move(first.x - 25, first.y + 18, { steps: 10 }); await page.mouse.up();
   await expect.poll(async () => (await state(page)).history).toBe(beforeDrag.history + 1);
   expect((await state(page)).anchors[0].x).toBeCloseTo(first.x - 25, 1);
+  expect((await state(page)).anchors[1].x).toBeCloseTo(selected.anchors[1].x, 1);
   await page.keyboard.press('Control+z');
   await expect.poll(async () => (await state(page)).anchors[0].x).toBeCloseTo(first.x, 1);
   const points = (await state(page)).anchors;
