@@ -8,16 +8,27 @@ public sealed class IconView : SKCanvasElement
 {
     public static readonly DependencyProperty GlyphProperty = DependencyProperty.Register(nameof(Glyph), typeof(string), typeof(IconView), new PropertyMetadata("move", Changed));
     public static readonly DependencyProperty ColorProperty = DependencyProperty.Register(nameof(Color), typeof(string), typeof(IconView), new PropertyMetadata(Studio.Ink, Changed));
-    public string Glyph { get => (string)GetValue(GlyphProperty); set => SetValue(GlyphProperty, value); }
-    public string Color { get => (string)GetValue(ColorProperty); set => SetValue(ColorProperty, value); }
-    public IconView() { Width = Height = 18; IsHitTestVisible = false; }
+    public string Glyph { get => (string)GetValue(GlyphProperty); set { if (Glyph != value) SetValue(GlyphProperty, value); } }
+    public string Color { get => (string)GetValue(ColorProperty); set { if (Color != value) SetValue(ColorProperty, value); } }
+    private SKPath? _path;
+    private SKPaint? _paint;
+    private string? _pathData, _paintColor;
+    public IconView()
+    {
+        Width = Height = 18; IsHitTestVisible = false;
+        Loaded += (_, _) => Invalidate();
+        Unloaded += (_, _) => { _path?.Dispose(); _path = null; _paint?.Dispose(); _paint = null; _pathData = _paintColor = null; };
+    }
     private static void Changed(DependencyObject sender, DependencyPropertyChangedEventArgs args) => ((IconView)sender).Invalidate();
     protected override void RenderOverride(SKCanvas canvas, Size area)
     {
-        canvas.Save(); canvas.Scale((float)(area.Width / 24), (float)(area.Height / 24));
-        using var path = SKPath.ParseSvgPathData(Paths.GetValueOrDefault(Glyph) ?? Paths["rectangle"]);
-        using var paint = new SKPaint { IsAntialias = true, Color = SKColor.TryParse(Color, out var c) ? c : SKColors.Black, Style = SKPaintStyle.Stroke, StrokeWidth = 1.6f, StrokeJoin = SKStrokeJoin.Round, StrokeCap = SKStrokeCap.Round };
-        canvas.DrawPath(path, paint); canvas.Restore();
+        var data = Paths.GetValueOrDefault(Glyph) ?? Paths["rectangle"];
+        if (_path is null || _pathData != data) { _path?.Dispose(); _path = SKPath.ParseSvgPathData(data); _pathData = data; }
+        _paint ??= new SKPaint { IsAntialias = true, Style = SKPaintStyle.Stroke, StrokeWidth = 1.6f, StrokeJoin = SKStrokeJoin.Round, StrokeCap = SKStrokeCap.Round };
+        if (_paintColor != Color) { _paint.Color = SKColor.TryParse(Color, out var color) ? color : SKColors.Black; _paintColor = Color; }
+        canvas.Save();
+        try { canvas.Scale((float)(area.Width / 24), (float)(area.Height / 24)); canvas.DrawPath(_path, _paint); }
+        finally { canvas.Restore(); }
     }
     public static readonly IReadOnlyDictionary<string, string> Paths = new Dictionary<string, string>
     {

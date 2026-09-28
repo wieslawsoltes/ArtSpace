@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.4.1-alpha.1 — selection and panel responsiveness
+
+- Retain inspector sections and update values rather than recreating controls on every selection and edit.
+- Coalesce UI refreshes and defer hidden Layers, Artboards and History panels; preserve section expansion and input state.
+- Reconcile layer rows incrementally and batch large collection changes; reuse row visuals and icon geometry.
+- Start transform and anchor transactions only after a three-pixel drag threshold; avoid whole-document snapshots and snap-index builds for selection clicks.
+- Resolve selections through a revision-invalidated ID/order index, preserve scene ordering, and suppress no-op selection notifications.
+- Add UI input-ownership guards, arbitrary opacity synchronization, browser control-value regressions and selection-latency reports.
+
+
 ## 0.4.0-alpha.1 — 2026-09-28
 
 ### Added

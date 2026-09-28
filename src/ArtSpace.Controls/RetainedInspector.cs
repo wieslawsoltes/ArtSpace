@@ -238,6 +238,7 @@ public sealed class InspectorBindings
     {
         foreach (var field in _fields)
         {
+            if (!field.Control.IsLoaded) continue;
             var bounds = field.Control.TransformToVisual(null).TransformBounds(new Rect(0, 0,
                 field.Control.ActualWidth, field.Control.ActualHeight));
             yield return new(section, field.Label, field.Value(), bounds.X, bounds.Y, bounds.Width, bounds.Height);

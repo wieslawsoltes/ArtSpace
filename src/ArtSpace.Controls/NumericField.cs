@@ -73,7 +73,7 @@ public sealed class NumericField : UserControl
     /// <summary>Discard pending input before recycling or retargeting the control.</summary>
     public void CancelEdit()
     {
-        if (_scrubbing) { _scrubbing = false; _value = _startValue; _prefix.ReleasePointerCaptures(); }
+        if (_scrubbing) { _scrubbing = false; _value = _startValue; _prefix.ReleasePointerCaptures(); Display(); }
         if (_dirty) Display();
     }
 

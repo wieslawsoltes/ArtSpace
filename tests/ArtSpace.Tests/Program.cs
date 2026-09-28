@@ -17,6 +17,8 @@ void Throws(Action action) { try { action(); } catch { return; } throw new Excep
 DesignNode Node(double x = 0, double y = 0, double w = 100, double h = 100) => new() { X = x, Y = y, Width = w, Height = h };
 EditorSession Editor(params DesignNode[] nodes) => new(new() { Pages = [new() { Nodes = nodes.ToList() }] });
 
+SelectionPerformanceTests.Register(Test);
+
 Test("affine composition and inversion", () => { var matrix = Matrix2D.Rotation(37) * Matrix2D.Translation(123, -8); var p = matrix.Inverse.Map(matrix.Map(new Vec2(40, 60))); Equal(p.X, 40); Equal(p.Y, 60); });
 Test("singular matrix rejected", () => Check(!Matrix2D.Scale(0, 1).TryInvert(out _)));
 Test("transformed bounds", () => { var b = Matrix2D.Rotation(90).Map(new RectD(0, 0, 100, 50)); Equal(b.Width, 50); Equal(b.Height, 100); });

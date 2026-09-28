@@ -15,6 +15,8 @@ public sealed partial class DesignSurface
     private DesignNode? _pathNode, _pathDragBasis;
     private EditablePath? _editablePath, _pathDragOriginal;
     private string? _pathSignature;
+    private SKPath? _pathGeometry;
+    public long EditablePathBuilds { get; private set; }
     private readonly HashSet<Address> _selectedAnchors = [];
     private Address _pathDragAnchor;
     private int _pathDragHandle;
@@ -55,11 +57,13 @@ public sealed partial class DesignSurface
     {
         if (!PathEditing.CanEdit(node)) return false;
         if (_gesture == Gesture.Vertex && _pathDragOriginal is not null && ReferenceEquals(_pathNode, node)) return true;
-        var signature = VectorPath.Build(node) + $"|{node.Width:R}|{node.Height:R}|{node.PathWidth:R}|{node.PathHeight:R}|{node.FillRule}";
-        if (ReferenceEquals(_pathNode, node) && _pathSignature == signature && _editablePath is not null) return true;
-        var geometry = PathEditing.Read(node, Renderer);
+        var source = Renderer.Geometry(node);
+        if (ReferenceEquals(_pathNode, node) && ReferenceEquals(_pathGeometry, source) && _pathSignature is not null && _editablePath is not null) return true;
+        var geometry = PathEditing.Read(source);
+        EditablePathBuilds++;
+        _pathGeometry = source;
         if (_pathNode?.Id != node.Id) _selectedAnchors.Clear();
-        _pathNode = node; _editablePath = geometry; _pathSignature = signature;
+        _pathNode = node; _editablePath = geometry; _pathSignature = "";
         var valid = geometry.Addresses.ToHashSet(); _selectedAnchors.IntersectWith(valid);
         return true;
     }
@@ -177,17 +181,26 @@ public sealed partial class DesignSurface
 
     private void BeginPathDrag(DesignNode node, Vec2 world, Address address, int handle)
     {
-        Session!.BeginInteraction(handle == 0 ? "Move path anchors" : "Move direction handle");
-        _pathDragBasis = DocumentJson.CloneNode(node); _pathDragWorld = node.WorldMatrix;
-        _pathDragOriginal = _editablePath!.Clone(); _pathDragStart = _pathDragWorld.Inverse.Map(world);
-        _pathDragMoved = false;
-        _pathDragAnchor = address; _pathDragHandle = handle; _gesture = Gesture.Vertex;
+        _pathDragBasis = null; _pathDragOriginal = null; _pathDragWorld = node.WorldMatrix;
+        _pathDragStart = _pathDragWorld.Inverse.Map(world); _pathDragMoved = false;
+        _pathDragAnchor = address; _pathDragHandle = handle; _gesture = Gesture.PendingVertex;
     }
 
     private void MovePathAnchor(Vec2 world, bool independent)
     {
         independent = HostModifiers?.HasFlag(VirtualKeyModifiers.Menu) ?? (independent || Keyboard.Alt);
-        if (Session is not { } editor || _pathNode is not { } node || _pathDragOriginal is not { } original || _pathDragBasis is null) return;
+        if (Session is not { } editor || _pathNode is not { } node) return;
+        if (_gesture == Gesture.PendingVertex)
+        {
+            if (screenDelta(world).DistanceTo(Vec2.Zero) < 3) return;
+            try
+            {
+                editor.BeginInteraction(_pathDragHandle == 0 ? "Move path anchors" : "Move direction handle");
+                _pathDragBasis = DocumentJson.CloneNode(node); _pathDragOriginal = _editablePath!.Clone(); _gesture = Gesture.Vertex;
+            }
+            catch (Exception ex) { CancelGesture(); StatusChanged?.Invoke(ex.Message); return; }
+        }
+        if (_pathDragOriginal is not { } original || _pathDragBasis is null) return;
         if (!_pathDragMoved && screenDelta(world).DistanceTo(Vec2.Zero) < .25) return;
         _pathDragMoved = true;
         var delta = _pathDragWorld.Inverse.Map(world) - _pathDragStart;

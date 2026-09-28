@@ -12,7 +12,7 @@ public sealed partial class StudioWorkbench : UserControl, IDisposable
     private readonly ColumnDefinition _leftColumn = new() { Width = new(248) };
     private readonly ColumnDefinition _rightColumn = new() { Width = new(288) };
     private readonly ListView _layers = new();
-    private readonly ObservableCollection<LayerEntry> _entries = [];
+    private readonly ReconciledCollection<LayerEntry> _entries = [];
     private readonly StackPanel _pages = new() { Margin = new(8, 2, 8, 12), Spacing = 2 };
     private readonly StackPanel _inspector = new();
     private readonly ContentControl _leftContent = new();
@@ -29,7 +29,6 @@ public sealed partial class StudioWorkbench : UserControl, IDisposable
     private readonly DispatcherTimer _autosaveTimer = new() { Interval = TimeSpan.FromMilliseconds(900) };
     private readonly DispatcherTimer _toastTimer = new() { Interval = TimeSpan.FromSeconds(4) };
     private readonly SemaphoreSlim _autosaveLock = new(1, 1);
-    private string _layerSignature = "";
     private bool _refreshing, _assets, _prototype, _uiVisible = true, _initialFit, _disposed;
     private bool _aspectLocked;
     public EditorSession Session { get; }
@@ -57,7 +56,8 @@ public sealed partial class StudioWorkbench : UserControl, IDisposable
             _leftPanel.Visibility = _rightPanel.Visibility = _palette.Visibility = presenting ? Visibility.Collapsed : Visibility.Visible;
             _leftColumn.Width = presenting ? new(0) : new(248); _rightColumn.Width = presenting ? new(0) : new(288);
             reveal.Visibility = presenting ? Visibility.Collapsed : Visibility.Visible;
-            if (presenting) ShowStatus("Prototype preview · Click linked layers · Esc to return");
+            if (presenting) { _inspectorView?.SuspendEditing(); ShowStatus("Prototype preview · Click linked layers · Esc to return"); }
+            else RequestUi(UiDirty.All);
         };
         PreviewKeyDown += (_, e) =>
         {
@@ -95,7 +95,7 @@ public sealed partial class StudioWorkbench : UserControl, IDisposable
         var file = new StudioButton("File", () => { _assets = false; RefreshLeftContent(); }) { FontWeight = new() { Weight = 600 }, HorizontalAlignment = HorizontalAlignment.Left, Padding = new(10, 6) };
         var assets = new StudioButton("Assets", () => { _assets = true; RefreshLeftContent(); }) { HorizontalAlignment = HorizontalAlignment.Left };
         var tabs = Studio.Columns((file, 46), (assets, 60)); tabs.Margin = new(10, 0, 10, 8); header.Children.Add(tabs);
-        _search.PlaceholderText = "Search all layers…"; _search.Margin = new(12, 0, 12, 12); _search.Visibility = Visibility.Collapsed; _search.TextChanged += (_, _) => RefreshLayers(true); header.Children.Add(_search); header.Children.Add(Studio.Rule());
+        _search.PlaceholderText = "Search all layers…"; _search.Margin = new(12, 0, 12, 12); _search.Visibility = Visibility.Collapsed; _search.TextChanged += (_, _) => RequestUi(UiDirty.Layers | UiDirty.LayerSelection); header.Children.Add(_search); header.Children.Add(Studio.Rule());
         root.Children.Add(header);
         var pageHeader = Studio.Columns((Studio.Text("Pages", 11, Studio.Ink, true), -1), (new IconButton("plus", "Add page", () => Run(Session.AddPage)), 26)); pageHeader.Margin = new(16, 8, 12, 0);
         var pageArea = new StackPanel(); pageArea.Children.Add(pageHeader); pageArea.Children.Add(_pages); pageArea.Children.Add(Studio.Rule()); Grid.SetRow(pageArea, 1); root.Children.Add(pageArea);
@@ -153,18 +153,33 @@ public sealed partial class StudioWorkbench : UserControl, IDisposable
         if (_disposed) return;
         if (e.Kind is EditorChangeKind.Document or EditorChangeKind.Selection)
         {
-            RefreshAll();
-            if (e.Kind == EditorChangeKind.Document && e.Label != "Switch page") { _status.Text = "Saving locally…"; _autosaveTimer.Stop(); _autosaveTimer.Start(); }
+            // Invalidate input ownership synchronously; drawing and rebinding are coalesced.
+            if (!ReferenceEquals(_inspectorDocument, Session.Document) || !ReferenceEquals(_inspectorPrimary, Session.Primary)
+                || !_inspectorSelection.SetEquals(Session.SelectedIds)) _inspectorView?.SuspendEditing();
+            if (!ReferenceEquals(_controlPrimary, Session.Primary) || !_controlSelection.SetEquals(Session.SelectedIds))
+            { _fillControl?.CancelEdit(); _strokeControl?.CancelEdit(); _strokeWidthControl?.CancelEdit(); }
         }
-        else if (e.Kind == EditorChangeKind.Viewport) _zoom.Content = Numbers.Format(Session.Viewport.Zoom * 100) + "%⌄";
-        else if (e.Kind == EditorChangeKind.Tool) RefreshTools();
+        switch (e.Kind)
+        {
+            case EditorChangeKind.Document:
+                RequestUi(UiDirty.All);
+                if (e.Label != "Switch page") { _status.Text = "Saving locally…"; _autosaveTimer.Stop(); _autosaveTimer.Start(); }
+                break;
+            case EditorChangeKind.Selection:
+                RequestUi(UiDirty.Inspector | UiDirty.LayerSelection | UiDirty.ControlBar);
+                break;
+            case EditorChangeKind.Preview:
+                RequestUi(UiDirty.Inspector | UiDirty.ControlBar);
+                break;
+            case EditorChangeKind.Viewport:
+                RequestUi(UiDirty.Header);
+                break;
+            case EditorChangeKind.Tool:
+                RequestUi(UiDirty.Tools | UiDirty.Inspector);
+                break;
+        }
     }
-    private void RefreshAll()
-    {
-        _title.Content = Session.Document.Name; AutomationProperties.SetName(_title, "Rename document"); _zoom.Content = Numbers.Format(Session.Viewport.Zoom * 100) + "%⌄";
-        RefreshPages(); RefreshLayers(); RefreshInspector(); RefreshTools(); RefreshIllustrationPanels();
-        if (_assets) RefreshLeftContent();
-    }
+    private void RefreshAll() => RequestUi(UiDirty.All);
     private void RefreshTools()
     {
         foreach (var (tool, button) in _toolButtons)
@@ -185,57 +200,6 @@ public sealed partial class StudioWorkbench : UserControl, IDisposable
             _pages.Children.Add(button);
         }
     }
-    private void RefreshLayers(bool force = false)
-    {
-        var filter = _search.Text.Trim(); var list = new List<(DesignNode Node, int Depth)>();
-        foreach (var node in Session.Page.Nodes.AsEnumerable().Reverse()) Append(node, 0);
-        void Append(DesignNode node, int depth)
-        {
-            if (filter.Length > 0)
-            {
-                if (node.Name.Contains(filter, StringComparison.OrdinalIgnoreCase)) list.Add((node, 0));
-                foreach (var child in node.Children.AsEnumerable().Reverse()) Append(child, depth + 1); return;
-            }
-            list.Add((node, depth)); if (node.Expanded) foreach (var child in node.Children.AsEnumerable().Reverse()) Append(child, depth + 1);
-        }
-        var signature = string.Join('|', list.Select(n => $"{n.Node.Id}:{n.Node.Name}:{n.Depth}:{n.Node.Visible}:{n.Node.Locked}:{n.Node.Expanded}:{n.Node.Kind}:{n.Node.Children.Count}"));
-        _refreshing = true;
-        try
-        {
-            if (signature != _layerSignature || force)
-            {
-                _layerSignature = signature; _entries.Clear();
-                foreach (var (node, depth) in list)
-                {
-                    _entries.Add(new()
-                    {
-                        Id = node.Id, Name = node.Name, Depth = depth, Glyph = Glyph(node.Kind), HasChildren = node.Children.Count > 0, Expanded = node.Expanded, Visible = node.Visible, Locked = node.Locked, IsComponent = node.Kind is NodeKind.Component or NodeKind.Instance,
-                        ToggleExpanded = () => { if (Session.Document.Find(node.Id) is { } current) { current.Expanded = !current.Expanded; RefreshLayers(true); } },
-                        ToggleVisibility = () => Run(() => { if (Session.Document.Find(node.Id) is { } current) Session.Edit("Toggle layer visibility", () => current.Visible = !current.Visible); }),
-                        ToggleLocked = () => Run(() => { if (Session.Document.Find(node.Id) is { } current) Session.Edit("Toggle layer lock", () => current.Locked = !current.Locked); }),
-                        Rename = () => { if (Session.Document.Find(node.Id) is { } current) RunAsync(() => RenameLayerAsync(current)); }
-                    });
-                }
-            }
-            _layers.SelectedItems.Clear(); foreach (var item in _entries.Where(n => Session.SelectedIds.Contains(n.Id))) _layers.SelectedItems.Add(item);
-        }
-        finally { _refreshing = false; }
-    }
-    private void RefreshLeftContent()
-    {
-        if (!_assets) { _leftContent.Content = _layers; return; }
-        var root = new StackPanel { Margin = new(14, 8, 14, 20), Spacing = 10 }; root.Children.Add(Studio.Text("Local components", 12, Studio.Ink, true));
-        var components = Session.Document.AllNodes().Where(n => n.Kind == NodeKind.Component).ToArray();
-        if (components.Length == 0) root.Children.Add(Wrapped("Select a layer and create a component to reuse it throughout this document."));
-        foreach (var component in components)
-        {
-            var tile = new StudioButton { Content = Studio.Columns((new IconView { Glyph = "component", Color = "#9747FF", VerticalAlignment = VerticalAlignment.Center }, 20), (Studio.Text(component.Name, 11, "#9747FF"), -1)), HorizontalContentAlignment = HorizontalAlignment.Stretch, Padding = new(12), Height = 56, BorderBrush = Studio.Brush(Studio.Line), BorderThickness = new(1), CornerRadius = new(8) };
-            AutomationProperties.SetName(tile, "Insert " + component.Name);
-            tile.Click += (_, _) => Run(() => { var p = Session.Viewport.ScreenToWorld(new(Surface.ActualWidth / 2, Surface.ActualHeight / 2)); ComponentService.InsertInstance(Session, component, p - new Vec2(component.Width / 2, component.Height / 2)); }); root.Children.Add(tile);
-        }
-        root.Children.Add(new StudioButton("Create component from selection", () => Run(() => ComponentService.MakeComponent(Session))) { RestBackground = Studio.Field, Background = Studio.Brush(Studio.Field), IsEnabled = Session.SelectionRoots.Count == 1 });
-        _leftContent.Content = Studio.Scroll(root);
-    }
     private void TogglePanels()
     {
         _uiVisible = !_uiVisible; ResizeIllustrationWorkspace(); Surface.FocusCanvas();
@@ -248,7 +212,16 @@ public sealed partial class StudioWorkbench : UserControl, IDisposable
     {
         if (_disposed || Session.IsInteracting) { if (!_disposed) _autosaveTimer.Start(); return; }
         await _autosaveLock.WaitAsync();
-        try { var json = DocumentJson.Save(Session.Document); await _storage.WriteAutosaveAsync(json); _status.Text = "All changes saved locally"; }
+        try
+        {
+            if (_disposed || Session.IsInteracting) { if (!_disposed) _autosaveTimer.Start(); return; }
+            var revision = Session.DocumentRevision;
+            var json = DocumentJson.Save(Session.Document);
+            await _storage.WriteAutosaveAsync(json);
+            if (_disposed) return;
+            if (revision == Session.DocumentRevision) _status.Text = "All changes saved locally";
+            else { _status.Text = "Saving locally…"; _autosaveTimer.Stop(); _autosaveTimer.Start(); }
+        }
         catch (Exception ex) { _status.Text = "Local save failed"; ShowStatus("Autosave failed: " + ex.Message + ". Download a document copy.", true); }
         finally { _autosaveLock.Release(); }
     }
@@ -269,6 +242,6 @@ public sealed partial class StudioWorkbench : UserControl, IDisposable
     private static string Glyph(NodeKind kind) => kind == NodeKind.Path ? "pen" : kind.ToString().ToLowerInvariant();
     public new void Dispose()
     {
-        if (_disposed) return; _disposed = true; Session.Changed -= OnSessionChanged; _autosaveTimer.Stop(); _toastTimer.Stop(); Surface.Dispose();
+        if (_disposed) return; _disposed = true; Session.Changed -= OnSessionChanged; _autosaveTimer.Stop(); _toastTimer.Stop(); _inspectorView?.Dispose(); _layerEntries.Clear(); _artboardButtons.Clear(); UiRefreshed = null; Surface.Dispose();
     }
 }

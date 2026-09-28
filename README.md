@@ -22,7 +22,7 @@ ArtSpace shares its C# document model, transaction engine, geometry, custom cont
 
 The compact dark shell combines menus, appearance controls, toolbox, rulers, pasteboard, artboards, layers/properties/history and status bar. The original **Alpine Echoes** sample is editable vector artwork across three artboards.
 
-**Version: `0.4.0-alpha.1`.** This is an independent functional alpha, not complete or pixel-identical Adobe Illustrator parity. The [feature matrix](docs/feature-matrix.md) distinguishes implemented behavior and remaining compatibility boundaries.
+**Version: `0.4.1-alpha.1`.** This is an independent functional alpha, not complete or pixel-identical Adobe Illustrator parity. The [feature matrix](docs/feature-matrix.md) distinguishes implemented behavior and remaining compatibility boundaries.
 
 ## New in 0.4
 
@@ -132,3 +132,7 @@ Advanced shaping, variable-font workflows, gradient meshes, full live effects, i
 ArtSpace is [MIT-licensed](LICENSE), derived from the author's MIT [VectorSpace](https://github.com/wieslawsoltes/VectorSpace) snapshot `587f780f2803f6b3aa59dfb5411da2c2fe601dfa`. Attribution is retained in [third-party notices](THIRD-PARTY-NOTICES.md).
 
 Adobe Illustrator is a design and interaction reference. ArtSpace contains no Adobe source code, proprietary artwork, logos or product icons and is not affiliated with or endorsed by Adobe.
+
+## Responsive selection and panels
+
+Selection and property-editing performance is described in [UI performance](docs/ui-performance.md), including retained controls, change routing, lazy drag transactions and reproducible browser measurements.

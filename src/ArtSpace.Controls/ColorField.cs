@@ -7,39 +7,81 @@ public sealed class ColorField : UserControl
 {
     private readonly TextBox _text;
     private readonly StudioButton _swatch;
-    private string _value;
+    private string _value = "";
+    private bool _writing, _dirty;
+    private Flyout? _flyout;
+    private long _editGeneration;
     public event Action<string>? ColorCommitted;
     public string Value
     {
         get => _value;
-        set { _value = value; _text.Text = value.TrimStart('#').ToUpperInvariant(); _swatch.Background = Studio.Brush(value); _swatch.RestBackground = value; }
+        set
+        {
+            var changed = _value != value;
+            _value = value;
+            _writing = true;
+            try
+            {
+                var text = value.TrimStart('#').ToUpperInvariant();
+                if (_text.Text != text) _text.Text = text;
+                _dirty = false;
+            }
+            finally { _writing = false; }
+            if (changed) { _swatch.RestBackground = value; _swatch.Background = Studio.Brush(value); }
+        }
     }
     public ColorField(string color, Action<string> commit)
     {
-        _value = color; _text = Studio.Input(color.TrimStart('#'), "Hex color");
+        _text = Studio.Input(color.TrimStart('#'), "Hex color");
         _swatch = new StudioButton { Width = 24, Height = 24, Padding = new(0), CornerRadius = new(4), BorderThickness = new(1), BorderBrush = Studio.Brush("#22000000") };
         AutomationProperties.SetName(_swatch, "Choose color");
         Content = Studio.Columns((_swatch, 24), (_text, -1)); Value = color; ColorCommitted += commit;
+        _text.TextChanged += (_, _) => { if (!_writing) _dirty = true; };
         _text.LostFocus += (_, _) => CommitText();
-        _text.KeyDown += (_, e) => { if (e.Key == VirtualKey.Enter) { CommitText(); e.Handled = true; } };
-        _swatch.Click += (_, _) =>
+        _text.KeyDown += (_, e) =>
         {
-            var spectrum = new ColorSpectrum { Width = 248, Height = 166 }; spectrum.SetColor(Value);
-            var flyout = new Flyout(); var root = new StackPanel { Spacing = 12 };
-            root.Children.Add(Studio.Text("Custom color", 12, Studio.Ink, true)); root.Children.Add(spectrum);
-            var palette = new Grid { ColumnSpacing = 6 };
-            var colors = new[] { "#FFFFFF", "#1E1E1E", "#477BDA", "#7B61FF", "#F24822", "#FFCD29", "#14AE5C", "#FFA6D5" };
-            for (var i = 0; i < colors.Length; i++)
-            {
-                var c = colors[i]; var b = new StudioButton("", () => { Set(c); flyout.Hide(); }) { Width = 25, Height = 25, RestBackground = c, Background = Studio.Brush(c), BorderThickness = new(1), BorderBrush = Studio.Brush("#22000000") };
-                AutomationProperties.SetName(b, c); palette.ColumnDefinitions.Add(new() { Width = GridLength.Auto }); Grid.SetColumn(b, i); palette.Children.Add(b);
-            }
-            root.Children.Add(palette); spectrum.ColorCommitted += c => { Set(c); }; flyout.Content = root; flyout.ShowAt(_swatch);
+            if (e.Key == VirtualKey.Enter) { CommitText(); e.Handled = true; }
+            else if (e.Key == VirtualKey.Escape) { CancelEdit(); e.Handled = true; }
         };
+        _swatch.Click += (_, _) => OpenPicker();
     }
-    private void Set(string color) { if (_value == color) return; Value = color; ColorCommitted?.Invoke(color); }
+    public void UpdateFromModel(string value, bool retarget = false)
+    {
+        if (retarget) CancelEdit();
+        else if (_dirty && _text.FocusState != FocusState.Unfocused) return;
+        Value = value;
+    }
+    public void CancelEdit()
+    {
+        _editGeneration++;
+        _flyout?.Hide(); _flyout = null;
+        if (_dirty) Value = _value;
+    }
+    private void OpenPicker()
+    {
+        CancelEdit();
+        var generation = _editGeneration;
+        var spectrum = new ColorSpectrum { Width = 248, Height = 166 }; spectrum.SetColor(Value);
+        var flyout = new Flyout(); _flyout = flyout;
+        var root = new StackPanel { Spacing = 12 };
+        root.Children.Add(Studio.Text("Custom color", 12, Studio.Ink, true)); root.Children.Add(spectrum);
+        var palette = new Grid { ColumnSpacing = 6 };
+        string[] colors = ["#FFFFFF", "#1E1E1E", "#477BDA", "#7B61FF", "#F24822", "#FFCD29", "#14AE5C", "#FFA6D5"];
+        for (var i = 0; i < colors.Length; i++)
+        {
+            var color = colors[i];
+            var button = new StudioButton("", () => { if (generation == _editGeneration) Set(color); flyout.Hide(); })
+                { Width = 25, Height = 25, RestBackground = color, Background = Studio.Brush(color), BorderThickness = new(1), BorderBrush = Studio.Brush("#22000000") };
+            AutomationProperties.SetName(button, color); palette.ColumnDefinitions.Add(new() { Width = GridLength.Auto }); Grid.SetColumn(button, i); palette.Children.Add(button);
+        }
+        root.Children.Add(palette);
+        spectrum.ColorCommitted += color => { if (generation == _editGeneration) Set(color); };
+        flyout.Content = root; flyout.ShowAt(_swatch);
+    }
+    private void Set(string color) { var changed = _value != color; Value = color; if (changed) ColorCommitted?.Invoke(color); }
     private void CommitText()
     {
+        if (!_dirty) return;
         var candidate = "#" + _text.Text.Trim().TrimStart('#');
         if (candidate.Length is 7 or 9 && SKColor.TryParse(candidate, out _)) Set(candidate.ToUpperInvariant()); else Value = _value;
     }
