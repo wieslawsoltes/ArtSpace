@@ -1,0 +1,32 @@
+name: Repair contour input predicate
+on:
+  push:
+    branches: [perf/selection-ui-latency]
+    paths: ['.github/workflows/ui-input-repair.yml']
+permissions:
+  contents: write
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: perf/selection-ui-latency
+      - name: Reuse the existing path-tool predicate
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          p = Path('src/ArtSpace.Editor/DesignSurface.cs')
+          assert subprocess.check_output(['git', 'hash-object', str(p)], text=True).strip() == '1f723614dbb145f59627716075641e40c01ad53c'
+          s = p.read_text()
+          old = 'if (Session.Tool is EditorTool.Vertex or EditorTool.AddAnchor or EditorTool.DeleteAnchor or EditorTool.ConvertAnchor)'
+          assert s.count(old) == 1
+          p.write_text(s.replace(old, 'if (IsPathTool)'))
+          PY
+          git diff --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/ArtSpace.Editor/DesignSurface.cs
+          git commit -m 'Reuse the shared path-tool predicate for contour double-tap ownership'
+          git push origin HEAD:perf/selection-ui-latency
