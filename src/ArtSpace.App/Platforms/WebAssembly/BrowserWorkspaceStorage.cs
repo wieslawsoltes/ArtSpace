@@ -48,6 +48,7 @@ internal static class BrowserDiagnostics
         if (!BrowserFiles.IsTestMode()) return;
         void Publish()
         {
+            if (workbench.IsDisposed) return;
             var primary = session.Primary;
             using var stream = new MemoryStream();
             using (var json = new Utf8JsonWriter(stream))
@@ -75,6 +76,37 @@ internal static class BrowserDiagnostics
                 json.WriteNumber("clipGroups", session.Page.AllNodes().Count(n => n.ClipPathId is not null));
                 json.WriteNumber("geometryBuilds", workbench.Surface.Renderer.GeometryBuilds);
                 json.WriteNumber("culledNodes", workbench.Surface.Renderer.CulledNodes);
+                json.WriteString("id", primary?.Id);
+                json.WriteString("inspectorTarget", workbench.InspectorTargetId);
+                json.WriteString("inspectorName", workbench.InspectorTargetName);
+                json.WriteNumber("inspectorSelection", workbench.InspectorSelectionCount);
+                json.WriteString("activePanel", workbench.ActivePanel);
+                json.WriteBoolean("uiPending", workbench.UiPending);
+                json.WriteNumber("uiFlushes", workbench.UiFlushes);
+                json.WriteNumber("uiFailures", workbench.UiRefreshFailures);
+                json.WriteNumber("uiMs", workbench.LastUiRefreshMs);
+                json.WriteNumber("inspectorBuilds", workbench.InspectorBuilds);
+                json.WriteNumber("inspectorRefreshes", workbench.InspectorRefreshes);
+                json.WriteNumber("layerPasses", workbench.LayerPasses);
+                json.WriteNumber("layerEntryBuilds", workbench.LayerEntryBuilds);
+                json.WriteNumber("layerSelectionChanges", workbench.LayerSelectionChanges);
+                json.WriteNumber("layerResets", workbench.LayerCollectionResets);
+                json.WriteNumber("artboardRefreshes", workbench.ArtboardRefreshes);
+                json.WriteNumber("historyRefreshes", workbench.HistoryRefreshes);
+                json.WriteNumber("selectionIndexBuilds", session.SelectionIndexBuilds);
+                json.WriteNumber("snapshots", session.SnapshotCaptures);
+                json.WriteNumber("snapIndexBuilds", workbench.Surface.SnapIndexBuilds);
+                json.WriteNumber("editablePathBuilds", workbench.Surface.EditablePathBuilds);
+                json.WriteStartArray("selectedLayerIds");
+                foreach (var id in workbench.SelectedLayerIds) json.WriteStringValue(id);
+                json.WriteEndArray();
+                json.WriteStartArray("inspectorFields");
+                foreach (var field in workbench.InspectorFields)
+                {
+                    json.WriteStartObject(); json.WriteString("section", field.Section); json.WriteString("label", field.Label); json.WriteString("value", field.Value);
+                    json.WriteNumber("x", field.X); json.WriteNumber("y", field.Y); json.WriteNumber("width", field.Width); json.WriteNumber("height", field.Height); json.WriteEndObject();
+                }
+                json.WriteEndArray();
                 json.WriteStartArray("anchors");
                 foreach (var anchor in workbench.Surface.GetPathAnchors())
                 {
@@ -90,6 +122,18 @@ internal static class BrowserDiagnostics
             }
             BrowserFiles.PublishDiagnostics(System.Text.Encoding.UTF8.GetString(stream.ToArray()));
         }
-        session.Changed += (_, _) => Publish(); workbench.Surface.SizeChanged += (_, _) => Publish(); workbench.Surface.PresentationChanged += _ => Publish(); Publish();
+        var queued = false;
+        void QueuePublish()
+        {
+            if (queued || workbench.IsDisposed) return;
+            queued = true;
+            if (!workbench.DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () => { queued = false; Publish(); })) queued = false;
+        }
+        session.Changed += (_, _) => QueuePublish();
+        workbench.UiRefreshed += QueuePublish;
+        workbench.LayoutUpdated += (_, _) => QueuePublish();
+        workbench.Surface.SizeChanged += (_, _) => QueuePublish();
+        workbench.Surface.PresentationChanged += _ => QueuePublish();
+        QueuePublish();
     }
 }

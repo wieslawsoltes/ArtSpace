@@ -22,7 +22,7 @@ jobs:
   deploy:
     if: github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.event != 'pull_request' && github.event.workflow_run.head_repository.full_name == github.repository)
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -92,4 +92,5 @@ jobs:
             artifacts/playwright-report
             artifacts/test-results
             artifacts/browser-results.xml
+            artifacts/ui-performance
           if-no-files-found: ignore

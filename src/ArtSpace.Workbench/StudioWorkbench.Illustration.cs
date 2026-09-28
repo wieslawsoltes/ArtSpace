@@ -80,6 +80,18 @@ public sealed partial class StudioWorkbench
         footer.Margin = new(5, 0, 8, 0); Put(footer, 4, 0, 3);
         Session.RulersVisible = true;
         _illustrationReady = true;
+        _illustrationDock.SelectionChanged += name =>
+        {
+            if (name != "Properties") _inspectorView?.SuspendEditing();
+            RequestUi(name switch
+            {
+                "Properties" => UiDirty.Inspector,
+                "Layers" => UiDirty.Layers | UiDirty.LayerSelection | UiDirty.Assets,
+                "Artboards" => UiDirty.Artboards,
+                "History" => UiDirty.History,
+                _ => UiDirty.None
+            });
+        };
         SizeChanged += (_, _) => ResizeIllustrationWorkspace();
         RefreshIllustrationPanels(); ResizeIllustrationWorkspace();
 
@@ -95,7 +107,10 @@ public sealed partial class StudioWorkbench
         var showRight = _uiVisible && (ActualWidth == 0 || ActualWidth >= 760);
         _rightColumn.Width = new(showRight ? _dockWidth : 0);
         _leftPanel.Visibility = _palette.Visibility = _uiVisible ? Visibility.Visible : Visibility.Collapsed;
+        var wasVisible = _rightPanel.Visibility == Visibility.Visible;
         _rightPanel.Visibility = showRight ? Visibility.Visible : Visibility.Collapsed;
+        if (showRight && !wasVisible) RequestUi(UiDirty.All);
+        else if (!showRight) _inspectorView?.SuspendEditing();
     }
 
     private UIElement BuildIllustrationTools()
@@ -149,108 +164,13 @@ public sealed partial class StudioWorkbench
             _controlBar.Children.Add(new IconButton(direction, "Align " + direction, () => Run(() => Session.Align(direction))) { Width = 27, Height = 29, Padding = new(5) });
     }
 
-    private void RefreshIllustrationPanels()
-    {
-        if (!_illustrationReady) return;
-        _selectionLabel.Text = Session.Primary is { } selected ? (selected.Kind == NodeKind.Frame ? "Artboard" : selected.Kind.ToString()) : "No Selection";
-        _syncingAppearance = true;
-        try
-        {
-            var primary = Session.Primary;
-            if (primary is not null)
-            {
-                Surface.FillColor = primary.Fill;
-                Surface.StrokeColor = primary.Strokes.FirstOrDefault()?.Color ?? Surface.StrokeColor;
-                Surface.StrokeWidth = primary.Strokes.FirstOrDefault()?.Width ?? 0;
-            }
-            if (_fillControl is not null) _fillControl.Value = Surface.FillColor;
-            if (_strokeControl is not null) _strokeControl.Value = Surface.StrokeColor;
-            if (_strokeWidthControl is not null) _strokeWidthControl.Value = Surface.StrokeWidth;
-            if (_opacityControl is not null)
-            {
-                var value = Numbers.Format((primary?.Opacity ?? 1) * 100) + "%";
-                if (!_opacityControl.Items.Contains(value)) _opacityControl.Items.Add(value);
-                _opacityControl.SelectedItem = value;
-            }
-        }
-        finally { _syncingAppearance = false; }
-        _artboards.Children.Clear();
-        _artboards.Children.Add(new StudioButton("+ New artboard", () => Run(AddArtboard)) { HorizontalAlignment = HorizontalAlignment.Stretch, RestBackground = Studio.Field });
-        foreach (var board in Session.Page.Nodes.Where(n => n.IsFrame))
-        {
-            var name = board.Name;
-            _artboards.Children.Add(new StudioButton(name + "   " + Numbers.Format(board.Width) + " × " + Numbers.Format(board.Height), () => { Session.Select(board); Surface.Fit(true); }) { HorizontalContentAlignment = HorizontalAlignment.Left, HorizontalAlignment = HorizontalAlignment.Stretch, Height = 33, Padding = new(8) });
-        }
-        _historyPanel.Children.Clear();
-        _historyPanel.Children.Add(Studio.Columns((new StudioButton("Undo", () => Run(Session.Undo)) { IsEnabled = Session.CanUndo }, -1), (new StudioButton("Redo", () => Run(Session.Redo)) { IsEnabled = Session.CanRedo }, -1)));
-        foreach (var label in Session.History.Reverse().Take(100)) _historyPanel.Children.Add(Studio.Text(label, 11, Studio.Muted));
-    }
+    private void RefreshIllustrationPanels() => RequestUi(UiDirty.ControlBar | UiDirty.Artboards | UiDirty.History);
 
     private void AddArtboard()
     {
         var right = Session.Page.Nodes.Count == 0 ? 0 : Session.Page.Nodes.Max(n => n.WorldBounds.Right) + 80;
         var board = new DesignNode { Kind = NodeKind.Frame, Name = "Artboard " + (Session.Page.Nodes.Count(n => n.IsFrame) + 1), X = right, Width = 640, Height = 800, Fill = "#FFFFFF", ClipContent = true };
         Session.Edit("Add artboard", () => { Session.AddNode(board); Session.Select(board); }); Surface.Fit(true);
-    }
-
-    private void AddIllustrationSections()
-    {
-        var transparency = AddSection("Transparency");
-        if (OpacityMaskOperations.FindOwner(Session.Primary) is { } owner)
-        {
-            transparency.Body.Children.Add(Studio.Choice(Enum.GetNames<OpacityMaskMode>(), owner.OpacityMaskMode.ToString(), value => Run(() => OpacityMaskOperations.SetMode(Session, Enum.Parse<OpacityMaskMode>(value))), "Opacity mask mode"));
-            transparency.Body.Children.Add(new StudioButton("Edit Mask Artwork", () => Run(() => OpacityMaskOperations.EditMask(Session))));
-            transparency.Body.Children.Add(new StudioButton("Edit Masked Artwork", () => Run(() => OpacityMaskOperations.EditContents(Session))));
-            transparency.Body.Children.Add(new StudioButton(owner.OpacityMaskInverted ? "Invert Mask: On" : "Invert Mask: Off", () => Run(() => OpacityMaskOperations.Invert(Session))));
-            transparency.Body.Children.Add(new StudioButton(owner.OpacityMaskEnabled ? "Disable Opacity Mask" : "Enable Opacity Mask", () => Run(() => OpacityMaskOperations.ToggleEnabled(Session))));
-            transparency.Body.Children.Add(new StudioButton("Release Opacity Mask", () => Run(() => OpacityMaskOperations.Release(Session))));
-        }
-        else transparency.Body.Children.Add(new StudioButton("Make Opacity Mask", () => Run(() => OpacityMaskOperations.Make(Session))) { IsEnabled = Session.Selection.Count > 0 });
-        if (ClippingOperations.FindGroup(Session.Primary) is not null)
-        {
-            var clip = AddSection("Clipping Mask");
-            clip.Body.Children.Add(new StudioButton("Edit Clipping Path", () => Run(() => { ClippingOperations.EditMask(Session); Surface.EnterPathEditing(); })));
-            clip.Body.Children.Add(new StudioButton("Edit Contents", () => Run(() => ClippingOperations.EditContents(Session))));
-            clip.Body.Children.Add(new StudioButton("Release Mask", () => Run(() => ClippingOperations.Release(Session))));
-        }
-        if (PathEditing.CanEdit(Session.Primary))
-        {
-            var pathSection = AddSection("Path");
-            pathSection.Body.Children.Add(new StudioButton("Edit anchors", () => Run(Surface.EnterPathEditing)) { HorizontalAlignment = HorizontalAlignment.Stretch });
-            pathSection.Body.Children.Add(Studio.Choice(new[] { "Nonzero", "Even-odd" }, Session.Primary!.FillRule == PathFillRule.EvenOdd ? "Even-odd" : "Nonzero", value => Change("Fill rule", n => n.FillRule = value == "Even-odd" ? PathFillRule.EvenOdd : PathFillRule.NonZero), "Path fill rule"));
-            if (Surface.SelectedAnchorCount > 0)
-            {
-                pathSection.Body.Children.Add(Studio.Text(Surface.SelectedAnchorCount + " anchors selected", 10, Studio.Muted));
-                pathSection.Body.Children.Add(Studio.Columns((new StudioButton("Smooth", () => Run(() => SmoothPathAnchors(true))), -1), (new StudioButton("Corner", () => Run(() => SmoothPathAnchors(false))), -1)));
-                pathSection.Body.Children.Add(new StudioButton("Remove selected anchors", () => Run(() => Surface.RemoveSelectedAnchors(false))));
-            }
-        }
-        if (Session.Primary?.Kind == NodeKind.Text)
-        {
-            var typeSection = AddSection("Type");
-            typeSection.Body.Children.Add(new StudioButton("Create outlines", () => Run(() => PathOperations.CreateOutlines(Session, Surface.Renderer))) { HorizontalAlignment = HorizontalAlignment.Stretch });
-        }
-        var section = AddSection("Pathfinder");
-        var actions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10 };
-        foreach (var (op, glyph) in new[] { (BooleanOperation.Union,"union"), (BooleanOperation.Subtract,"subtract"), (BooleanOperation.Intersect,"intersect"), (BooleanOperation.Exclude,"exclude") })
-            actions.Children.Add(new IconButton(glyph, "Pathfinder " + op, () => Run(() => BooleanOperations.Apply(Session, Surface.Renderer, op))) { Width = 42, Height = 29 });
-        section.Body.Children.Add(actions);
-        var swatches = AddSection("Swatches"); var palette = new Grid { RowSpacing = 4, ColumnSpacing = 4 };
-        var colors = new[] { "#FFFFFF", "#111111", "#F5E8D0", "#F1BB78", "#E47956", "#CF4640", "#AE3C69", "#7955A3", "#4059A9", "#477AD0", "#4489A0", "#327F79", "#365348", "#748A60", "#ADC58C", "#ECD875" };
-        for (var c = 0; c < 8; c++) palette.ColumnDefinitions.Add(new() { Width = new(1, GridUnitType.Star) });
-        for (var r = 0; r < 2; r++) palette.RowDefinitions.Add(new() { Height = new(23) });
-        for (var i = 0; i < colors.Length; i++)
-        {
-            var color = colors[i]; var button = new StudioButton("", () => { Surface.FillColor = color; Change("Apply swatch", n => n.Fill = color); }) { Height = 23, HorizontalAlignment = HorizontalAlignment.Stretch, Padding = new(0), CornerRadius = new(0), RestBackground = color, Background = Studio.Brush(color), BorderThickness = new(1), BorderBrush = Studio.Brush("#252525") };
-            AutomationProperties.SetName(button, "Swatch " + color); Grid.SetRow(button, i / 8); Grid.SetColumn(button, i % 8); palette.Children.Add(button);
-        }
-        swatches.Body.Children.Add(palette);
-        if (Session.Primary is { Strokes.Count: > 0 } node)
-        {
-            var stroke = AddSection("Stroke options");
-            stroke.Body.Children.Add(Studio.Choice(Enum.GetNames<StrokeCap>(), node.Strokes[0].Cap.ToString(), value => Change("Stroke cap", n => { foreach (var s in n.Strokes) s.Cap = Enum.Parse<StrokeCap>(value); }), "Stroke cap"));
-            stroke.Body.Children.Add(Studio.Choice(Enum.GetNames<StrokeJoin>(), node.Strokes[0].Join.ToString(), value => Change("Stroke join", n => { foreach (var s in n.Strokes) s.Join = Enum.Parse<StrokeJoin>(value); }), "Stroke join"));
-        }
     }
 
     private IEnumerable<MenuCommand> IllustrationMenu(string menu)

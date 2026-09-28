@@ -15,16 +15,20 @@ public sealed partial class DesignSurface : UserControl, IDisposable
         public Action<SKCanvas, Size>? Draw { get; set; }
         protected override void RenderOverride(SKCanvas canvas, Size area) => Draw?.Invoke(canvas, area);
     }
-    private enum Gesture { None, Move, Resize, Rotate, Create, Marquee, Pan, PenControl, Pencil, Guide, Pinch, Vertex, Gradient, AnchorMarquee }
+    private enum Gesture { None, Move, Resize, Rotate, Create, Marquee, Pan, PenControl, Pencil, Guide, Pinch, Vertex, Gradient, AnchorMarquee, PendingTransform, PendingVertex }
     private readonly DrawingCanvas _canvas = new();
     private readonly Canvas _overlay = new();
     private EditorSession? _session;
     private Gesture _gesture;
     private Vec2 _startScreen, _startWorld, _startPan;
     private RectD _startBounds;
-    private readonly Dictionary<string, DesignNode> _originals = [];
+    private readonly record struct TransformSnapshot(double X, double Y, double Width, double Height, double Rotation, Matrix2D LocalMatrix);
+    private readonly Dictionary<string, TransformSnapshot> _originals = [];
+    private Gesture _pendingTransform;
+    private bool _pendingDuplicate;
+    public long SnapIndexBuilds { get; private set; }
     private DesignNode? _created, _penNode, _vectorNode, _hover;
-    private int _resizeHandle, _vertexIndex;
+    private int _resizeHandle;
     private Matrix2D _resizeMatrix;
     private Guide? _guide;
     private RectD? _marquee;
@@ -33,6 +37,7 @@ public sealed partial class DesignSurface : UserControl, IDisposable
     private bool _dynamicSnapTargets;
     private SnapIndex BuildSnapIndex()
     {
+        SnapIndexBuilds++;
         var editor = Session!; var roots = editor.SelectionRoots;
         return new SnapIndex(editor.Page.AllNodes().Where(n => n.IsEffectivelyVisible && n.Parent?.ClipPathId != n.Id && n.Parent?.OpacityMaskId != n.Id && !editor.SelectedIds.Contains(n.Id) && !roots.Any(n.IsDescendantOf)).Select(n => n.WorldBounds));
     }
@@ -76,6 +81,11 @@ public sealed partial class DesignSurface : UserControl, IDisposable
         _canvas.DoubleTapped += (_, e) =>
         {
             if (Session is null || IsPresenting) return;
+            // An explicit contour tool owns anchor clicks, including a rapid second press.
+            // Generic artwork picking deliberately excludes mask sources, so allowing it here
+            // can switch an anchor drag to the underlying masked artwork.
+            if (IsPathTool)
+            { e.Handled = true; return; }
             if (_penNode is not null) { FinishPath(false); e.Handled = true; return; }
             var p = e.GetPosition(_canvas); var hit = Renderer.HitTest(Session.Page.Nodes, Session.Viewport.ScreenToWorld(new(p.X, p.Y)), true, 4 / Session.Viewport.Zoom);
             if (hit?.Kind == NodeKind.Text) { BeginTextEdit(hit); e.Handled = true; }
@@ -104,6 +114,7 @@ public sealed partial class DesignSurface : UserControl, IDisposable
             if (Session is not null) Renderer.PruneCache(Session.Document.Pages.SelectMany(p => p.Nodes)); _snapIndex = null; _hover = null;
             if (_vectorNode is not null) _vectorNode = Session?.Document.Find(_vectorNode.Id);
         }
+        if (e.Kind == EditorChangeKind.Tool && _gesture is Gesture.PendingTransform or Gesture.PendingVertex) _gesture = Gesture.None;
         if (e.Kind == EditorChangeKind.Tool && _penNode is not null) FinishPath(false);
         _canvas.Invalidate();
     }
@@ -163,9 +174,8 @@ public sealed partial class DesignSurface : UserControl, IDisposable
         {
             if (handles[i].DistanceTo(screen) <= 7 && editor.SelectionRoots.All(n => !n.IsEffectivelyLocked))
             {
-                editor.BeginInteraction(i == 8 ? "Rotate layers" : "Resize layers"); CaptureOriginals(); _resizeHandle = i;
-                _gesture = i == 8 ? Gesture.Rotate : Gesture.Resize;
-                if (editor.SelectionRoots.Count == 1) _resizeMatrix = editor.SelectionRoots[0].WorldMatrix;
+                _resizeHandle = i; _pendingTransform = i == 8 ? Gesture.Rotate : Gesture.Resize;
+                _pendingDuplicate = false; _gesture = Gesture.PendingTransform;
                 return;
             }
         }
@@ -174,9 +184,7 @@ public sealed partial class DesignSurface : UserControl, IDisposable
         {
             if (shift) { editor.Select(hit, true); if (!editor.SelectedIds.Contains(hit.Id)) return; }
             else if (!editor.SelectedIds.Contains(hit.Id)) editor.Select(hit);
-            editor.BeginInteraction(alt ? "Duplicate layers" : "Move layers");
-            if (alt) editor.DuplicateInTransaction(editor.SelectionRoots);
-            CaptureOriginals(); _gesture = Gesture.Move;
+            _pendingDuplicate = alt; _pendingTransform = Gesture.Move; _gesture = Gesture.PendingTransform;
         }
         else
         {
@@ -214,10 +222,10 @@ public sealed partial class DesignSurface : UserControl, IDisposable
     private void CaptureOriginals()
     {
         _originals.Clear(); if (Session is null) return;
-        foreach (var node in Session.SelectionRoots) _originals[node.Id] = DocumentJson.CloneNode(node);
+        foreach (var node in Session.SelectionRoots) _originals[node.Id] = new(node.X, node.Y, node.Width, node.Height, node.Rotation, node.LocalMatrix);
         _startBounds = Session.SelectionBounds();
         _dynamicSnapTargets = Session.Page.AllNodes().Any(n => n.Layout.Direction != LayoutDirection.None);
-        _snapIndex = BuildSnapIndex();
+        _snapIndex = null;
     }
     private void Moved(object sender, PointerRoutedEventArgs e)
     {
@@ -228,6 +236,20 @@ public sealed partial class DesignSurface : UserControl, IDisposable
         {
             var points = _touches.Values.Take(2).ToArray(); var center = (points[0] + points[1]) / 2; var ratio = points[0].DistanceTo(points[1]) / _pinchDistance;
             editor.Viewport.ZoomAt(_pinchZoom, Vec2.Zero); editor.Viewport.Pan = _pinchPan; editor.Viewport.ZoomAt(_pinchZoom * ratio, _pinchCenter); editor.Viewport.Pan += center - _pinchCenter; editor.Notify(EditorChangeKind.Viewport); return;
+        }
+        if (_gesture == Gesture.PendingTransform)
+        {
+            if (screen.DistanceTo(_startScreen) < 3) return;
+            if (editor.SelectionRoots.Count == 0 || editor.SelectionRoots.Any(n => n.IsEffectivelyLocked)) { _gesture = Gesture.None; return; }
+            try
+            {
+                editor.BeginInteraction(_pendingTransform == Gesture.Move ? (_pendingDuplicate ? "Duplicate layers" : "Move layers") : _pendingTransform == Gesture.Resize ? "Resize layers" : "Rotate layers");
+                if (_pendingDuplicate) editor.DuplicateInTransaction(editor.SelectionRoots);
+                CaptureOriginals();
+                if (_pendingTransform == Gesture.Resize && editor.SelectionRoots.Count == 1) _resizeMatrix = editor.SelectionRoots[0].WorldMatrix;
+                _gesture = _pendingTransform;
+            }
+            catch (Exception ex) { CancelGesture(); StatusChanged?.Invoke(ex.Message); return; }
         }
         var shift = e.KeyModifiers.HasFlag(VirtualKeyModifiers.Shift);
         switch (_gesture)
@@ -273,6 +295,7 @@ public sealed partial class DesignSurface : UserControl, IDisposable
             case Gesture.PenControl:
                 if (_penNode is null || screen.DistanceTo(_startScreen) < 3) break;
                 var control = _penNode.WorldMatrix.Inverse.Map(world); var last = _penNode.Points[^1]; last.ControlOut = control; last.ControlIn = last.Position * 2 - control; editor.Preview(); break;
+            case Gesture.PendingVertex:
             case Gesture.Vertex:
                 MovePathAnchor(world, e.KeyModifiers.HasFlag(VirtualKeyModifiers.Menu)); break;
             case Gesture.Gradient:
@@ -285,6 +308,7 @@ public sealed partial class DesignSurface : UserControl, IDisposable
     private void Released(object sender, PointerRoutedEventArgs e)
     {
         if (Session is not { } editor) return;
+        if (_gesture is Gesture.PendingTransform or Gesture.Move or Gesture.Resize or Gesture.Rotate or Gesture.PendingVertex or Gesture.Vertex) Moved(sender, e);
         _touches.Remove(e.Pointer.PointerId);
         var gesture = _gesture; _gesture = Gesture.None;
         _canvas.ReleasePointerCapture(e.Pointer); e.Handled = true;
@@ -302,7 +326,7 @@ public sealed partial class DesignSurface : UserControl, IDisposable
             if (node.Kind == NodeKind.Text) BeginTextEdit(node);
         }
         else if (gesture == Gesture.Pencil) FinishPath(false);
-        else if (gesture is not Gesture.None and not Gesture.Pan and not Gesture.Marquee and not Gesture.AnchorMarquee and not Gesture.PenControl) editor.CommitInteraction();
+        else if (gesture is not Gesture.None and not Gesture.Pan and not Gesture.Marquee and not Gesture.AnchorMarquee and not Gesture.PenControl and not Gesture.PendingTransform and not Gesture.PendingVertex) editor.CommitInteraction();
         _marquee = null; _guide = null; _snapLines = []; _canvas.Invalidate();
     }
     private void ResizeSelection(Vec2 world, bool aspect, bool center)

@@ -29,7 +29,7 @@ public sealed class Viewport
 }
 
 /// <summary>UI-independent editor state. A pointer gesture is one atomic, cancellable history entry.</summary>
-public sealed class EditorSession
+public sealed partial class EditorSession
 {
     private sealed record Snapshot(string Json, string PageId, string[] Selection);
     private sealed record HistoryEntry(string Label, Snapshot Before, Snapshot After);
@@ -54,25 +54,8 @@ public sealed class EditorSession
     public bool CanRedo => _redo.Count > 0;
     public string UndoLabel => _undo.LastOrDefault()?.Label ?? "";
     public string RedoLabel => _redo.TryPeek(out var item) ? item.Label : "";
-    public IReadOnlyList<string> History => _undo.Select(e => e.Label).ToArray();
+    public IReadOnlyList<string> History => _historyCache ??= Array.AsReadOnly(_undo.Select(e => e.Label).ToArray());
     public IReadOnlySet<string> SelectedIds => _selected;
-    private IReadOnlyList<DesignNode>? _selectionCache, _rootsCache;
-    public long SelectionMaterializations { get; private set; }
-    private void InvalidateSelection() { _selectionCache = null; _rootsCache = null; }
-    public IReadOnlyList<DesignNode> Selection
-    {
-        get
-        {
-            if (_selectionCache is null)
-            {
-                SelectionMaterializations++;
-                _selectionCache = Array.AsReadOnly(Page.AllNodes().Where(n => _selected.Contains(n.Id)).ToArray());
-            }
-            return _selectionCache;
-        }
-    }
-    public IReadOnlyList<DesignNode> SelectionRoots => _rootsCache ??= Array.AsReadOnly(Selection.Where(n => !Ancestors(n).Any(a => _selected.Contains(a.Id))).ToArray());
-    public DesignNode? Primary => Selection.LastOrDefault();
     public EditorTool Tool { get => _tool; set { if (_tool == value) return; _tool = value; Notify(EditorChangeKind.Tool); } }
     public EditorSession(DesignDocument document)
     {
@@ -89,14 +72,6 @@ public sealed class EditorSession
         var page = Document.Pages.FirstOrDefault(p => p.Id == id); if (page is null) return;
         Page = page; _selected.Clear(); Notify(EditorChangeKind.Document, "Switch page");
     }
-    public void Select(IEnumerable<string> ids, bool toggle = false)
-    {
-        var existing = Page.AllNodes().Select(n => n.Id).ToHashSet();
-        if (!toggle) _selected.Clear();
-        foreach (var id in ids.Where(existing.Contains)) if (!toggle || !_selected.Remove(id)) _selected.Add(id);
-        Notify(EditorChangeKind.Selection);
-    }
-    public void Select(DesignNode? node, bool toggle = false) => Select(node is null ? [] : [node.Id], toggle);
     public void SelectAll() => Select(Page.Nodes.Where(n => n.Visible && !n.Locked).Select(n => n.Id));
     public RectD SelectionBounds()
     {
@@ -104,7 +79,8 @@ public sealed class EditorSession
     }
     public void Notify(EditorChangeKind kind, string label = "")
     {
-        if (kind is EditorChangeKind.Document or EditorChangeKind.Selection) InvalidateSelection();
+        if (kind == EditorChangeKind.Document) { InvalidateSceneSelection(); _historyCache = null; DocumentRevision++; }
+        else if (kind == EditorChangeKind.Selection) InvalidateSelection();
         Changed?.Invoke(this, new(kind, label));
     }
     public void Preview()
@@ -114,7 +90,7 @@ public sealed class EditorSession
     public void BeginInteraction(string label)
     {
         if (_before is not null) throw new InvalidOperationException("An edit transaction is already active.");
-        InvalidateSelection(); _before = Capture(); _interactionLabel = label;
+        InvalidateSceneSelection(); _before = Capture(); _interactionLabel = label;
     }
     public void CommitInteraction()
     {
@@ -152,18 +128,18 @@ public sealed class EditorSession
     }
     public void MarkSaved(string? json = null)
     {
-        _savedJson = json ?? DocumentJson.Save(Document); IsDirty = DocumentJson.Save(Document) != _savedJson; Notify(EditorChangeKind.Selection);
+        var current = DocumentJson.Save(Document); _savedJson = json ?? current; IsDirty = current != _savedJson; Notify(EditorChangeKind.Selection);
     }
     public void AddNode(DesignNode node, DesignNode? parent = null)
     {
-        node.Parent = parent; (parent?.Children ?? Page.Nodes).Add(node); InvalidateSelection();
+        node.Parent = parent; (parent?.Children ?? Page.Nodes).Add(node); InvalidateSceneSelection();
     }
     public void RemoveNode(DesignNode node)
     {
         var parent = node.Parent; (parent?.Children ?? Page.Nodes).Remove(node);
         if (parent?.ClipPathId == node.Id) parent.ClipPathId = null;
         if (parent?.OpacityMaskId == node.Id) parent.OpacityMaskId = null;
-        InvalidateSelection();
+        InvalidateSceneSelection();
     }
     public void DeleteSelection()
     {
@@ -296,11 +272,17 @@ public sealed class EditorSession
         if (Document.Pages.Count < 2) return;
         Edit("Delete page", () => { Document.Pages.RemoveAll(p => p.Id == id); Document.Comments.RemoveAll(c => c.PageId == id); if (Page.Id == id) Page = Document.Pages[0]; _selected.Clear(); });
     }
-    private Snapshot Capture() => new(DocumentJson.Save(Document), Page.Id, _selected.ToArray());
+    private Snapshot Capture()
+    {
+        SnapshotCaptures++;
+        return new(DocumentJson.Save(Document), Page.Id, _selected.ToArray());
+    }
     private void Restore(Snapshot state)
     {
         Document = DocumentJson.Load(state.Json); Page = Document.Pages.FirstOrDefault(p => p.Id == state.PageId) ?? Document.Pages[0];
-        _selected.Clear(); _selected.UnionWith(state.Selection.Where(id => Page.AllNodes().Any(n => n.Id == id))); IsDirty = state.Json != _savedJson;
+        InvalidateSceneSelection();
+        var existing = Page.AllNodes().Select(n => n.Id).ToHashSet(StringComparer.Ordinal);
+        _selected.Clear(); _selected.UnionWith(state.Selection.Where(existing.Contains)); IsDirty = state.Json != _savedJson;
     }
     private static IEnumerable<DesignNode> Ancestors(DesignNode node) { for (var p = node.Parent; p is not null; p = p.Parent) yield return p; }
 }

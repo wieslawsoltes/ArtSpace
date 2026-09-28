@@ -29,8 +29,8 @@ public sealed class PanelDock : UserControl
     public void Select(string name)
     {
         var index = _panels.FindIndex(p => p.Name == name);
-        if (index < 0) return;
-        SelectedName = name; _body.Content = null; _body.Content = _panels[index].Content;
+        if (index < 0 || SelectedName == name) return;
+        SelectedName = name; _body.Content = _panels[index].Content;
         foreach (var panel in _panels)
         {
             panel.Button.RestBackground = panel.Name == name ? "#3D3D3D" : "#292929";

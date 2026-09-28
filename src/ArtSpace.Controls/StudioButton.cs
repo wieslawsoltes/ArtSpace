@@ -5,8 +5,8 @@ public class StudioButton : Button
     private bool _selected;
     private bool _primary;
     private bool _hover;
-    public bool IsSelected { get => _selected; set { _selected = value; Refresh(); } }
-    public bool IsPrimary { get => _primary; set { _primary = value; Refresh(); } }
+    public bool IsSelected { get => _selected; set { if (_selected == value) return; _selected = value; Refresh(); } }
+    public bool IsPrimary { get => _primary; set { if (_primary == value) return; _primary = value; Refresh(); } }
     public string RestBackground { get; set; } = "#00FFFFFF";
     public StudioButton()
     {

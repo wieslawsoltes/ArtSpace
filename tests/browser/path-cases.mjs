@@ -9,9 +9,13 @@ async function ready(page) {
   await page.waitForTimeout(1200);
 }
 async function draw(page, key, a, b) {
+  const before = await state(page);
   await page.keyboard.press(key);
   await page.mouse.move(...a); await page.mouse.down();
   await page.mouse.move(...b, { steps: 12 }); await page.mouse.up();
+  // Diagnostics are deliberately coalesced. Pointer-up returning is not a barrier for
+  // observing its completed transaction, even though preview already shows the shape.
+  await expect.poll(async () => (await state(page)).history).toBe(before.history + 1);
 }
 async function importSvg(page, name, content) {
   const before = await state(page);

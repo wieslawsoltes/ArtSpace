@@ -99,7 +99,10 @@ test('warm geometry caches survive repeated movement without rebuilding the scen
   await page.mouse.move(550, 370); await page.mouse.down(); await page.mouse.move(700, 490, { steps: 10 }); await page.mouse.up();
   await expect.poll(async () => (await state(page)).kind).toBe('Rectangle');
   await page.waitForTimeout(250);
+  const beforeWarm = await state(page);
   await page.keyboard.press('ArrowRight');
+  await expect.poll(async () => (await state(page)).history).toBe(beforeWarm.history + 1);
+  await expect.poll(async () => (await state(page)).x).toBeCloseTo(beforeWarm.x + 1, 3);
   const baseline = await state(page);
   for (let i = 0; i < 12; i++) await page.keyboard.press('ArrowRight');
   await expect.poll(async () => (await state(page)).x).toBeCloseTo(baseline.x + 12, 3);
