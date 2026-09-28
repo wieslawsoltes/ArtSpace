@@ -1,0 +1,50 @@
+name: Development validation
+on:
+  push:
+    branches: [feat/opacity-masks-svg-fidelity]
+    paths: ['.github/workflows/development-validation.yml']
+permissions:
+  contents: read
+jobs:
+  engine:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+      - name: Verify baseline and dependency versions
+        run: |
+          dotnet run --project tests/ArtSpace.Tests -c Release
+          python3 - <<'PY'
+          import json,urllib.request
+          for package in ['uno.sdk','skiasharp']:
+            with urllib.request.urlopen(f'https://api.nuget.org/v3-flatcontainer/{package}/index.json') as response:
+              versions=json.load(response)['versions']
+            print(package, 'latest stable:', [v for v in versions if '-' not in v][-1])
+          PY
+      - name: Bundle engine-only offline validation dependencies
+        run: |
+          python3 - <<'PY'
+          import os,tarfile
+          from pathlib import Path
+          root=Path(os.environ['DOTNET_ROOT'])
+          with tarfile.open('/tmp/artspace-engine-toolchain.tar.gz','w:gz',compresslevel=3) as output:
+            output.add(root/'dotnet',arcname='dotnet/dotnet')
+            output.add(root/'sdk'/'10.0.401',arcname='dotnet/sdk/10.0.401')
+            for relative in ['host/fxr','shared/Microsoft.NETCore.App','packs/Microsoft.NETCore.App.Ref','packs/Microsoft.NETCore.App.Host.linux-x64','packs/NETStandard.Library.Ref']:
+              directory=root/relative
+              if directory.exists():
+                for version in directory.iterdir():
+                  if version.name.startswith('10.0.') or relative.endswith('NETStandard.Library.Ref'):
+                    output.add(version,arcname='dotnet/'+relative+'/'+version.name)
+            cache=Path.home()/'.nuget/packages'
+            output.add(cache,arcname='nuget/packages')
+          PY
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ArtSpace-engine-toolchain
+          path: /tmp/artspace-engine-toolchain.tar.gz
+          compression-level: 0
+          retention-days: 1
