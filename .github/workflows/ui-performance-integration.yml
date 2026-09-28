@@ -16,7 +16,8 @@ jobs:
       - name: Apply guarded source integration
         run: |
           python3 scripts/apply-ui-performance.py
-          rm scripts/apply-ui-performance.py .github/workflows/ui-performance-integration.yml
+          git restore .github/workflows
+          rm scripts/apply-ui-performance.py
           git diff --check
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
