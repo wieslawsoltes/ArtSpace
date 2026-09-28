@@ -13,15 +13,28 @@ public sealed partial class SceneRenderer
     public long GradientCacheHits { get; private set; }
     public int CachedGradientCount => _gradients.Count;
 
+    private RectD GradientBounds(DesignNode node)
+    {
+        if (node.Kind == NodeKind.Text) return node.LocalBounds;
+        var b = Geometry(node).TightBounds;
+        return new(b.Left, b.Top, b.Width, b.Height);
+    }
+
+    /// <summary>Maps persisted gradient coordinates to node-local coordinates for interactive editing.</summary>
+    public Matrix2D GradientCoordinateMatrix(DesignNode node, FillStyle fill)
+    {
+        ArgumentNullException.ThrowIfNull(node); ArgumentNullException.ThrowIfNull(fill);
+        if (fill.GradientSpace == GradientSpace.Legacy)
+            return Matrix2D.Scale(Math.Max(.000001, node.Width), Math.Max(.000001, node.Height)) * fill.GradientTransform;
+        if (fill.GradientSpace == GradientSpace.UserSpaceOnUse) return fill.GradientTransform;
+        var b = GradientBounds(node);
+        return fill.GradientTransform * Matrix2D.Scale(Math.Max(.000001, b.Width), Math.Max(.000001, b.Height)) * Matrix2D.Translation(b.X, b.Y);
+    }
+
     private SKShader? Shader(FillStyle fill, DesignNode node)
     {
         if (fill.Kind == FillKind.Solid) return null;
-        var box = node.LocalBounds;
-        if (fill.GradientSpace == GradientSpace.ObjectBoundingBox && node.Kind != NodeKind.Text)
-        {
-            var b = Geometry(node).TightBounds;
-            box = new(b.Left, b.Top, b.Width, b.Height);
-        }
+        var box = fill.GradientSpace == GradientSpace.ObjectBoundingBox ? GradientBounds(node) : node.LocalBounds;
         var key = new GradientKey(fill.Kind, fill.GradientSpace, fill.GradientSpread, fill.Start, fill.End, fill.GradientRadius, fill.GradientFocus, fill.GradientTransform, box, node.Width, node.Height);
         if (_gradients.TryGetValue(fill, out var cached) && cached.Key == key && cached.Stops.Length == fill.Stops.Count)
         {
@@ -65,8 +78,16 @@ public sealed partial class SceneRenderer
                 basic = focus == start ? SKShader.CreateRadialGradient(ToPoint(start), (float)radius, colors, positions, tile)
                     : SKShader.CreateTwoPointConicalGradient(ToPoint(focus), 0, ToPoint(start), (float)radius, colors, positions, tile);
             }
-            using (basic)
-                shader = basic?.WithLocalMatrix(Matrix(transform)) ?? throw new InvalidOperationException("Could not construct gradient shader.");
+            if (basic is null) throw new InvalidOperationException("Could not construct gradient shader.");
+            // Skia may return the same native/managed shader for an identity matrix. Do not dispose
+            // that object via a temporary 'using': the retained cache owns it from this point onward.
+            if (transform == Matrix2D.Identity) shader = basic;
+            else
+            {
+                try { shader = basic.WithLocalMatrix(Matrix(transform)) ?? throw new InvalidOperationException("Could not transform gradient shader."); }
+                catch { basic.Dispose(); throw; }
+                if (!ReferenceEquals(shader, basic)) basic.Dispose();
+            }
         }
         if (_gradients.Count >= 8192) ClearGradients();
         else cached?.Shader.Dispose();
