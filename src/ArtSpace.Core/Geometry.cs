@@ -1,25 +1,26 @@
 using System.Globalization;
+using System.Text.Json.Serialization;
 
 namespace ArtSpace.Core;
 
 public readonly record struct Vec2(double X, double Y)
 {
     public static Vec2 Zero => default;
-    public double Length => Math.Sqrt(X * X + Y * Y);
+    [JsonIgnore] public double Length => Math.Sqrt(X * X + Y * Y);
     public static Vec2 operator +(Vec2 a, Vec2 b) => new(a.X + b.X, a.Y + b.Y);
     public static Vec2 operator -(Vec2 a, Vec2 b) => new(a.X - b.X, a.Y - b.Y);
     public static Vec2 operator *(Vec2 a, double s) => new(a.X * s, a.Y * s);
     public static Vec2 operator /(Vec2 a, double s) => new(a.X / s, a.Y / s);
     public double DistanceTo(Vec2 p) => (this - p).Length;
-    public bool IsFinite => double.IsFinite(X) && double.IsFinite(Y);
+    [JsonIgnore] public bool IsFinite => double.IsFinite(X) && double.IsFinite(Y);
 }
 
 public readonly record struct RectD(double X, double Y, double Width, double Height)
 {
-    public double Right => X + Width;
-    public double Bottom => Y + Height;
-    public Vec2 Center => new(X + Width / 2, Y + Height / 2);
-    public bool IsEmpty => Width <= 0 || Height <= 0;
+    [JsonIgnore] public double Right => X + Width;
+    [JsonIgnore] public double Bottom => Y + Height;
+    [JsonIgnore] public Vec2 Center => new(X + Width / 2, Y + Height / 2);
+    [JsonIgnore] public bool IsEmpty => Width <= 0 || Height <= 0;
     public bool Contains(Vec2 p) => p.X >= X && p.X <= Right && p.Y >= Y && p.Y <= Bottom;
     public bool Intersects(RectD r) => Right >= r.X && r.Right >= X && Bottom >= r.Y && r.Bottom >= Y;
     public RectD Inflate(double amount) => new(X - amount, Y - amount, Width + amount * 2, Height + amount * 2);
@@ -27,10 +28,18 @@ public readonly record struct RectD(double X, double Y, double Width, double Hei
     public static RectD Union(RectD a, RectD b) => new(Math.Min(a.X, b.X), Math.Min(a.Y, b.Y), Math.Max(a.Right, b.Right) - Math.Min(a.X, b.X), Math.Max(a.Bottom, b.Bottom) - Math.Min(a.Y, b.Y));
     public static RectD Bounds(IEnumerable<Vec2> points)
     {
-        var list = points.ToArray();
-        if (list.Length == 0) return default;
-        var minX = list.Min(p => p.X); var minY = list.Min(p => p.Y);
-        return new(minX, minY, list.Max(p => p.X) - minX, list.Max(p => p.Y) - minY);
+        ArgumentNullException.ThrowIfNull(points);
+        using var iterator = points.GetEnumerator();
+        if (!iterator.MoveNext()) return default;
+        var first = iterator.Current;
+        var minX = first.X; var maxX = first.X; var minY = first.Y; var maxY = first.Y;
+        while (iterator.MoveNext())
+        {
+            var point = iterator.Current;
+            minX = Math.Min(minX, point.X); maxX = Math.Max(maxX, point.X);
+            minY = Math.Min(minY, point.Y); maxY = Math.Max(maxY, point.Y);
+        }
+        return new(minX, minY, maxX - minX, maxY - minY);
     }
 }
 
@@ -46,7 +55,14 @@ public readonly record struct Matrix2D(double M11, double M12, double M21, doubl
         return new(c, s, -s, c, 0, 0);
     }
     public Vec2 Map(Vec2 p) => new(p.X * M11 + p.Y * M21 + DX, p.X * M12 + p.Y * M22 + DY);
-    public RectD Map(RectD r) => RectD.Bounds([Map(new Vec2(r.X, r.Y)), Map(new Vec2(r.Right, r.Y)), Map(new Vec2(r.Right, r.Bottom)), Map(new Vec2(r.X, r.Bottom))]);
+    /// <summary>Exact affine corner bounds with no arrays, enumerators, LINQ or managed allocations.</summary>
+    public RectD Map(RectD r)
+    {
+        var origin = Map(new Vec2(r.X, r.Y));
+        var ux = r.Width * M11; var uy = r.Width * M12;
+        var vx = r.Height * M21; var vy = r.Height * M22;
+        return new(origin.X + Math.Min(0, ux) + Math.Min(0, vx), origin.Y + Math.Min(0, uy) + Math.Min(0, vy), Math.Abs(ux) + Math.Abs(vx), Math.Abs(uy) + Math.Abs(vy));
+    }
     public bool TryInvert(out Matrix2D inverse)
     {
         var d = M11 * M22 - M12 * M21;
@@ -54,7 +70,7 @@ public readonly record struct Matrix2D(double M11, double M12, double M21, doubl
         inverse = new(M22 / d, -M12 / d, -M21 / d, M11 / d, (M21 * DY - M22 * DX) / d, (M12 * DX - M11 * DY) / d);
         return true;
     }
-    public Matrix2D Inverse => TryInvert(out var m) ? m : throw new InvalidOperationException("The transform is singular.");
+    [JsonIgnore] public Matrix2D Inverse => TryInvert(out var m) ? m : throw new InvalidOperationException("The transform is singular.");
     public static Matrix2D operator *(Matrix2D a, Matrix2D b) => new(
         a.M11 * b.M11 + a.M12 * b.M21, a.M11 * b.M12 + a.M12 * b.M22,
         a.M21 * b.M11 + a.M22 * b.M21, a.M21 * b.M12 + a.M22 * b.M22,
