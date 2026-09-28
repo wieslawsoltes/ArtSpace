@@ -1,0 +1,34 @@
+name: UI performance integration
+on:
+  push:
+    branches: [perf/selection-ui-latency]
+    paths: ['scripts/apply-ui-performance.py', '.github/workflows/ui-performance-integration.yml']
+permissions:
+  contents: write
+jobs:
+  materialize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: perf/selection-ui-latency
+      - name: Apply guarded source integration
+        run: |
+          python3 scripts/apply-ui-performance.py
+          rm scripts/apply-ui-performance.py .github/workflows/ui-performance-integration.yml
+          git diff --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'Integrate retained panels, lazy selection gestures and indexed editor state'
+          git push origin HEAD:perf/selection-ui-latency
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+      - name: Engine and collection regressions
+        run: dotnet run --project tests/ArtSpace.Tests -c Release
+      - name: Native Uno host
+        run: |
+          python3 scripts/fetch-assets.py
+          dotnet build src/ArtSpace.App -c Release -f net10.0-desktop -p:ArtSpaceDesktopOnly=true
