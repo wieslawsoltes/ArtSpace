@@ -3,6 +3,9 @@ import fs from 'node:fs/promises';
 const state = page => page.evaluate(() => globalThis.__artSpaceState);
 const field = (s, section, label) => s.inspectorFields?.find(f => f.section === section && f.label === label);
 const at = (s, x, y) => [s.canvasX + s.panX + x * s.zoom, s.canvasY + s.panY + y * s.zoom];
+async function frames(page) {
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+}
 async function ready(page) {
   await page.goto('?test=1');
   await page.waitForFunction(() => globalThis.__artSpaceState?.ready, null, { timeout: 150_000 });
@@ -17,7 +20,7 @@ async function fixture(page, dense = false) {
   await (await picker).setFiles({ name: 'ui-fixture.svg', mimeType: 'image/svg+xml', buffer: Buffer.from(svg) });
   await expect.poll(async () => (await state(page)).roots).toBe(previous.roots + 1);
   await expect.poll(async () => (await state(page)).kind).toBe('Frame');
-  await page.waitForTimeout(300);
+  await frames(page);
   return state(page);
 }
 async function select(page, root, x, y = 85, shift = false) {
@@ -27,7 +30,12 @@ async function select(page, root, x, y = 85, shift = false) {
   await page.mouse.click(...at(root, root.x + x, root.y + y));
   if (shift) await page.keyboard.up('Shift');
   await page.keyboard.up('Control');
-  await expect.poll(async () => (await state(page)).kind).toBe('Rectangle');
+  // A and B are both rectangles: kind alone can match the PREVIOUS observation.
+  // Width uniquely identifies them even after A's X is changed by the numeric-edit test.
+  await page.waitForFunction(({ width, count }) => {
+    const s = globalThis.__artSpaceState;
+    return s?.kind === 'Rectangle' && s.width === width && s.selection === count;
+  }, { width: shift || x > 200 ? 150 : 120, count: shift ? 2 : 1 });
   return state(page);
 }
 async function settled(page) {
@@ -40,17 +48,23 @@ async function settled(page) {
 }
 async function panel(page, index, name) {
   const s = await state(page);
-  const width = 314;
-  await page.mouse.click(s.canvasX + s.canvasWidth + width * (index + .5) / 4, s.canvasY + 15);
+  await page.mouse.click(s.canvasX + s.canvasWidth + 314 * (index + .5) / 4, s.canvasY + 15);
   await expect.poll(async () => (await state(page)).activePanel).toBe(name);
   await expect.poll(async () => (await state(page)).uiPending).toBe(false);
 }
 async function editNumber(page, section, label, text) {
+  await frames(page);
   await expect.poll(async () => field(await state(page), section, label)?.width ?? 0).toBeGreaterThan(40);
   const f = field(await state(page), section, label);
   await page.mouse.click(f.x + f.width * .72, f.y + f.height / 2);
   await page.keyboard.press('Control+a'); await page.keyboard.type(text); await page.keyboard.press('Enter');
 }
+
+test.afterEach(async ({ page }, info) => {
+  if (info.status === info.expectedStatus || page.isClosed()) return;
+  const snapshot = await state(page).catch(() => null);
+  if (snapshot) console.log('FAILED_UI_OBSERVATION ' + JSON.stringify(snapshot));
+});
 
 test('retained inspector updates actual controls without snapshots or rebuilding common sections', async ({ page }) => {
   const errors = []; page.on('pageerror', e => errors.push(e.message));
@@ -82,7 +96,6 @@ test('retained numeric edits keep focus and bind undo redo and subsequent select
   await expect.poll(async () => (await state(page)).x).toBe(74);
   const edited = await settled(page); expect(edited.inspectorBuilds).toBe(before.inspectorBuilds);
   expect(Number(field(edited, 'Transform', 'X').value)).toBe(74);
-  // Real focus loss, retarget, and return: B must not receive A's buffered numeric value.
   await select(page, root, 290); const other = await settled(page);
   expect(other.x).toBe(230); expect(Number(field(other, 'Transform', 'X').value)).toBe(230);
   await page.keyboard.press('Control+z'); await expect.poll(async () => (await state(page)).x).toBe(73);
@@ -99,8 +112,8 @@ test('hidden panels defer work and layer selection updates without resetting the
   await select(page, root, 105); await settled(page);
   await panel(page, 1, 'Layers'); const start = await state(page);
   for (let i = 0; i < 6; i++) {
-    await select(page, root, i % 2 ? 290 : 105);
-    await expect.poll(async () => (await state(page)).selectedLayerIds).toEqual([(await state(page)).id]);
+    const selected = await select(page, root, i % 2 ? 290 : 105);
+    await expect.poll(async () => (await state(page)).selectedLayerIds).toEqual([selected.id]);
   }
   const end = await state(page);
   expect(end.inspectorRefreshes).toBe(start.inspectorRefreshes);
