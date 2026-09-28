@@ -84,7 +84,7 @@ public sealed partial class DesignSurface : UserControl, IDisposable
             // An explicit contour tool owns anchor clicks, including a rapid second press.
             // Generic artwork picking deliberately excludes mask sources, so allowing it here
             // can switch an anchor drag to the underlying masked artwork.
-            if (Session.Tool is EditorTool.Vertex or EditorTool.AddAnchor or EditorTool.DeleteAnchor or EditorTool.ConvertAnchor)
+            if (IsPathTool)
             { e.Handled = true; return; }
             if (_penNode is not null) { FinishPath(false); e.Handled = true; return; }
             var p = e.GetPosition(_canvas); var hit = Renderer.HitTest(Session.Page.Nodes, Session.Viewport.ScreenToWorld(new(p.X, p.Y)), true, 4 / Session.Viewport.Zoom);
