@@ -24,6 +24,10 @@ The compact dark shell combines menus, appearance controls, toolbox, rulers, pas
 
 **Version: `0.4.1-alpha.1`.** This is an independent functional alpha, not complete or pixel-identical Adobe Illustrator parity. The [feature matrix](docs/feature-matrix.md) distinguishes implemented behavior and remaining compatibility boundaries.
 
+## New in 0.4.1
+
+**Responsive selection and panels:** retained inspector sections and values, visible-panel-only refreshes, incremental layer rows, indexed selection and lazy drag transactions. Plain clicks no longer serialize the document or construct a snapping index. Focused edits and section expansion survive ordinary updates. [Implementation and reproducible measurements](docs/ui-performance.md).
+
 ## New in 0.4
 
 **Editable alpha and luminance masks:** create, release, invert, disable, select source/content independently and retain nested mask relationships through undo, cloning, clipboard and symbols. The Transparency section exposes mode and source editing.
@@ -103,7 +107,7 @@ Skia consumers need compatible native assets for the executing platform. CI prod
 
 ## Verification and performance
 
-The repository contains **195 registered engine cases**, **five additional benchmark boundary checks** and **13 browser scenarios**. Tests exercise actual pointer, keyboard and file-picker input against the published Uno app. Diagnostics enabled by `?test=1` are read-only, not an editing API.
+The repository contains **211 registered engine cases**, **five additional benchmark boundary checks** and **18 browser scenarios**. Tests exercise actual pointer, keyboard and file-picker input against the published Uno app. Diagnostics enabled by `?test=1` are read-only, not an editing API.
 
 ```bash
 npm ci
