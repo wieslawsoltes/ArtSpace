@@ -12,10 +12,10 @@ public partial class ArtSpaceJsonContext : JsonSerializerContext;
 
 public static class DocumentJson
 {
-    public const int CurrentFormatVersion = 2;
+    public const int CurrentFormatVersion = 3;
     public const int MaxDocumentCharacters = 32 * 1024 * 1024;
     public const int MaxNodes = 100_000;
-    /// <summary>Save using schema 2. Legacy schema 1 is upgraded so older readers cannot silently discard clipping semantics.</summary>
+    /// <summary>Save using schema 3. Legacy schema 1 is upgraded so older readers cannot silently discard clipping semantics.</summary>
     public static string Save(DesignDocument document)
     {
         ArgumentNullException.ThrowIfNull(document);
@@ -51,6 +51,7 @@ public static class DocumentJson
         foreach (var node in nodes)
         {
             node.Id = ids[node.Id];
+            if (node.OpacityMaskId is { } opacity && ids.TryGetValue(opacity, out var opacityReplacement)) node.OpacityMaskId = opacityReplacement;
             if (node.ClipPathId is { } clip && ids.TryGetValue(clip, out var clipReplacement)) node.ClipPathId = clipReplacement;
             if (node.PrototypeTargetId is { } target && ids.TryGetValue(target, out var replacement)) node.PrototypeTargetId = replacement;
             if (node.ComponentId is { } component && ids.TryGetValue(component, out replacement)) node.ComponentId = replacement;
@@ -77,6 +78,21 @@ public static class DocumentJson
                 var mask = n.Children.Find(child => child?.Id == clip);
                 if (!n.IsContainer || mask is null || mask.IsContainer || mask.Children is null || mask.Children.Count != 0 || mask.Kind is NodeKind.Text or NodeKind.Slice)
                     throw new InvalidDataException("A clipping path must reference a direct vector child of its container.");
+            }
+            if (n.AffineTransform is { } affine && !AffineGeometry.IsInvertible(affine)) throw new InvalidDataException("Invalid affine transform.");
+            if (!Enum.IsDefined(n.OpacityMaskMode)) throw new InvalidDataException("Invalid opacity mask mode.");
+            if (n.OpacityMaskId is { } opacityId)
+            {
+                var source = n.Children.Find(c => c?.Id == opacityId);
+                if (!n.IsContainer || source is null || source.Kind == NodeKind.Slice || opacityId == n.ClipPathId)
+                    throw new InvalidDataException("An opacity mask must reference a distinct renderable direct child.");
+            }
+            if (n.OpacityMaskRegion is { } region && (!double.IsFinite(region.X) || !double.IsFinite(region.Y) || !double.IsFinite(region.Right) || !double.IsFinite(region.Bottom) || region.Width <= 0 || region.Height <= 0))
+                throw new InvalidDataException("Invalid opacity mask region.");
+            foreach (var fill in n.Fills)
+            {
+                if (fill is null || fill.Stops is null || fill.Stops.Count > 4096 || !double.IsFinite(fill.Opacity) || !fill.Start.IsFinite || !fill.End.IsFinite || !double.IsFinite(fill.GradientRadius) || fill.GradientRadius < 0 || !Enum.IsDefined(fill.GradientSpace) || !Enum.IsDefined(fill.GradientSpread) || !AffineGeometry.IsInvertible(fill.GradientTransform) || (fill.GradientFocus.HasValue && !fill.GradientFocus.Value.IsFinite) || fill.Stops.Any(s => s is null || !double.IsFinite(s.Offset) || !double.IsFinite(s.Opacity)))
+                    throw new InvalidDataException("Invalid gradient appearance.");
             }
             if (!Enum.IsDefined(n.FillRule)) throw new InvalidDataException("Invalid path fill rule.");
             n.Opacity = Numbers.Clamp(n.Opacity, 0, 1); n.FontSize = Numbers.Clamp(n.FontSize, 1, 4096);

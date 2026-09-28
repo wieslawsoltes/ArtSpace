@@ -61,6 +61,13 @@ public static class ComponentService
             var remapped = copy.DescendantsAndSelf().ToDictionary(n => n.SourceId!, n => n.Id);
             foreach (var n in copy.DescendantsAndSelf())
                 if (n.ClipPathId is { } mask && remapped.TryGetValue(mask, out var id)) n.ClipPathId = id;
+            foreach (var n in copy.DescendantsAndSelf())
+                if (n.OpacityMaskId is { } maskId && remapped.TryGetValue(maskId, out var newMaskId)) n.OpacityMaskId = newMaskId;
+            instance.OpacityMaskId = copy.OpacityMaskId;
+            instance.OpacityMaskMode = copy.OpacityMaskMode;
+            instance.OpacityMaskEnabled = copy.OpacityMaskEnabled;
+            instance.OpacityMaskInverted = copy.OpacityMaskInverted;
+            instance.OpacityMaskRegion = copy.OpacityMaskRegion;
             instance.ClipPathId = copy.ClipPathId;
             instance.Children = copy.Children; foreach (var child in instance.Children) child.Parent = instance;
             instance.Fills = copy.Fills; instance.Strokes = copy.Strokes; instance.Shadows = copy.Shadows; instance.CornerRadius = copy.CornerRadius;

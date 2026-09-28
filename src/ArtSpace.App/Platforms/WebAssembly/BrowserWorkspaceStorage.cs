@@ -66,6 +66,12 @@ internal static class BrowserDiagnostics
                 json.WriteNumber("canvasX", origin.X); json.WriteNumber("canvasY", origin.Y);
                 json.WriteString("fillRule", primary?.FillRule.ToString());
                 json.WriteString("clipPathId", primary?.ClipPathId);
+                json.WriteString("opacityMaskId", primary?.OpacityMaskId);
+                json.WriteString("opacityMaskMode", primary?.OpacityMaskMode.ToString());
+                json.WriteBoolean("opacityMaskInverted", primary?.OpacityMaskInverted ?? false);
+                json.WriteBoolean("opacityMaskEnabled", primary?.OpacityMaskEnabled ?? false);
+                json.WriteNumber("opacityMasks", session.Page.AllNodes().Count(n => n.OpacityMaskId is not null));
+                json.WriteNumber("gradientBuilds", workbench.Surface.Renderer.GradientBuilds);
                 json.WriteNumber("clipGroups", session.Page.AllNodes().Count(n => n.ClipPathId is not null));
                 json.WriteNumber("geometryBuilds", workbench.Surface.Renderer.GeometryBuilds);
                 json.WriteNumber("culledNodes", workbench.Surface.Renderer.CulledNodes);

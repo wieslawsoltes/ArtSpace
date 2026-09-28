@@ -162,6 +162,7 @@ public sealed class EditorSession
     {
         var parent = node.Parent; (parent?.Children ?? Page.Nodes).Remove(node);
         if (parent?.ClipPathId == node.Id) parent.ClipPathId = null;
+        if (parent?.OpacityMaskId == node.Id) parent.OpacityMaskId = null;
         InvalidateSelection();
     }
     public void DeleteSelection()
@@ -217,7 +218,7 @@ public sealed class EditorSession
     {
         var nodes = SelectionRoots.Where(n => !n.IsEffectivelyLocked).ToArray(); if (nodes.Length == 0) return;
         var parent = nodes[0].Parent; if (nodes.Any(n => n.Parent != parent)) return;
-        if (nodes.Any(n => n.Parent?.ClipPathId == n.Id))
+        if (nodes.Any(n => n.Parent?.ClipPathId == n.Id || n.Parent?.OpacityMaskId == n.Id))
             throw new InvalidOperationException("Release the clipping mask before grouping its clipping path.");
         Edit(asFrame ? "Frame selection" : "Group selection", () =>
         {

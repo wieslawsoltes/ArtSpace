@@ -195,6 +195,17 @@ public sealed partial class StudioWorkbench
 
     private void AddIllustrationSections()
     {
+        var transparency = AddSection("Transparency");
+        if (OpacityMaskOperations.FindOwner(Session.Primary) is { } owner)
+        {
+            transparency.Body.Children.Add(Studio.Choice(Enum.GetNames<OpacityMaskMode>(), owner.OpacityMaskMode.ToString(), value => Run(() => OpacityMaskOperations.SetMode(Session, Enum.Parse<OpacityMaskMode>(value))), "Opacity mask mode"));
+            transparency.Body.Children.Add(new StudioButton("Edit Mask Artwork", () => Run(() => OpacityMaskOperations.EditMask(Session))));
+            transparency.Body.Children.Add(new StudioButton("Edit Masked Artwork", () => Run(() => OpacityMaskOperations.EditContents(Session))));
+            transparency.Body.Children.Add(new StudioButton(owner.OpacityMaskInverted ? "Invert Mask: On" : "Invert Mask: Off", () => Run(() => OpacityMaskOperations.Invert(Session))));
+            transparency.Body.Children.Add(new StudioButton(owner.OpacityMaskEnabled ? "Disable Opacity Mask" : "Enable Opacity Mask", () => Run(() => OpacityMaskOperations.ToggleEnabled(Session))));
+            transparency.Body.Children.Add(new StudioButton("Release Opacity Mask", () => Run(() => OpacityMaskOperations.Release(Session))));
+        }
+        else transparency.Body.Children.Add(new StudioButton("Make Opacity Mask", () => Run(() => OpacityMaskOperations.Make(Session))) { IsEnabled = Session.Selection.Count > 0 });
         if (ClippingOperations.FindGroup(Session.Primary) is not null)
         {
             var clip = AddSection("Clipping Mask");
@@ -281,6 +292,12 @@ public sealed partial class StudioWorkbench
                 yield return Item("Smooth Anchors", () => SmoothPathAnchors(true), enabled: selected);
                 yield return Item("Corner Anchors", () => SmoothPathAnchors(false), enabled: selected);
                 yield return Item("Reverse Path Direction", () => PathOperations.Reverse(Session, Surface.Renderer), enabled: selected);
+                yield return Item("Make Opacity Mask", () => OpacityMaskOperations.Make(Session), enabled: selected);
+                yield return Item("Release Opacity Mask", () => OpacityMaskOperations.Release(Session), enabled: selected);
+                yield return Item("Edit Opacity Mask", () => OpacityMaskOperations.EditMask(Session), enabled: selected);
+                yield return Item("Edit Masked Artwork", () => OpacityMaskOperations.EditContents(Session), enabled: selected);
+                yield return Item("Invert Opacity Mask", () => OpacityMaskOperations.Invert(Session), enabled: selected);
+                yield return Item("Enable / Disable Opacity Mask", () => OpacityMaskOperations.ToggleEnabled(Session), enabled: selected);
                 yield return Item("Make Clipping Mask", () => ClippingOperations.Make(Session), "Ctrl 7", selected);
                 yield return Item("Release Clipping Mask", () => ClippingOperations.Release(Session), "Ctrl Alt 7", selected);
                 yield return Item("Edit Clipping Path", () => { ClippingOperations.EditMask(Session); Surface.EnterPathEditing(); }, enabled: selected);

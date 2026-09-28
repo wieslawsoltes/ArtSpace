@@ -34,7 +34,7 @@ public sealed partial class DesignSurface : UserControl, IDisposable
     private SnapIndex BuildSnapIndex()
     {
         var editor = Session!; var roots = editor.SelectionRoots;
-        return new SnapIndex(editor.Page.AllNodes().Where(n => n.IsEffectivelyVisible && n.Parent?.ClipPathId != n.Id && !editor.SelectedIds.Contains(n.Id) && !roots.Any(n.IsDescendantOf)).Select(n => n.WorldBounds));
+        return new SnapIndex(editor.Page.AllNodes().Where(n => n.IsEffectivelyVisible && n.Parent?.ClipPathId != n.Id && n.Parent?.OpacityMaskId != n.Id && !editor.SelectedIds.Contains(n.Id) && !roots.Any(n.IsDescendantOf)).Select(n => n.WorldBounds));
     }
     private TextBox? _textEditor;
     private DesignNode? _textNode;

@@ -37,9 +37,7 @@ public static partial class SvgFormat
             if (fill.Kind != FillKind.Solid)
             {
                 var id = $"paint-{node.Id}-{i}";
-                var gradient = new XElement(Ns + (fill.Kind == FillKind.LinearGradient ? "linearGradient" : "radialGradient"), new XAttribute("id", id));
-                if (fill.Kind == FillKind.LinearGradient) { gradient.SetAttributeValue("x1", F(fill.Start.X)); gradient.SetAttributeValue("y1", F(fill.Start.Y)); gradient.SetAttributeValue("x2", F(fill.End.X)); gradient.SetAttributeValue("y2", F(fill.End.Y)); }
-                foreach (var stop in fill.Stops.OrderBy(s => s.Offset)) gradient.Add(new XElement(Ns + "stop", new XAttribute("offset", F(stop.Offset)), new XAttribute("stop-color", stop.Color)));
+                var gradient = ExportGradient(fill, node, id);
                 defs.Add(gradient); color = "url(#" + id + ")";
             }
             var shape = Shape(node); shape.SetAttributeValue("fill", color); shape.SetAttributeValue("fill-opacity", F(fill.Opacity)); shape.SetAttributeValue("stroke", "none"); group.Add(shape);
@@ -65,8 +63,16 @@ public static partial class SvgFormat
             defs.Add(new XElement(Ns + "clipPath", new XAttribute("id", id), new XAttribute("clipPathUnits", "userSpaceOnUse"), shape));
             contentTarget = new XElement(Ns + "g", new XAttribute("clip-path", "url(#" + id + ")")); children.Add(contentTarget);
         }
-        foreach (var child in node.Children) if (child.Id != node.ClipPathId) contentTarget.Add(ExportNode(child, defs));
-        if (children.HasElements) group.Add(children); return group;
+        foreach (var child in node.Children) if (child.Id != node.ClipPathId && child.Id != node.OpacityMaskId) contentTarget.Add(ExportNode(child, defs));
+        if (children.HasElements) group.Add(children);
+        if (node.OpacityMaskId is not null && node.OpacityMaskEnabled)
+        {
+            var definition = ExportOpacityMask(node, defs); defs.Add(definition);
+            var masked = new XElement(Ns + "g", new XAttribute("mask", "url(#" + definition.Attribute("id")!.Value + ")"));
+            var artwork = group.Elements().ToArray(); foreach (var element in artwork) { element.Remove(); masked.Add(element); }
+            group.Add(masked);
+        }
+        return group;
     }
     private static XElement Shape(DesignNode node)
     {
@@ -99,6 +105,9 @@ public static partial class SvgFormat
             var id = definition.Attribute("id")?.Value;
             if (id is not null && !clips.TryAdd(id, definition)) throw new InvalidDataException("Duplicate SVG clipping identifier.");
         }
+        var gradients = Definitions(root, "linearGradient", "radialGradient");
+        var opacityMasks = Definitions(root, "mask");
+        var activeMasks = new HashSet<string>(StringComparer.Ordinal);
         var count = 0;
         foreach (var child in root.Elements())
         {
@@ -107,7 +116,7 @@ public static partial class SvgFormat
         if (viewBox.Length == 4 && viewBox[2] > 0 && viewBox[3] > 0)
         {
             var transform = Matrix2D.Translation(-viewBox[0], -viewBox[1]) * Matrix2D.Scale(width / viewBox[2], height / viewBox[3]);
-            foreach (var n in frame.Children) NodeGeometry.SetLocalMatrix(n, n.LocalMatrix * transform);
+            foreach (var n in frame.Children) NodeGeometry.SetExactMatrix(n, n.LocalMatrix * transform);
         }
         var document = new DesignDocument { Name = name, Pages = [new() { Nodes = [frame] }] }; document.RebuildParents(); DocumentJson.Validate(document); return new(document, warnings.ToArray());
         DesignNode? Read(XElement element, int depth)
@@ -129,16 +138,17 @@ public static partial class SvgFormat
                 case "text": node.Kind = NodeKind.Text; node.Text = element.Value; node.FontSize = Number(element, "font-size", 16); node.FontFamily = element.Attribute("font-family")?.Value ?? "Inter"; node.FontWeight = (int)Number(element, "font-weight", 400); node.Y -= node.FontSize; node.Width = Math.Max(1, node.Text.Length * node.FontSize * .6); node.Height = node.FontSize * 1.3; break;
                 default: warnings.Add($"{kind} elements were not imported."); return null;
             }
-            string? Attribute(string key) => element.Attribute(key)?.Value ?? Style(element, key) ?? element.Ancestors().Select(a => a.Attribute(key)?.Value ?? Style(a, key)).FirstOrDefault(v => v is not null);
+            string? Attribute(string key) => Inherited(element, key);
             node.FillRule = Attribute("fill-rule") == "evenodd" ? PathFillRule.EvenOdd : PathFillRule.NonZero;
             var fill = Attribute("fill") ?? "#000000";
             if (kind is not "g" and not "svg" && fill != "none")
             {
-                if (fill.StartsWith("url", StringComparison.OrdinalIgnoreCase)) { warnings.Add("Referenced paint servers currently import as a solid fill."); fill = "#A78BFA"; }
-                node.Fills.Add(new() { Color = fill, Opacity = Numbers.Parse(Attribute("fill-opacity") ?? "1", 1) });
+                var appearance = fill.StartsWith("url", StringComparison.OrdinalIgnoreCase) ? ReadGradient(fill, node, gradients, viewBox.Length == 4 ? viewBox[2] : width, viewBox.Length == 4 ? viewBox[3] : height) : new FillStyle { Color = fill == "currentColor" ? Attribute("color") ?? "#000000" : fill };
+                appearance.Opacity = Math.Clamp(Scalar(Attribute("fill-opacity"), 1), 0, 1);
+                node.Fills.Add(appearance);
             }
             var stroke = Attribute("stroke"); if (stroke is not null && stroke != "none") node.Strokes.Add(new() { Color = stroke, Width = Numbers.Parse(Attribute("stroke-width") ?? "1", 1), Opacity = Numbers.Parse(Attribute("stroke-opacity") ?? "1", 1), Cap = Enum.TryParse<StrokeCap>(Attribute("stroke-linecap"), true, out var cap) ? cap : StrokeCap.Butt, Join = Enum.TryParse<StrokeJoin>(Attribute("stroke-linejoin"), true, out var join) ? join : StrokeJoin.Miter, MiterLimit = Numbers.Parse(Attribute("stroke-miterlimit") ?? "4", 4), Dashes = (Attribute("stroke-dasharray") ?? "").Split(new[] { ' ', ',' }, StringSplitOptions.RemoveEmptyEntries).Where(x => x != "none").Select(x => Numbers.Parse(x, 0)).Where(x => x > 0).ToList() });
-            node.Opacity = Number(element, "opacity", 1); node.Visible = Attribute("display") != "none" && Attribute("visibility") != "hidden";
+            node.Opacity = Math.Clamp(Scalar(Own(element, "opacity"), 1), 0, 1); node.Visible = Attribute("display") != "none" && Attribute("visibility") != "hidden";
             if (kind is "g" or "svg") foreach (var child in element.Elements()) { var c = Read(child, depth + 1); if (c is not null) node.Add(c); }
             var clipReference = element.Attribute("clip-path")?.Value ?? Style(element, "clip-path");
             if (!string.IsNullOrWhiteSpace(clipReference) && clipReference != "none")
@@ -151,11 +161,32 @@ public static partial class SvgFormat
                 var mask = Read(shapes[0], depth + 1) ?? throw new InvalidDataException("Invalid SVG clipping shape.");
                 mask.FillRule = (shapes[0].Attribute("clip-rule")?.Value ?? Style(shapes[0], "clip-rule") ?? definition.Attribute("clip-rule")?.Value ?? "nonzero") == "evenodd" ? PathFillRule.EvenOdd : PathFillRule.NonZero;
                 mask.Fills.Clear(); mask.Strokes.Clear(); mask.Shadows.Clear();
-                if (definition.Attribute("transform") is { } clipTransform) NodeGeometry.SetLocalMatrix(mask, mask.LocalMatrix * ParseTransform(clipTransform.Value));
+                if (definition.Attribute("transform") is { } clipTransform) NodeGeometry.SetExactMatrix(mask, mask.LocalMatrix * ParseTransform(clipTransform.Value));
                 var wrapper = new DesignNode { Kind = NodeKind.Group, Name = node.Name + " / Clip Group", Width = node.Width, Height = node.Height, Fills = [], ClipPathId = mask.Id };
                 wrapper.Opacity = node.Opacity; node.Opacity = 1; wrapper.Add(node); wrapper.Add(mask); node = wrapper;
             }
-            if (element.Attribute("transform") is { } attribute) NodeGeometry.SetLocalMatrix(node, node.LocalMatrix * ParseTransform(attribute.Value));
+            var opacityReference = Own(element, "mask");
+            if (!string.IsNullOrWhiteSpace(opacityReference) && opacityReference != "none")
+            {
+                var maskId = LocalReference(opacityReference);
+                if (!opacityMasks.TryGetValue(maskId, out var definition) || !activeMasks.Add(maskId)) throw new InvalidDataException("Missing or cyclic SVG opacity mask.");
+                try
+                {
+                    if ((Own(definition, "maskUnits") ?? "objectBoundingBox") != "userSpaceOnUse" || (Own(definition, "maskContentUnits") ?? "userSpaceOnUse") != "userSpaceOnUse") throw new InvalidDataException("Opacity-mask import currently requires userSpaceOnUse units.");
+                    if (Inherited(definition, "color-interpolation") is { } interpolation && interpolation != "sRGB") throw new InvalidDataException("Only sRGB opacity masks are supported.");
+                    if (definition.Descendants().Any(e => e.Name.LocalName is "script" or "foreignObject" or "image" or "use" or "style" || Own(e, "filter") is not null)) throw new InvalidDataException("Unsupported content in SVG opacity mask.");
+                    var mask = new DesignNode { Kind = NodeKind.Group, Name = maskId + " / Mask", Width = width, Height = height, Fills = [] };
+                    foreach (var child in definition.Elements()) { var source = Read(child, depth + 1); if (source is not null) mask.Add(source); }
+                    var mode = Own(element, "mask-mode");
+                    if (mode is null or "match-source") mode = Own(definition, "mask-type") ?? "luminance";
+                    var region = new RectD(Scalar(Own(definition, "x"), -.1 * width, width), Scalar(Own(definition, "y"), -.1 * height, height), Scalar(Own(definition, "width"), 1.2 * width, width), Scalar(Own(definition, "height"), 1.2 * height, height));
+                    if (region.Width <= 0 || region.Height <= 0) throw new InvalidDataException("Empty SVG mask region.");
+                    var wrapper = new DesignNode { Kind = NodeKind.Group, Name = node.Name + " / Opacity Mask", Width = node.Width, Height = node.Height, Fills = [], OpacityMaskId = mask.Id, OpacityMaskRegion = region, OpacityMaskMode = mode switch { "alpha" => OpacityMaskMode.Alpha, "luminance" => OpacityMaskMode.Luminance, _ => throw new InvalidDataException("Unsupported SVG mask mode.") }, Opacity = node.Opacity };
+                    node.Opacity = 1; wrapper.Add(node); wrapper.Add(mask); node = wrapper;
+                }
+                finally { activeMasks.Remove(maskId); }
+            }
+            if (element.Attribute("transform") is { } attribute) NodeGeometry.SetExactMatrix(node, node.LocalMatrix * ParseTransform(attribute.Value));
             return node;
         }
     }
