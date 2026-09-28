@@ -4,61 +4,65 @@
 
 ### Vector illustration. One C# engine. Desktop and browser.
 
-A local-first illustration editor built with **Uno Platform** and **SkiaSharp**, with a compact Illustrator-style workspace and nine reusable .NET libraries.
+A local-first illustration editor built with **Uno Platform** and **SkiaSharp**, with an Illustrator-style dark workspace and nine reusable .NET libraries.
 
-[Open ArtSpace](https://wieslawsoltes.github.io/ArtSpace/) · [Getting started](docs/getting-started.md) · [Path editing](docs/path-editing.md) · [Clipping and performance](docs/clipping-and-performance.md)
+[Open ArtSpace](https://wieslawsoltes.github.io/ArtSpace/) · [Getting started](docs/getting-started.md) · [Path editing](docs/path-editing.md) · [Opacity masks and gradients](docs/opacity-masks-and-gradients.md)
 
 [![Build](https://github.com/wieslawsoltes/ArtSpace/actions/workflows/build.yml/badge.svg)](https://github.com/wieslawsoltes/ArtSpace/actions/workflows/build.yml)
 [![Pages](https://github.com/wieslawsoltes/ArtSpace/actions/workflows/pages.yml/badge.svg)](https://github.com/wieslawsoltes/ArtSpace/actions/workflows/pages.yml)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 </div>
 
 ---
 
-## A real illustration application
+## An editable illustration workspace
 
-ArtSpace runs the same C# document model, transaction engine, vector operations, custom controls and workbench in native desktop hosts and Uno WebAssembly. It is not an HTML mock-up around a separate browser-only drawing engine. JavaScript is limited to file transfer, IndexedDB recovery, input adaptation and opt-in read-only diagnostics.
+ArtSpace shares its C# document model, transaction engine, geometry, custom controls and workbench between native desktop hosts and real Uno WebAssembly. JavaScript is confined to file transfer, local recovery, input adaptation and opt-in read-only diagnostics. There is no separate JavaScript editor hidden beneath an HTML mock-up.
 
-The dark workspace combines an application menu, appearance bar, toolbox, document tab, rulers, pasteboard, artboards, properties/layers/artboards/history panels and status bar. The original **Alpine Echoes** artwork is fully editable across three artboards.
+The compact dark shell combines menus, appearance controls, toolbox, rulers, pasteboard, artboards, layers/properties/history and status bar. The original **Alpine Echoes** sample is editable vector artwork across three artboards.
 
-**Current package version: `0.3.0-alpha.1`.** This is an independent functional alpha, not a complete or pixel-identical Adobe Illustrator replacement. The [feature matrix](docs/feature-matrix.md) records implemented workflows and remaining boundaries.
+**Version: `0.4.0-alpha.1`.** This is an independent functional alpha, not complete or pixel-identical Adobe Illustrator parity. The [feature matrix](docs/feature-matrix.md) distinguishes implemented behavior and remaining compatibility boundaries.
 
-## Illustration workflows
+## New in 0.4
 
-| Area | Capabilities |
+**Editable alpha and luminance masks:** create, release, invert, disable, select source/content independently and retain nested mask relationships through undo, cloning, clipboard and symbols. The Transparency section exposes mode and source editing.
+
+**SVG paints and affine fidelity:** import/export linear/radial gradient fills with stop opacity, coordinates, focus, radius, spread and local inheritance. Preserve nested group scaling/skew instead of silently changing only nominal bounds. Supported SVG opacity masks retain source artwork and finite regions.
+
+**Lower repeated rendering cost:** retain gradient shaders with exact invalidation and correct native ownership; compute affine rectangle bounds without managed arrays. Five-sample CPU benchmark results and pixel-equivalence checks are retained by CI.
+
+[Read the workflow, API and compatibility guide](docs/opacity-masks-and-gradients.md).
+
+## Capabilities
+
+| Area | Implemented workflows |
 | --- | --- |
-| Drawing | Primitives, pen paths, freehand strokes, fixed-width brush, text, artboards and slices |
-| Transformation | Selection, marquee, move, eight-handle resize, rotation, constrained transforms, duplication, grouping, ordering, alignment, distribution and nudging |
-| Path editing | Native/imported/expanded/compound contours, multi-anchor selection, tangent editing, exact cubic insertion, reconnecting removal, segment cutting, smooth/corner conversion and undo |
-| Geometry | Shape/stroke expansion, offsets, union/subtract/intersect/exclude, compound make/release and nonzero/even-odd fills |
-| Typography | Basic editing, wrapping, tracking/alignment and Create Outlines using the same glyph layout as painting |
-| Clipping | Editable vector masks, mask/content selection, nested sets, compound holes, release, native persistence and supported SVG clipping interchange |
-| Appearance | Multiple fills/strokes, linear/radial gradients, on-canvas direction, caps/joins/dashes, opacity, blends, shadows and frame clipping |
-| Reuse | Bounded editable blends, radial repeats, linked local symbols/components and instances |
-| Navigation | Hierarchical layers, visibility/locking, swatches, indexed snapping, guides, rulers, outline preview, pan and zoom |
-| Files | Validated native JSON, editable SVG subset, SVG/PNG export, clipboard transfer and local recovery |
-
-**New in 0.3:** Ctrl 7 creates a vector clipping set; Ctrl Alt 7 releases it. Edit the clipping path or artwork independently from the Object menu and Properties panel. Geometry, text and selection caches now survive unrelated changes, snapping uses an indexed stationary-target path, and conservative leaf culling avoids offscreen paint work. See [contracts, measurements and limits](docs/clipping-and-performance.md).
+| Drawing | Primitives, pen/cubic paths, pencil, fixed-width brush, text, artboards and slices |
+| Editing | Selection, marquee, transforms, duplication, grouping, order, alignment, distribution, clipboard and transactional undo/redo |
+| Contours | Native/imported/expanded/compound/glyph paths, multiple anchors, tangent editing, exact cubic insertion, reconnecting removal, segment cutting and smooth/corner conversion |
+| Geometry | Shape/stroke expansion, offsets, Boolean union/subtract/intersect/exclude and compound paths with nonzero/even-odd rules |
+| Appearance | Multiple fills/strokes, linear/radial gradients, opacity, blends, shadows, vector clipping and editable alpha/luminance masks |
+| Text | Basic wrapping, tracking/alignment and Create Outlines using the same glyph runs as painting |
+| Reuse | Bounded editable blends/repeats and linked local symbols/components |
+| Files | Native JSON, supported SVG interchange, SVG/PNG export and IndexedDB/native recovery |
+| Performance | Retained geometry/text/gradient caches, selection snapshots, indexed stationary-target snapping and conservative nested-leaf culling |
 
 ## Build and run
 
-The pinned stack is **.NET SDK 10.0.401**, **Uno SDK 6.7.30**, and **SkiaSharp 3.119.2** matched to Uno's native runtime. Uno's stable index was checked on September 27, 2026. Keep managed/native Skia ABI versions aligned.
+The pinned stack is **.NET SDK 10.0.401**, **Uno SDK 6.7.30** and **SkiaSharp 3.119.2** matched to the Uno native runtime. Keep managed/native Skia ABI families aligned; a standalone major dependency bump is not a validated runtime migration.
 
 ```bash
 git clone https://github.com/wieslawsoltes/ArtSpace.git
 cd ArtSpace
 python3 scripts/fetch-assets.py
 
-# Geometry, persistence and transaction regressions
 dotnet run --project tests/ArtSpace.Tests -c Release
-
-# Native desktop host
 dotnet run --project src/ArtSpace.App -f net10.0-desktop \
   -p:ArtSpaceDesktopOnly=true
 ```
 
-Publish and serve the browser app:
+Publish the browser application:
 
 ```bash
 dotnet workload install wasm-tools --skip-manifest-update
@@ -68,23 +72,23 @@ python3 scripts/collect-site.py artifacts/publish artifacts/site
 python3 scripts/serve-site.py --directory artifacts/site
 ```
 
-Open `http://127.0.0.1:4173/ArtSpace/`. Use HTTP(S), not `file://`. The asset script fetches pinned Inter assets with their SIL OFL notice; font binaries are not committed.
+Open `http://127.0.0.1:4173/ArtSpace/`. HTTP(S) is required; `file://` is not supported. The asset script retrieves pinned Inter files and their SIL OFL notice. Font binaries are not committed.
 
-## Reusable packages
+## Reusable libraries
 
 | Package | Responsibility |
 | --- | --- |
 | `ArtSpace.Core` | Document, appearance, affine geometry and managed editable contours |
-| `ArtSpace.Layout` | Layout, constraints, exhaustive/reference snapping and indexed snapping |
-| `ArtSpace.Documents` | Native validation/migration, clipboard, SVG subset and sample artwork |
-| `ArtSpace.Editing` | Selection snapshots, transactions, history and linked components |
-| `ArtSpace.Skia` | Retained geometry/text caches, clipping, culling, picking, glyph outlines and raster export |
-| `ArtSpace.Illustration` | Expansion, offsets, blends, repeats, compound paths and clipping commands |
-| `ArtSpace.Controls` | Custom menus, docks, resize grips, icons, numeric/color fields and layer rows |
-| `ArtSpace.Editor` | Embeddable Uno surface, direct manipulation and gestures |
-| `ArtSpace.Workbench` | Illustration workspace, command routing, properties and file workflows |
+| `ArtSpace.Layout` | Constraints, layout and reference/indexed snapping |
+| `ArtSpace.Documents` | Validated native schemas, clipboard and SVG subset |
+| `ArtSpace.Editing` | Selection, transactions, history and linked components |
+| `ArtSpace.Skia` | Cached paths/text/shaders, compositing, culling, hit testing, glyph paths and raster export |
+| `ArtSpace.Illustration` | Expansion, offsets, compounds, clipping/opacity-mask commands, blends and repeats |
+| `ArtSpace.Controls` | Custom menus, panels, fields, resize grips, vector icons and layer rows |
+| `ArtSpace.Editor` | Embeddable Uno drawing surface and direct-manipulation gestures |
+| `ArtSpace.Workbench` | Application workspace, properties, command routing and storage workflows |
 
-The first six libraries have no Uno dependency. The host supplies fonts, storage and lifetime; no static document singleton is required.
+The first six packages do not depend on Uno. Hosts own lifetime, fonts and an `IWorkspaceStorage` implementation. `OpacityMaskOperations`, `PathOperations` and `PathEditing` are reusable independently of the shell.
 
 ```csharp
 using ArtSpace.Documents;
@@ -92,50 +96,39 @@ using ArtSpace.Editing;
 using ArtSpace.Workbench;
 
 var session = new EditorSession(IllustrationSample.Create());
-// storage implements IWorkspaceStorage.
 window.Content = new StudioWorkbench(session, storage);
 ```
 
-Use `PathEditing`, `PathOperations` and `ClippingOperations` without a window. Matching Skia native assets are needed on the executing platform. CI package artifacts are not a claim of NuGet.org publication.
+Skia consumers need compatible native assets for the executing platform. CI produces package artifacts; this does not imply public NuGet.org publication.
 
-## Rendering and performance
+## Verification and performance
 
-Painting uses Uno **SKCanvasElement** and its shared Skia composition path, avoiding an extra application-owned CPU framebuffer/upload layer. Backend and hardware acceleration depend on the host/browser/driver. Path geometry and Boolean operations remain CPU work; this is not a raw-WebGPU engine.
-
-Warm geometry lookup uses exact snapshots instead of reconstructing SVG keys. Stationary-target drags use sorted-axis snapping indexes with reference-equivalent ties and guides. Text runs/fonts and selection lists are retained across unrelated changes. Conservative culling checks leaves against the actual canvas clip while preserving overflowing groups and offscreen shadow sources.
-
-```bash
-# CPU allocation/timing report, with equivalence and safety preflight checks
-dotnet run --project tests/ArtSpace.Tests -c Release --no-build -- --benchmark
-```
-
-Build retains the JSON as **ArtSpace-performance**. The [performance guide](docs/clipping-and-performance.md#reproduce-measurements) documents fixtures, sample results and limitations. Index construction is excluded from query timings. These are software-Skia CPU microbenchmarks, not whole-app frame-rate or physical-GPU claims.
-
-## Verification and delivery
-
-The suite contains **141 engine regressions**, five untimed benchmark boundary checks and **ten browser scenarios**. The latter drive actual pointer, keyboard and file-picker input, including clipping creation/release, mask-anchor editing, holes, recovery and cache retention.
+The repository contains **195 registered engine cases**, **five additional benchmark boundary checks** and **13 browser scenarios**. Tests exercise actual pointer, keyboard and file-picker input against the published Uno app. Diagnostics enabled by `?test=1` are read-only, not an editing API.
 
 ```bash
 npm ci
 npx playwright install chromium
-# Start the static server first.
-npx playwright test
+npx playwright test # after starting the local static server
+
+dotnet run --project tests/ArtSpace.Tests -c Release --no-build -- --benchmark
 ```
 
-`?test=1` exposes read-only diagnostics, never an editing API. **Build** runs regression/benchmark checks, compiles Windows/Linux/macOS, publishes WebAssembly, packages all libraries and runs browser acceptance. **Pages** deploys successful main-branch artifacts, verifies `build-info.json` and runs public-site acceptance. **Release** produces tagged archives, packages and checksums; public NuGet publication requires an explicitly configured secret. Workflow conclusions and retained reports establish results for each commit.
+Build validates the engine/benchmarks, Windows/Linux/macOS compilation, browser publication/acceptance and all nine packages. Pages deploys successful main-branch artifacts, verifies `build-info.json` and tests the public application. Release tags produce browser/native/source/package archives and checksums; NuGet publication requires explicitly configured credentials. Workflow results establish which commit passed.
 
-## File compatibility and remaining boundaries
+Rendering uses Uno **SKCanvasElement** and its shared Skia composition path, not an extra application-owned CPU framebuffer. Hardware acceleration depends on the host/browser/driver; path operations remain CPU-side. CI Chromium and benchmark surfaces use software graphics. CPU allocations/timings are not whole-app frame rates or physical-GPU certification. See [clipping/performance](docs/clipping-and-performance.md) and the [0.4 guide](docs/opacity-masks-and-gradients.md#cache-ownership-and-measured-work).
 
-**Native saves now use schema 2.** ArtSpace 0.3 reads schemas 1 and 2 and upgrades schema 1 when saving. Older ArtSpace versions reject schema 2 rather than silently removing clipping behavior. Retain an original copy for older-version workflows.
+## Compatibility
 
-Vector clipping is implemented; opacity/luminance masks are not. SVG clipping accepts one primitive/compound path per `userSpaceOnUse` definition and rejects unsupported clipping definitions. Existing transform, paint-server and SVG subset limits remain. This is not lossless Illustrator interchange.
+**Native saves use schema 3.** ArtSpace 0.4 reads schemas 1–3 and upgrades older documents when saving. Previous releases reject schema 3 rather than silently dropping new mask/paint/affine semantics. Preserve an original copy for older-version workflows. Autosave is local recovery, not durable backup.
 
-AI/EPS/PDF, CMYK/ICC/spot-color production, overprint, advanced text shaping, meshes, perspective tools, tracing, pressure/pattern brushes, multiple documents, arbitrary floating docking and Adobe plugins remain outside this alpha. Rational conics are approximated during editing; direct selection edits one object's contours at a time. Autosave is local recovery, not a backup service.
+Supported SVG gradients and masks are not full SVG/Illustrator roundtripping. Opacity-mask import currently requires user-space units; inverted masks retain native/PNG output but SVG export is explicitly rejected. General filters, image/use content, gradient strokes, stylesheet cascade and linear-light paint interpolation remain outside the supported subset.
+
+Advanced shaping, variable-font workflows, gradient meshes, full live effects, image tracing, pressure/pattern brushes, AI/EPS/PDF interchange, CMYK/ICC production, multiple documents and arbitrary floating docking remain unfinished. Direct contour editing works on one object's contours at a time; rational curves are approximated on editing. See the complete [feature matrix](docs/feature-matrix.md).
 
 ## Documentation and license
 
-[Getting started](docs/getting-started.md) · [Path editing](docs/path-editing.md) · [Clipping/performance](docs/clipping-and-performance.md) · [Architecture](docs/architecture.md) · [Feature matrix](docs/feature-matrix.md) · [Contributing](CONTRIBUTING.md) · [Changelog](CHANGELOG.md)
+[Getting started](docs/getting-started.md) · [Architecture](docs/architecture.md) · [Contours/outlines](docs/path-editing.md) · [Clipping/performance](docs/clipping-and-performance.md) · [Opacity/gradients](docs/opacity-masks-and-gradients.md) · [Contributing](CONTRIBUTING.md)
 
-ArtSpace is [MIT-licensed](LICENSE). Its shared engine derives from the author's MIT [VectorSpace](https://github.com/wieslawsoltes/VectorSpace) snapshot `587f780f2803f6b3aa59dfb5411da2c2fe601dfa`; attribution is retained in [third-party notices](THIRD-PARTY-NOTICES.md).
+ArtSpace is [MIT-licensed](LICENSE), derived from the author's MIT [VectorSpace](https://github.com/wieslawsoltes/VectorSpace) snapshot `587f780f2803f6b3aa59dfb5411da2c2fe601dfa`. Attribution is retained in [third-party notices](THIRD-PARTY-NOTICES.md).
 
-Adobe Illustrator is the design/interaction reference. ArtSpace contains no Adobe source code, proprietary artwork, logos or product icons and is not affiliated with or endorsed by Adobe.
+Adobe Illustrator is a design and interaction reference. ArtSpace contains no Adobe source code, proprietary artwork, logos or product icons and is not affiliated with or endorsed by Adobe.

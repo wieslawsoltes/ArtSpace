@@ -19,11 +19,11 @@ internal static class PerformanceBenchmarks
     private static void VerifyBoundaryRegressions()
     {
         static void Require(bool success, string message) { if (!success) throw new InvalidOperationException(message); }
-        var legacy = DocumentJson.Save(new DesignDocument()).Replace("\"formatVersion\":2", "\"formatVersion\":1", StringComparison.Ordinal);
+        var legacy = DocumentJson.Save(new DesignDocument()).Replace("\"formatVersion\":3", "\"formatVersion\":1", StringComparison.Ordinal);
         var migrated = DocumentJson.Load(legacy);
         Require(migrated.FormatVersion == 1, "Legacy schema must still load.");
         var saved = DocumentJson.Save(migrated);
-        Require(migrated.FormatVersion == 2 && saved.Contains("\"formatVersion\":2", StringComparison.Ordinal), "Native saves must advertise clipping-aware schema 2.");
+        Require(migrated.FormatVersion == 3 && saved.Contains("\"formatVersion\":3", StringComparison.Ordinal), "Native saves must advertise clipping-aware schema 3.");
         var node = new DesignNode();
         var editor = new EditorSession(new() { Pages = [new() { Nodes = [node] }] }); editor.Select(node);
         var before = DocumentJson.Save(editor.Document); var failed = false;
@@ -77,8 +77,10 @@ internal static class PerformanceBenchmarks
         var uncullled = Measure(() => { for (var i = 0; i < 10; i++) { surface.Canvas.Clear(SKColors.Transparent); renderer.Draw(surface.Canvas, [group]); } });
         using var referenceImage = surface.Snapshot(); using var referencePng = referenceImage.Encode(SKEncodedImageFormat.Png, 100);
         if (!optimizedPng.ToArray().SequenceEqual(referencePng.ToArray())) throw new InvalidOperationException("Culling pixel mismatch.");
+        var appearance = AppearanceBenchmarks.Run();
         Console.WriteLine(JsonSerializer.Serialize(new
         {
+            appearance,
             schema = 1, framework = System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription,
             platform = System.Runtime.InteropServices.RuntimeInformation.OSDescription,
             note = "CPU microbenchmarks; software Skia surface; not a physical GPU or end-to-end frame-rate measurement. Index build excluded from query timings. Single-run timings vary with tiering and host load.",

@@ -118,7 +118,15 @@ public static class PathEditing
         if (!float.IsFinite(bounds.Left) || !float.IsFinite(bounds.Top) || !float.IsFinite(bounds.Right) || !float.IsFinite(bounds.Bottom))
             throw new InvalidOperationException("Edited path has invalid bounds.");
         var width = Math.Max(.001, bounds.Width); var height = Math.Max(.001, bounds.Height);
-        var gradients = basis.Fills.Select(f => (f.Start, f.End)).ToArray();
+        var gradients = basis.Fills.Select(f => (f.Start, f.End, f.GradientSpace, f.GradientTransform, f.GradientFocus, f.GradientRadius)).ToArray();
+        var oldBounds = basis.LocalBounds;
+        if (gradients.Any(f => f.GradientSpace == GradientSpace.ObjectBoundingBox))
+        {
+            using var oldPath = SKPath.ParseSvgPathData(VectorPath.Build(basis)) ?? new SKPath();
+            if (basis.Kind == NodeKind.Path && basis.PathWidth > 0 && basis.PathHeight > 0)
+                oldPath.Transform(SKMatrix.CreateScale((float)(oldWidth / basis.PathWidth), (float)(oldHeight / basis.PathHeight)));
+            var old = oldPath.TightBounds; oldBounds = new(old.Left, old.Top, old.Width, old.Height);
+        }
         using var normalized = new SKPath(localGeometry);
         normalized.Transform(SKMatrix.CreateTranslation(-bounds.Left, -bounds.Top));
         node.FillRule = localGeometry.FillType == SKPathFillType.EvenOdd ? PathFillRule.EvenOdd : PathFillRule.NonZero;
@@ -129,8 +137,27 @@ public static class PathEditing
         {
             if (node.Fills[i].Kind == FillKind.Solid) continue;
             var old = gradients[i];
-            node.Fills[i].Start = new((old.Start.X * oldWidth - bounds.Left) / width, (old.Start.Y * oldHeight - bounds.Top) / height);
-            node.Fills[i].End = new((old.End.X * oldWidth - bounds.Left) / width, (old.End.Y * oldHeight - bounds.Top) / height);
+            var fill = node.Fills[i];
+            if (old.GradientSpace == GradientSpace.Legacy && old.GradientTransform == Matrix2D.Identity)
+            {
+                fill.Start = new((old.Start.X * oldWidth - bounds.Left) / width, (old.Start.Y * oldHeight - bounds.Top) / height);
+                fill.End = new((old.End.X * oldWidth - bounds.Left) / width, (old.End.Y * oldHeight - bounds.Top) / height);
+            }
+            else
+            {
+                fill.Start = old.Start; fill.End = old.End; fill.GradientFocus = old.GradientFocus; fill.GradientRadius = old.GradientRadius;
+                var transform = old.GradientTransform;
+                if (old.GradientSpace == GradientSpace.ObjectBoundingBox)
+                    transform *= Matrix2D.Scale(Math.Max(.000001, oldBounds.Width), Math.Max(.000001, oldBounds.Height)) * Matrix2D.Translation(oldBounds.X, oldBounds.Y);
+                else if (old.GradientSpace == GradientSpace.Legacy)
+                {
+                    fill.Start = new(old.Start.X * oldWidth, old.Start.Y * oldHeight);
+                    fill.End = new(old.End.X * oldWidth, old.End.Y * oldHeight);
+                    fill.GradientFocus = fill.Start; fill.GradientRadius = Math.Max(1, fill.Start.DistanceTo(fill.End));
+                }
+                fill.GradientSpace = GradientSpace.UserSpaceOnUse;
+                fill.GradientTransform = transform * Matrix2D.Translation(-bounds.Left, -bounds.Top) * Matrix2D.Scale(node.Width / width, node.Height / height);
+            }
         }
     }
     private static Vec2 V(SKPoint point) => new(point.X, point.Y);

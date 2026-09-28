@@ -14,11 +14,17 @@ public enum TextAlignment { Left, Center, Right }
 
 public sealed class GradientStop
 {
+    public double Opacity { get; set; } = 1;
     public double Offset { get; set; }
     public string Color { get; set; } = "#FFFFFF";
 }
 public sealed class FillStyle
 {
+    public GradientSpace GradientSpace { get; set; }
+    public GradientSpread GradientSpread { get; set; }
+    public Matrix2D GradientTransform { get; set; } = Matrix2D.Identity;
+    public double GradientRadius { get; set; } = .5;
+    public Vec2? GradientFocus { get; set; }
     public FillKind Kind { get; set; }
     public string Color { get; set; } = "#D9D9D9";
     public double Opacity { get; set; } = 1;
@@ -94,6 +100,14 @@ public sealed class DesignNode
     /// <summary>Identifier of the direct child whose filled geometry clips this container's contents.</summary>
     public string? ClipPathId { get; set; }
     [JsonIgnore] public DesignNode? ClippingPath => ClipPathId is null ? null : Children.Find(n => n.Id == ClipPathId);
+    public string? OpacityMaskId { get; set; }
+    public OpacityMaskMode OpacityMaskMode { get; set; }
+    public bool OpacityMaskEnabled { get; set; } = true;
+    public bool OpacityMaskInverted { get; set; }
+    public RectD? OpacityMaskRegion { get; set; }
+    [JsonIgnore] public DesignNode? OpacityMask => OpacityMaskId is null ? null : Children.Find(n => n.Id == OpacityMaskId);
+    /// <summary>Residual affine transform before editable placement; preserves imported skew and group scale.</summary>
+    public Matrix2D? AffineTransform { get; set; }
     public bool Expanded { get; set; } = true;
     public int Sides { get; set; } = 5;
     public double StarRatio { get; set; } = .45;
@@ -130,7 +144,8 @@ public sealed class DesignNode
     [JsonIgnore] public bool IsEffectivelyVisible => Visible && (Parent?.IsEffectivelyVisible ?? true);
     [JsonIgnore] public RectD Bounds => new(X, Y, Width, Height);
     [JsonIgnore] public RectD LocalBounds => new(0, 0, Width, Height);
-    [JsonIgnore] public Matrix2D LocalMatrix => Matrix2D.Translation(-Width / 2, -Height / 2) * Matrix2D.Scale(FlipX ? -1 : 1, FlipY ? -1 : 1) * Matrix2D.Rotation(Rotation) * Matrix2D.Translation(X + Width / 2, Y + Height / 2);
+    [JsonIgnore] public Matrix2D PlacementMatrix => Matrix2D.Translation(-Width / 2, -Height / 2) * Matrix2D.Scale(FlipX ? -1 : 1, FlipY ? -1 : 1) * Matrix2D.Rotation(Rotation) * Matrix2D.Translation(X + Width / 2, Y + Height / 2);
+    [JsonIgnore] public Matrix2D LocalMatrix => (AffineTransform ?? Matrix2D.Identity) * PlacementMatrix;
     [JsonIgnore] public Matrix2D WorldMatrix => Parent is null ? LocalMatrix : LocalMatrix * Parent.WorldMatrix;
     [JsonIgnore] public RectD WorldBounds => WorldMatrix.Map(LocalBounds);
     [JsonIgnore] public string Fill
@@ -195,16 +210,29 @@ public sealed class DesignDocument
 
 public static class NodeGeometry
 {
-    /// <summary>Re-expresses a node in another rigid/scaled coordinate system without losing its center.</summary>
+    /// <summary>Preserves geometry coordinates, including skew and nested group scaling, without decomposition loss.</summary>
+    public static void SetExactMatrix(DesignNode node, Matrix2D matrix)
+    {
+        if (!AffineGeometry.IsInvertible(matrix)) throw new InvalidOperationException("A transform must be finite and invertible.");
+        node.AffineTransform = matrix * node.PlacementMatrix.Inverse;
+    }
+    /// <summary>Re-expresses editable placement and retains any affine residual that cannot be represented by rotation/size.</summary>
     public static void SetLocalMatrix(DesignNode node, Matrix2D matrix)
     {
-        var center = matrix.Map(new Vec2(node.Width / 2, node.Height / 2));
+        if (!AffineGeometry.IsInvertible(matrix)) throw new InvalidOperationException("A transform must be finite and invertible.");
+        var oldWidth = node.Width; var oldHeight = node.Height;
+        var center = matrix.Map(new Vec2(oldWidth / 2, oldHeight / 2));
         var sx = Math.Sqrt(matrix.M11 * matrix.M11 + matrix.M12 * matrix.M12);
         var determinant = matrix.M11 * matrix.M22 - matrix.M12 * matrix.M21;
-        var sy = sx > 1e-9 ? determinant / sx : 1;
-        node.Width *= Math.Max(.0001, sx); node.Height *= Math.Max(.0001, Math.Abs(sy));
+        var sy = determinant / sx;
+        if (!node.IsContainer)
+        {
+            node.Width *= Math.Max(.0001, sx); node.Height *= Math.Max(.0001, Math.Abs(sy));
+            matrix = Matrix2D.Scale(oldWidth > 0 ? oldWidth / Math.Max(1e-12, node.Width) : 1, oldHeight > 0 ? oldHeight / Math.Max(1e-12, node.Height) : 1) * matrix;
+        }
         node.FlipX = false; node.FlipY = sy < 0;
         node.Rotation = Math.Atan2(matrix.M12, matrix.M11) * 180 / Math.PI;
         node.X = center.X - node.Width / 2; node.Y = center.Y - node.Height / 2;
+        node.AffineTransform = matrix * node.PlacementMatrix.Inverse;
     }
 }

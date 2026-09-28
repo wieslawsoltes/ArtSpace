@@ -18,6 +18,7 @@ public static class ClippingOperations
             throw new InvalidOperationException("Clipping requires unlocked objects in the same parent.");
         if (parent?.ClipPathId is { } activeMask && nodes.Any(n => n.Id == activeMask))
             throw new InvalidOperationException("Release the existing clipping mask before regrouping its clipping path.");
+        if (nodes.Any(n => parent?.OpacityMaskId == n.Id)) throw new InvalidOperationException("Release the opacity mask before regrouping its source.");
         var siblings = parent?.Children ?? editor.Page.Nodes;
         nodes = nodes.OrderBy(siblings.IndexOf).ToArray(); var mask = nodes[^1];
         if (!IsVectorMask(mask)) throw new InvalidOperationException("The topmost object must be a vector shape or compound path. Outline text first.");

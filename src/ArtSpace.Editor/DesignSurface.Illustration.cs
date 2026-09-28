@@ -37,7 +37,7 @@ public sealed partial class DesignSurface
             var node = editor.Primary;
             if (node is null || node.IsEffectivelyLocked) return true;
             editor.BeginInteraction("Edit gradient"); _gradientNode = node;
-            var start = node.WorldMatrix.Inverse.Map(world);
+            var local = node.WorldMatrix.Inverse.Map(world);
             var fill = node.Fills.FirstOrDefault();
             if (fill is null) { fill = new() { Color = FillColor }; node.Fills.Add(fill); }
             if (fill.Kind == FillKind.Solid)
@@ -45,8 +45,11 @@ public sealed partial class DesignSurface
                 fill.Kind = FillKind.LinearGradient;
                 fill.Stops = [new() { Offset = 0, Color = fill.Color }, new() { Offset = 1, Color = "#203F49" }];
             }
-            fill.Start = new(start.X / Math.Max(.001, node.Width), start.Y / Math.Max(.001, node.Height));
-            fill.End = fill.Start + new Vec2(.01, .01); _gesture = Gesture.Gradient; editor.Preview(); return true;
+            fill.Start = Renderer.GradientCoordinateMatrix(node, fill).Inverse.Map(local);
+            fill.End = fill.Start + new Vec2(.01, .01);
+            if (fill.Kind == FillKind.RadialGradient && fill.GradientSpace != GradientSpace.Legacy)
+            { fill.GradientFocus = fill.Start; fill.GradientRadius = .01; }
+            _gesture = Gesture.Gradient; editor.Preview(); return true;
         }
         return PathPressed(world, screen, e);
     }
@@ -54,8 +57,11 @@ public sealed partial class DesignSurface
     private void MoveGradient(Vec2 world)
     {
         if (_gradientNode is not { } node || node.Fills.Count == 0 || Session is null) return;
+        var fill = node.Fills[0];
         var local = node.WorldMatrix.Inverse.Map(world);
-        node.Fills[0].End = new(local.X / Math.Max(.001, node.Width), local.Y / Math.Max(.001, node.Height));
+        fill.End = Renderer.GradientCoordinateMatrix(node, fill).Inverse.Map(local);
+        if (fill.Kind == FillKind.RadialGradient && fill.GradientSpace != GradientSpace.Legacy)
+            fill.GradientRadius = fill.Start.DistanceTo(fill.End);
         Session.Preview();
     }
 
@@ -63,8 +69,10 @@ public sealed partial class DesignSurface
     {
         DrawEditableHandles(canvas);
         if (Session is not { Tool: EditorTool.Gradient, Primary: { } node } editor || node.Fills.FirstOrDefault() is not { Kind: not FillKind.Solid } fill) return;
-        Vec2 Screen(Vec2 p) => editor.Viewport.WorldToScreen(node.WorldMatrix.Map(new Vec2(p.X * node.Width, p.Y * node.Height)));
-        var start = Screen(fill.Start); var end = Screen(fill.End);
+        var coordinates = Renderer.GradientCoordinateMatrix(node, fill);
+        Vec2 Screen(Vec2 p) => editor.Viewport.WorldToScreen(node.WorldMatrix.Map(coordinates.Map(p)));
+        var start = Screen(fill.Start);
+        var end = Screen(fill.Kind == FillKind.RadialGradient && fill.GradientSpace != GradientSpace.Legacy ? fill.Start + new Vec2(fill.GradientRadius, 0) : fill.End);
         using var paint = new SKPaint { IsAntialias = true, Color = SKColors.White, StrokeWidth = 2 };
         canvas.DrawLine(P(start), P(end), paint); canvas.DrawCircle(P(start), 5, paint); canvas.DrawCircle(P(end), 5, paint);
         paint.Color = new(58, 118, 238); paint.Style = SKPaintStyle.Stroke; paint.StrokeWidth = 1;

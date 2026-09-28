@@ -1,58 +1,47 @@
 # Changelog
 
-## 0.3.0-alpha.1 — 2026-09-27
+## 0.4.0-alpha.1 — 2026-09-28
 
 ### Added
 
-- Editable vector clipping sets with Make/Release, mask/content selection, nested rendering, compound holes, clipping-aware picking and stable child references.
-- Native/cloned/clipboard/component clipping reference preservation and safe SVG single-shape/compound-path `userSpaceOnUse` clipping interchange.
-- Schema 2 native saves with legacy schema 1 reading. Older readers reject the new schema rather than silently dropping clipping behavior.
-- Exact retained geometry-cache snapshots, cached text/font layouts and selection/root lists, and incremental deleted-resource pruning.
-- Sorted-axis stationary-target snapping indexes with exhaustive-reference-equivalent tie-breaking and guide extents.
-- Conservative nested-leaf culling against the actual canvas clip, retaining overflowing groups and offscreen shadow sources.
-- 34 additional engine regressions (141 total), five untimed benchmark boundary checks and three browser scenarios (ten total).
-- CPU timing/allocation reports with snapping/pixel-equivalence checks retained by Build. Build, Pages and Release run the complete browser suite.
-- Clipping/performance documentation, schema compatibility guidance and refreshed feature boundaries.
+- Editable alpha/luminance opacity masks with retained vector/text/group source artwork, nesting, inversion, enable/disable, release and independent source/content selection.
+- Transparency controls and Object-menu actions. Explicit source selection permits canvas movement even where mask coverage is zero.
+- Persistent mask references through JSON validation, undo, cloning, clipboard and component synchronization.
+- Supported SVG opacity-mask import/export with user-space units, regions, local reference checks and finite exported mask bounds.
+- SVG linear/radial gradient fills with local inheritance, stop opacity, object-box/user-space coordinates, spread, transforms and radial center/focus/radius.
+- On-canvas imported-gradient editing and preserved gradient placement during contour normalization.
+- Residual affine transforms preserving nested group scaling, skew and reflection, strict SVG transform parsing and round-trip affine numeric serialization.
+- Retained gradient shader caches with exact invalidation; allocation-free affine rectangle bounds and single-pass point bounds.
+- 54 additional registered engine regressions (195 total), including mask pixels, shader ownership, affine properties, serialization and gradient normalization.
+- Three additional real browser scenarios (13 total) for mask commands/source movement/recovery, SVG alpha/radial/affine data and imported gradient editing/cache retention.
+- Five-sample appearance CPU benchmark medians with allocation and pixel-equivalence checks.
 
-### Correctness
+### Correctness and compatibility
 
-- Retain rollback snapshots until commit serialization succeeds.
-- Reject regrouping an active clipping path into a different parent until its existing mask is released.
-- Include miter reach in picking bounds and preserve mask identities during symbol synchronization.
-- Keep unchanged geometry cached during object movement and appearance changes.
+- Fixed retained identity-matrix shaders being disposed as temporary objects, which could remove gradient output and produce incorrect combined opacity.
+- Gradient stop alpha and overall fill alpha are applied once each. Luminance is computed after source compositing.
+- Computed matrix inverse/bounds properties are excluded from native JSON.
+- New saves use schema 3; schemas 1 and 2 remain readable and upgrade when saved. Earlier releases reject the new schema rather than silently dropping semantics.
+- Removed temporary integration/toolchain-export workflows after source materialization.
 
 ### Boundaries
 
-Vector clipping is not opacity/luminance masking. SVG clipping supports one vector shape or compound path per local `userSpaceOnUse` definition; unsupported definitions fail closed. Existing SVG transform/paint-server limits remain. Performance reports measure CPU microbenchmarks on software Skia, exclude cold index construction from query timings and make no physical-GPU or whole-app frame-rate claim.
+Inverted masks are supported in native/PNG workflows; SVG export of inversion is explicitly rejected. SVG opacity-mask import requires user-space units. General filters, object-box mask units, image/use sources, gradient strokes, full CSS cascade and linear-light interpolation remain unsupported. This increment does not complete advanced typography, meshes, AI/EPS/PDF, CMYK/ICC production, multiple documents or arbitrary floating docking. CPU software-Skia measurements are not physical-GPU or whole-application frame-rate claims.
+
+## 0.3.0-alpha.1 — 2026-09-27
+
+Added editable vector clipping sets, mask/content selection, nested clips and compound holes; native/clipboard/component mask reference preservation; supported user-space SVG clipping; schema 2 compatibility protection; exact retained geometry snapshots, text/font and selection caches; indexed stationary-target snapping; conservative nested-leaf culling; rollback-through-serialization and live-mask ownership guards.
+
+Validation expanded to 141 registered engine cases, five benchmark safety checks and ten browser scenarios. Build retained CPU reports and all deployment/release workflows ran the complete browser suite. Performance measurements used software Skia and excluded cold snap-index construction from query timings.
 
 ## 0.2.0-alpha.1 — 2026-09-27
 
-### Added
+Added managed editable contours and direct anchor editing for primitives, imported SVG, compounds, Boolean/expanded paths and outlined glyphs; multi-anchor selection/marquee, drag/nudge, exact cubic insertion, reconnecting removal and incident-segment cutting; bounded rational-conic conversion; persistent fill rules; Make/Release Compound Path; and Create Outlines using shared glyph runs.
 
-- Managed, renderer-independent editable contours with double-coordinate anchors and tangent handles.
-- Direct anchor editing for primitives, imported SVG, compound paths, Boolean/expanded geometry and outlined glyphs.
-- Multi-anchor selection/marquee, drag/nudge, exact cubic insertion, reconnecting removal, incident-segment cutting, smooth/corner conversion and cancellation.
-- Quadratic elevation and bounded rational-conic-to-cubic conversion.
-- Nonzero/even-odd fill rules across native JSON, SVG inheritance/export, renderer caching, hit testing and geometry results.
-- Make/Release Compound Path using the topmost selected appearance and preserved sibling stacking.
-- Create Outlines with shared rendering/layout runs, stable identifiers, preserved appearance/transforms and undo.
-- 33 additional engine regressions (107 total) and three additional browser scenarios (seven total).
-- A path-editing/outline guide and refreshed architecture, README and feature boundaries.
-
-### Correctness
-
-- Pointer updates use a pre-gesture basis instead of accumulating normalized-coordinate drift.
-- Moving a direction handle aligns its opposite while preserving the opposite length; Alt allows independent edits.
-- Closing cubic contours retain the first anchor's incoming handle and do not introduce links between contours.
-- Text fill, stroke and outlines share layout; tracking uses Unicode scalar offsets and a linear prefix-advance line breaker.
-- Whitespace-only and locked text are not destructively converted.
-
-### Boundaries at this version
-
-One object's contours are edited at a time. Rational geometry is approximated on editing. Text outlines reproduce the basic text layout, without advanced shaping, bidi, font fallback or variable-font axes. AI/EPS/PDF, color-managed print production, masks, meshes and full live effects were not implemented in 0.2.
+Fixed absolute pointer normalization drift, opposite-tangent length preservation, closing-contour handles and basic text-layout consistency. Validation expanded to 107 engine cases and seven browser scenarios. Complex shaping and full Illustrator path-tool parity were not claimed.
 
 ## 0.1.0-alpha.1 — 2026-09-27
 
-Initial independent illustration editor derived from the author's MIT VectorSpace engine. Added the shared Uno desktop/WebAssembly app, dark workspace, original Alpine Echoes artwork, nine reusable libraries, vector drawing/manipulation, stroke/shape expansion, offsets, blends, repeats, Pathfinder, gradients, local recovery, SVG/PNG workflows and build/Pages/release automation.
+Initial independent illustration editor based on the author's MIT VectorSpace engine. Added the shared Uno desktop/WebAssembly app, original Alpine Echoes artwork, dark workspace, nine reusable libraries, vector drawing/manipulation, expansion/offsets/blends/repeats, Pathfinder, gradients, local recovery, SVG/PNG workflows and build/Pages/release automation.
 
-The initial alpha was not full or pixel-identical Illustrator parity. Hardware acceleration depends on host/driver; software-rendered CI is not a physical-GPU benchmark.
+The initial alpha was not complete or pixel-identical Illustrator parity. Acceleration depended on host/driver, and software-rendered CI was not a physical-GPU benchmark.
