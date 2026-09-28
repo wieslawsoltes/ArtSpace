@@ -1,0 +1,37 @@
+name: Appearance integration
+on:
+  push:
+    branches: [feat/opacity-masks-svg-fidelity]
+    paths: ['.github/workflows/appearance-integration.yml']
+permissions:
+  contents: write
+jobs:
+  integrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feat/opacity-masks-svg-fidelity
+      - name: Apply source integration once
+        run: |
+          if [ -f eng/integrate-appearance.py ]; then
+            python3 eng/integrate-appearance.py
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git add src tests Directory.Build.props
+            git rm eng/integrate-appearance.py
+            git commit -m 'Integrate editable opacity masks, affine preservation and retained gradient shaders'
+            git push origin HEAD:feat/opacity-masks-svg-fidelity
+          fi
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+      - name: Engine and pixel regressions
+        run: dotnet run --project tests/ArtSpace.Tests -c Release
+      - name: Native compilation
+        run: |
+          python3 scripts/fetch-assets.py
+          dotnet build src/ArtSpace.App -c Release -f net10.0-desktop -p:ArtSpaceDesktopOnly=true
+      - name: Reference performance checks
+        run: dotnet run --project tests/ArtSpace.Tests -c Release --no-build -- --benchmark
