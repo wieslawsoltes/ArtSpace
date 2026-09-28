@@ -1,0 +1,45 @@
+name: Appearance polish
+on:
+  push:
+    branches: [feat/opacity-masks-svg-fidelity]
+    paths: ['.github/workflows/appearance-polish.yml']
+permissions:
+  contents: write
+jobs:
+  materialize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feat/opacity-masks-svg-fidelity
+      - name: Apply reviewed source refinements once
+        run: |
+          if [ -f eng/polish-appearance.py ]; then
+            python3 eng/polish-appearance.py
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git add src tests
+            git rm eng/polish-appearance.py
+            git commit -m 'Preserve imported gradient coordinates, bound mask exports and add regression coverage'
+            git push origin HEAD:feat/opacity-masks-svg-fidelity
+          fi
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+      - name: Engine regressions
+        run: dotnet run --project tests/ArtSpace.Tests -c Release
+      - name: Native host
+        run: |
+          python3 scripts/fetch-assets.py
+          dotnet build src/ArtSpace.App -c Release -f net10.0-desktop -p:ArtSpaceDesktopOnly=true
+      - name: Measure and verify
+        run: |
+          mkdir -p artifacts/benchmarks
+          dotnet run --project tests/ArtSpace.Tests -c Release --no-build -- --benchmark | tee artifacts/benchmarks/cpu.json
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: ArtSpace-appearance-performance
+          path: artifacts/benchmarks
+          if-no-files-found: ignore
