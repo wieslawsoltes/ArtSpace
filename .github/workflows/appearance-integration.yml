@@ -2,28 +2,18 @@ name: Appearance integration
 on:
   push:
     branches: [feat/opacity-masks-svg-fidelity]
-    paths: ['.github/workflows/appearance-integration.yml']
+    paths: ['.github/workflows/appearance-integration.yml', 'src/**', 'tests/**']
 permissions:
-  contents: write
+  contents: read
+concurrency:
+  group: appearance-engine
+  cancel-in-progress: true
 jobs:
-  integrate:
+  engine:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
-        with:
-          ref: feat/opacity-masks-svg-fidelity
-      - name: Apply source integration once
-        run: |
-          if [ -f eng/integrate-appearance.py ]; then
-            python3 eng/integrate-appearance.py
-            git config user.name 'github-actions[bot]'
-            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-            git add src tests Directory.Build.props
-            git rm eng/integrate-appearance.py
-            git commit -m 'Integrate editable opacity masks, affine preservation and retained gradient shaders'
-            git push origin HEAD:feat/opacity-masks-svg-fidelity
-          fi
       - uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
@@ -34,4 +24,12 @@ jobs:
           python3 scripts/fetch-assets.py
           dotnet build src/ArtSpace.App -c Release -f net10.0-desktop -p:ArtSpaceDesktopOnly=true
       - name: Reference performance checks
-        run: dotnet run --project tests/ArtSpace.Tests -c Release --no-build -- --benchmark
+        run: |
+          mkdir -p artifacts/benchmarks
+          dotnet run --project tests/ArtSpace.Tests -c Release --no-build -- --benchmark | tee artifacts/benchmarks/cpu.json
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: ArtSpace-appearance-performance
+          path: artifacts/benchmarks
+          if-no-files-found: ignore
