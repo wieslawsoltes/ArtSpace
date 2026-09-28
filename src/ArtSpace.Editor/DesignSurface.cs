@@ -187,6 +187,19 @@ public sealed partial class DesignSurface : UserControl, IDisposable
     private DesignNode? Hit(Vec2 world, Vec2 screen, bool deep)
     {
         if (Session is null) return null;
+        foreach (var selected in Session.SelectionRoots)
+        {
+            var source = selected;
+            while (source.Parent is { } parent)
+            {
+                if (parent.OpacityMaskId == source.Id)
+                {
+                    if (!selected.IsEffectivelyLocked && selected.WorldBounds.Contains(world)) return selected;
+                    break;
+                }
+                source = parent;
+            }
+        }
         foreach (var node in Session.Page.Nodes.Where(n => n.IsContainer && !n.Locked).Reverse())
         {
             var p = Session.Viewport.WorldToScreen(new(node.WorldBounds.X, node.WorldBounds.Y));

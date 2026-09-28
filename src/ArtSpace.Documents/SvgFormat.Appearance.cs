@@ -122,10 +122,14 @@ public static partial class SvgFormat
         return result;
     }
 
+    private sealed record ExportViewport(RectD Bounds);
+
     private static XElement ExportOpacityMask(DesignNode owner, XElement defs)
     {
         var id = "opacity-mask-" + owner.Id;
-        var region = owner.OpacityMaskRegion ?? new RectD(-1e9, -1e9, 2e9, 2e9);
+        var viewport = defs.Annotation<ExportViewport>()?.Bounds ?? owner.WorldBounds;
+        var region = owner.OpacityMaskRegion ?? owner.WorldMatrix.Inverse.Map(viewport);
+        if (region.IsEmpty || !double.IsFinite(region.Right) || !double.IsFinite(region.Bottom)) throw new InvalidOperationException("Invalid SVG mask export bounds.");
         var mask = new XElement(Ns + "mask", new XAttribute("id", id), new XAttribute("maskUnits", "userSpaceOnUse"), new XAttribute("maskContentUnits", "userSpaceOnUse"),
             new XAttribute("x", F(region.X)), new XAttribute("y", F(region.Y)), new XAttribute("width", F(region.Width)), new XAttribute("height", F(region.Height)),
             new XAttribute("style", "mask-type:" + (owner.OpacityMaskMode == OpacityMaskMode.Alpha ? "alpha" : "luminance")), new XAttribute("color-interpolation", "sRGB"));

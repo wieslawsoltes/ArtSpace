@@ -14,7 +14,9 @@ public static partial class SvgFormat
     private static readonly XNamespace Ns = "http://www.w3.org/2000/svg";
     public static string Export(IEnumerable<DesignNode> roots, RectD bounds)
     {
+        if (!double.IsFinite(bounds.X) || !double.IsFinite(bounds.Y) || !double.IsFinite(bounds.Right) || !double.IsFinite(bounds.Bottom) || bounds.IsEmpty) throw new ArgumentException("SVG export needs finite nonempty bounds.", nameof(bounds));
         var defs = new XElement(Ns + "defs");
+        defs.AddAnnotation(new ExportViewport(bounds));
         var svg = new XElement(Ns + "svg", new XAttribute("width", F(bounds.Width)), new XAttribute("height", F(bounds.Height)), new XAttribute("viewBox", $"{F(bounds.X)} {F(bounds.Y)} {F(bounds.Width)} {F(bounds.Height)}"), defs);
         foreach (var node in roots) svg.Add(ExportNode(node, defs, true));
         return new XDocument(new XDeclaration("1.0", "utf-8", null), svg).ToString();
@@ -195,25 +197,33 @@ public static partial class SvgFormat
     private static double[] Values(string? text) => text is null ? [] : NumberRegex().Matches(text).Select(m => double.Parse(m.Value, CultureInfo.InvariantCulture)).ToArray();
     public static Matrix2D ParseTransform(string text)
     {
-        var result = Matrix2D.Identity;
+        ArgumentNullException.ThrowIfNull(text);
+        var result = Matrix2D.Identity; var end = 0;
         foreach (Match match in TransformRegex().Matches(text))
         {
-            var values = Values(match.Groups[2].Value); var matrix = Matrix2D.Identity;
-            switch (match.Groups[1].Value)
+            if (text[end..match.Index].Any(c => !char.IsWhiteSpace(c) && c != ',')) throw new InvalidDataException("Unsupported SVG transform syntax.");
+            var arguments = match.Groups[2].Value;
+            if (NumberRegex().Replace(arguments, "").Any(c => !char.IsWhiteSpace(c) && c != ',')) throw new InvalidDataException("Invalid SVG transform arguments.");
+            var v = Values(arguments);
+            var matrix = match.Groups[1].Value switch
             {
-                case "matrix" when values.Length == 6: matrix = new(values[0], values[1], values[2], values[3], values[4], values[5]); break;
-                case "translate" when values.Length >= 1: matrix = Matrix2D.Translation(values[0], values.Length > 1 ? values[1] : 0); break;
-                case "scale" when values.Length >= 1: matrix = Matrix2D.Scale(values[0], values.Length > 1 ? values[1] : values[0]); break;
-                case "rotate" when values.Length >= 1: matrix = values.Length >= 3 ? Matrix2D.Translation(-values[1], -values[2]) * Matrix2D.Rotation(values[0]) * Matrix2D.Translation(values[1], values[2]) : Matrix2D.Rotation(values[0]); break;
-                case "skewX" when values.Length >= 1: matrix = new(1, 0, Math.Tan(values[0] * Math.PI / 180), 1, 0, 0); break;
-                case "skewY" when values.Length >= 1: matrix = new(1, Math.Tan(values[0] * Math.PI / 180), 0, 1, 0, 0); break;
-            }
-            result = matrix * result;
+                "matrix" when v.Length == 6 => new Matrix2D(v[0], v[1], v[2], v[3], v[4], v[5]),
+                "translate" when v.Length is 1 or 2 => Matrix2D.Translation(v[0], v.Length == 2 ? v[1] : 0),
+                "scale" when v.Length is 1 or 2 => Matrix2D.Scale(v[0], v.Length == 2 ? v[1] : v[0]),
+                "rotate" when v.Length == 1 => Matrix2D.Rotation(v[0]),
+                "rotate" when v.Length == 3 => Matrix2D.Translation(-v[1], -v[2]) * Matrix2D.Rotation(v[0]) * Matrix2D.Translation(v[1], v[2]),
+                "skewX" when v.Length == 1 => new Matrix2D(1, 0, Math.Tan(v[0] * Math.PI / 180), 1, 0, 0),
+                "skewY" when v.Length == 1 => new Matrix2D(1, Math.Tan(v[0] * Math.PI / 180), 0, 1, 0, 0),
+                _ => throw new InvalidDataException("Unsupported SVG transform or invalid argument count.")
+            };
+            result = matrix * result; end = match.Index + match.Length;
+            if (!AffineGeometry.IsInvertible(result)) throw new InvalidDataException("Singular or nonfinite SVG transforms are not supported.");
         }
+        if (text[end..].Any(c => !char.IsWhiteSpace(c) && c != ',')) throw new InvalidDataException("Unsupported SVG transform syntax.");
         return result;
     }
     private static string Transform(Matrix2D m) => $"matrix({F(m.M11)} {F(m.M12)} {F(m.M21)} {F(m.M22)} {F(m.DX)} {F(m.DY)})";
-    private static string F(double number) => number.ToString("0.######", CultureInfo.InvariantCulture);
+    private static string F(double number) => number.ToString("G17", CultureInfo.InvariantCulture);
     [GeneratedRegex(@"[-+]?(?:\d*\.\d+|\d+\.?\d*)(?:[eE][-+]?\d+)?")] private static partial Regex NumberRegex();
     [GeneratedRegex(@"(matrix|translate|scale|rotate|skewX|skewY)\s*\(([^)]*)\)")] private static partial Regex TransformRegex();
 }

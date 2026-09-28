@@ -99,6 +99,7 @@ Test("inset normalizes reduced selection bounds", () => { var n=Node(20,30); var
 PathEditingTests.Register(Test);
 ClippingPerformanceTests.Register(Test);
 AppearanceTests.Register(Test);
+AppearanceRegressionTests.Register(Test);
 
 var failed = 0;
 foreach (var (name, test) in tests) { try { test(); Console.WriteLine("PASS " + name); } catch (Exception ex) { failed++; Console.WriteLine("FAIL " + name + "\n" + ex); } }

@@ -77,8 +77,10 @@ internal static class PerformanceBenchmarks
         var uncullled = Measure(() => { for (var i = 0; i < 10; i++) { surface.Canvas.Clear(SKColors.Transparent); renderer.Draw(surface.Canvas, [group]); } });
         using var referenceImage = surface.Snapshot(); using var referencePng = referenceImage.Encode(SKEncodedImageFormat.Png, 100);
         if (!optimizedPng.ToArray().SequenceEqual(referencePng.ToArray())) throw new InvalidOperationException("Culling pixel mismatch.");
+        var appearance = AppearanceBenchmarks.Run();
         Console.WriteLine(JsonSerializer.Serialize(new
         {
+            appearance,
             schema = 1, framework = System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription,
             platform = System.Runtime.InteropServices.RuntimeInformation.OSDescription,
             note = "CPU microbenchmarks; software Skia surface; not a physical GPU or end-to-end frame-rate measurement. Index build excluded from query timings. Single-run timings vary with tiering and host load.",
