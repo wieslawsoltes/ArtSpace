@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import fs from 'node:fs/promises';
+import vm from 'node:vm';
 const state = page => page.evaluate(() => globalThis.__artSpaceState);
 const field = (s, section, label) => s.inspectorFields?.find(f => f.section === section && f.label === label);
 const frames = page => page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
@@ -99,6 +100,28 @@ test('Graphic Styles captures appearance and applies it without replacing target
 });
 
 test('unchanged scene is replayed during selection without rerecording paints or geometry', async ({ page }) => {
+  // Test the read-only host adapter as well: frame patches cannot replace UI observations.
+  const script = await fs.readFile('src/ArtSpace.App/Platforms/WebAssembly/WasmScripts/Storage.js', 'utf8');
+  for (const search of ['', '?test=1']) {
+    const context = vm.createContext({ URLSearchParams, location: { search }, document: { addEventListener() {} } });
+    vm.runInContext(script, context);
+    const adapter = context.artSpaceStorage;
+    adapter.publishFrameDiagnostics(1, 2, 3, 4, 5, 6, 7, 8, 9);
+    expect(context.__artSpaceState).toBeUndefined();
+    adapter.publishDiagnostics(JSON.stringify({ ready: true, id: 'selected', inspectorFields: [{ value: '19' }] }));
+    if (!search) {
+      adapter.publishFrameDiagnostics(1, 2, 3, 4, 5, 6, 7, 8, 9);
+      expect(context.__artSpaceState).toBeUndefined();
+      continue;
+    }
+    const previous = context.__artSpaceState;
+    adapter.publishFrameDiagnostics(1, 2, 3, 4, 5, 6, 7, 8, 9);
+    expect(context.__artSpaceState.id).toBe('selected');
+    expect(context.__artSpaceState.inspectorFields).toBe(previous.inspectorFields);
+    expect(context.__artSpaceState.sceneReplays).toBe(2);
+    expect(previous.sceneReplays).toBeUndefined();
+    expect(Object.isFrozen(context.__artSpaceState)).toBe(true);
+  }
   const root = await ready(page); await select(page, root); await select(page, root, true);
   await page.waitForFunction(() => globalThis.__artSpaceState?.sceneReplays > 0);
   const warm = await state(page);
@@ -107,6 +130,8 @@ test('unchanged scene is replayed during selection without rerecording paints or
   expect(end.sceneRecordings).toBe(warm.sceneRecordings);
   expect(end.sceneReplays).toBeGreaterThan(warm.sceneReplays);
   expect(end.paintBuilds).toBe(warm.paintBuilds);
+  expect(warm.diagnosticSceneScans).toBeGreaterThan(0);
+  expect(end.diagnosticSceneScans).toBe(warm.diagnosticSceneScans);
   expect(end.snapshots).toBe(warm.snapshots);
   expect(end.uiFailures).toBe(0);
 });

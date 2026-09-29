@@ -23,8 +23,16 @@ public sealed class NumericField : UserControl
     {
         _input = Studio.Input(); _input.Background = Studio.Brush("#00FFFFFF"); _input.Padding = new(1, 4, 5, 4);
         AutomationProperties.SetName(_input, label); ToolTipService.SetToolTip(_input, label);
-        _prefix = new Border { Width = 28, Background = Studio.Brush("#00FFFFFF"), Child = Studio.Text(label, 10, Studio.Muted), Padding = new(8, 0, 0, 0) };
+        _prefix = new Border { MinWidth = 28, MaxWidth = 120, Background = Studio.Brush("#00FFFFFF"), Child = Studio.Text(label, 10, Studio.Muted), Padding = new(8, 0, 6, 0) };
+        ToolTipService.SetToolTip(_prefix, label);
         var grid = Studio.Columns((_prefix, 28), (_input, -1)); grid.ColumnSpacing = 0;
+        grid.ColumnDefinitions[0].Width = GridLength.Auto;
+        SizeChanged += (_, e) =>
+        {
+            // Fit descriptive labels without consuming the editable numeric area in compact rows.
+            var width = Math.Max(28, Math.Min(120, e.NewSize.Width * .48));
+            if (_prefix.MaxWidth != width) _prefix.MaxWidth = width;
+        };
         Content = new Border { Background = Studio.Brush(Studio.Field), CornerRadius = new(5), Child = grid, Height = 30 };
         Value = value;
         if (commit is not null) ValueCommitted += commit;

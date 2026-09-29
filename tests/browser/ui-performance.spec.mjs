@@ -148,7 +148,7 @@ test('selection latency report for a 2000-node document', async ({ page }) => {
   await select(page, root, 105); await select(page, root, 290);
   const baseline = process.env.ARTSPACE_BENCHMARK_BASELINE === '1';
   const samples = [];
-  for (let i = 0; i < 12; i++) {
+  for (let i = 0; i < 32; i++) {
     const expectedX = i % 2 ? 230 : 50;
     await page.evaluate(expectedX => {
       globalThis.__selectionSample = null;
@@ -172,8 +172,8 @@ test('selection latency report for a 2000-node document', async ({ page }) => {
   const sorted = [...samples].sort((a, b) => a - b); const final = await state(page);
   const report = { schema: 1, variant: baseline ? 'baseline' : 'optimized', nodes: final.nodes,
     note: 'Pointerdown to matching selection (and matching retained inspector fields when available) plus two animation-frame opportunities. Chromium/SwiftShader CI, not physical-GPU display latency or application FPS. Includes rendering and opt-in diagnostics.',
-    medianMs: sorted[Math.floor(sorted.length / 2)], p95Ms: sorted[Math.ceil(sorted.length * .95) - 1], samplesMs: samples,
-    inspectorBuilds: final.inspectorBuilds, uiFailures: final.uiFailures, snapshots: final.snapshots };
+    medianMs: (sorted[Math.floor((sorted.length - 1) / 2)] + sorted[Math.floor(sorted.length / 2)]) / 2, p95Ms: sorted[Math.ceil(sorted.length * .95) - 1], samplesMs: samples,
+    inspectorBuilds: final.inspectorBuilds, uiFailures: final.uiFailures, snapshots: final.snapshots, diagnosticSceneScans: final.diagnosticSceneScans, diagnosticPublishes: final.diagnosticPublishes };
   await fs.mkdir('artifacts/ui-performance', { recursive: true });
   await fs.writeFile(`artifacts/ui-performance/${report.variant}.json`, JSON.stringify(report, null, 2));
   console.log('UI_SELECTION_LATENCY ' + JSON.stringify(report));

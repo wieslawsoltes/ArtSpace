@@ -39,6 +39,10 @@ internal static partial class BrowserFiles
     internal static partial bool IsTestMode();
     [JSImport("globalThis.artSpaceStorage.publishDiagnostics")]
     internal static partial void PublishDiagnostics(string json);
+    [JSImport("globalThis.artSpaceStorage.publishFrameDiagnostics")]
+    internal static partial void PublishFrameDiagnostics(double sceneRecordings, double sceneReplays,
+        double sceneBytes, double paintBuilds, double dashBuilds, double effectFilterBuilds,
+        double gradientBuilds, double geometryBuilds, double culledNodes);
 }
 internal static class BrowserDiagnostics
 {
@@ -46,15 +50,33 @@ internal static class BrowserDiagnostics
     public static void Attach(EditorSession session, StudioWorkbench workbench)
     {
         if (!BrowserFiles.IsTestMode()) return;
+        ArtSpace.Core.DesignPage? countedPage = null;
+        var countsDirty = true;
+        var nodeCount = 0; var maskCount = 0; var clipCount = 0;
+        long sceneScans = 0, publishes = 0;
+        void RefreshCounts()
+        {
+            if (!countsDirty && ReferenceEquals(countedPage, session.Page)) return;
+            countedPage = session.Page;
+            nodeCount = maskCount = clipCount = 0;
+            foreach (var node in countedPage.AllNodes())
+            {
+                nodeCount++;
+                if (node.OpacityMaskId is not null) maskCount++;
+                if (node.ClipPathId is not null) clipCount++;
+            }
+            countsDirty = false; sceneScans++;
+        }
         void Publish()
         {
             if (workbench.IsDisposed) return;
+            RefreshCounts(); publishes++;
             var primary = session.Primary;
             using var stream = new MemoryStream();
             using (var json = new Utf8JsonWriter(stream))
             {
                 json.WriteStartObject(); json.WriteBoolean("ready", true); json.WriteString("tool", session.Tool.ToString());
-                json.WriteNumber("nodes", session.Page.AllNodes().Count()); json.WriteNumber("roots", session.Page.Nodes.Count);
+                json.WriteNumber("nodes", nodeCount); json.WriteNumber("roots", session.Page.Nodes.Count);
                 json.WriteNumber("pages", session.Document.Pages.Count); json.WriteNumber("selection", session.Selection.Count);
                 json.WriteNumber("history", session.History.Count); json.WriteNumber("zoom", session.Viewport.Zoom);
                 json.WriteNumber("panX", session.Viewport.Pan.X); json.WriteNumber("panY", session.Viewport.Pan.Y);
@@ -71,7 +93,7 @@ internal static class BrowserDiagnostics
                 json.WriteString("opacityMaskMode", primary?.OpacityMaskMode.ToString());
                 json.WriteBoolean("opacityMaskInverted", primary?.OpacityMaskInverted ?? false);
                 json.WriteBoolean("opacityMaskEnabled", primary?.OpacityMaskEnabled ?? false);
-                json.WriteNumber("opacityMasks", session.Page.AllNodes().Count(n => n.OpacityMaskId is not null));
+                json.WriteNumber("opacityMasks", maskCount);
                 json.WriteNumber("gradientBuilds", workbench.Surface.Renderer.GradientBuilds);
                 json.WriteNumber("effects", primary?.Effects.Count ?? 0);
                 json.WriteNumber("effectRadius", primary?.Effects.FirstOrDefault()?.Radius ?? 0);
@@ -83,7 +105,9 @@ internal static class BrowserDiagnostics
                 json.WriteNumber("paintBuilds", workbench.Surface.Renderer.PaintBuilds);
                 json.WriteNumber("dashBuilds", workbench.Surface.Renderer.DashBuilds);
                 json.WriteNumber("effectFilterBuilds", workbench.Surface.Renderer.EffectFilterBuilds);
-                json.WriteNumber("clipGroups", session.Page.AllNodes().Count(n => n.ClipPathId is not null));
+                json.WriteNumber("clipGroups", clipCount);
+                json.WriteNumber("diagnosticSceneScans", sceneScans);
+                json.WriteNumber("diagnosticPublishes", publishes);
                 json.WriteNumber("geometryBuilds", workbench.Surface.Renderer.GeometryBuilds);
                 json.WriteNumber("culledNodes", workbench.Surface.Renderer.CulledNodes);
                 json.WriteString("id", primary?.Id);
@@ -111,7 +135,7 @@ internal static class BrowserDiagnostics
                 foreach (var id in workbench.SelectedLayerIds) json.WriteStringValue(id);
                 json.WriteEndArray();
                 json.WriteStartArray("inspectorFields");
-                foreach (var field in workbench.InspectorFields.Concat(workbench.AppearanceFields))
+                foreach (var field in workbench.ActivePanel == "Properties" ? workbench.InspectorFields : workbench.AppearanceFields)
                 {
                     json.WriteStartObject(); json.WriteString("section", field.Section); json.WriteString("label", field.Label); json.WriteString("value", field.Value);
                     json.WriteNumber("x", field.X); json.WriteNumber("y", field.Y); json.WriteNumber("width", field.Width); json.WriteNumber("height", field.Height); json.WriteEndObject();
@@ -139,9 +163,23 @@ internal static class BrowserDiagnostics
             queued = true;
             if (!workbench.DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () => { queued = false; Publish(); })) queued = false;
         }
-        session.Changed += (_, _) => QueuePublish();
+        session.Changed += (_, change) =>
+        {
+            // Previews can add/remove nodes inside a transaction before DocumentRevision changes.
+            if (change.Kind is EditorChangeKind.Document or EditorChangeKind.Preview) countsDirty = true;
+            QueuePublish();
+        };
         workbench.UiRefreshed += QueuePublish;
-        workbench.Surface.FrameRendered += QueuePublish;
+        workbench.Surface.FrameRendered += () =>
+        {
+            if (workbench.IsDisposed) return;
+            var renderer = workbench.Surface.Renderer;
+            // Keep real post-render counters without another traversal, control walk or JSON snapshot.
+            // Session/layout/UI events still publish the complete actual-control state separately.
+            BrowserFiles.PublishFrameDiagnostics(renderer.SceneRecordings, renderer.SceneReplays,
+                renderer.RetainedSceneBytes, renderer.PaintBuilds, renderer.DashBuilds,
+                renderer.EffectFilterBuilds, renderer.GradientBuilds, renderer.GeometryBuilds, renderer.CulledNodes);
+        };
         workbench.LayoutUpdated += (_, _) => QueuePublish();
         workbench.Surface.SizeChanged += (_, _) => QueuePublish();
         workbench.Surface.PresentationChanged += _ => QueuePublish();

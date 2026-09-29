@@ -69,6 +69,10 @@ npx playwright test tests/browser/live-appearance.spec.mjs
 
 Browser acceptance uses real file pickers, pointer actions and keyboard editing. Opt-in read-only diagnostics under `?test=1` expose actual field values, effect counts, style counts, scene recordings/replays and native resource-build counters. Normal usage does not publish these diagnostics. Browser CI uses SwiftShader; hardware performance must be measured separately.
 
+Numeric field captions use content-sized prefixes bounded by available width, preserving room for input in compact rows. Opt-in diagnostics cache aggregate document counts until a document/preview change; rendered frames update only renderer counters rather than re-walking all nodes and controls. Model, UI and layout changes continue to publish actual control values and bounds. Normal use has no diagnostics subscription.
+
+The selection experiment records 32 samples per variant, averages the middle two samples for an even-sized median, and reports nearest-rank p95. The baseline is run after the optimized variant. Different diagnostic implementations and sequential host load are confounders; changes in this instrumented experiment must not be attributed solely to GPU acceleration. Functional tests independently require unchanged selection to reuse the native picture and avoid new paint builds and document scans.
+
 ## Remaining compatibility boundary
 
 ArtSpace remains an independently implemented illustration editor, not a complete or pixel-identical Illustrator replacement. Still outside this increment: native AI/PDF/EPS compatibility, general SVG filters, gradient meshes, editable envelope/warp graphs, variable-width and art/pattern brushes, type-on-path and full text shaping, image tracing, live paint, perspective tools, production CMYK/ICC/spot/overprint workflows, arbitrary per-paint effect graphs, Adobe plugin APIs, and full floating-window/workspace/UI parity. The repository feature matrix separates working features from these boundaries.

@@ -45,7 +45,14 @@
       return "";
     },
     isTestMode: () => new URLSearchParams(location.search).get("test") === "1",
-    publishDiagnostics: json => { if (new URLSearchParams(location.search).get("test") === "1") globalThis.__artSpaceState = Object.freeze(JSON.parse(json)); }
+    publishDiagnostics: json => { if (new URLSearchParams(location.search).get("test") === "1") globalThis.__artSpaceState = Object.freeze(JSON.parse(json)); },
+    publishFrameDiagnostics: (sceneRecordings, sceneReplays, sceneBytes, paintBuilds, dashBuilds, effectFilterBuilds, gradientBuilds, geometryBuilds, culledNodes) => {
+      if (new URLSearchParams(location.search).get("test") !== "1") return;
+      const current = globalThis.__artSpaceState;
+      if (!current) return; // Never advertise readiness with a partial frame-only observation.
+      globalThis.__artSpaceState = Object.freeze({ ...current, sceneRecordings, sceneReplays,
+        sceneBytes, paintBuilds, dashBuilds, effectFilterBuilds, gradientBuilds, geometryBuilds, culledNodes });
+    }
   });
   document.addEventListener("contextmenu", e => { if (e.target instanceof HTMLCanvasElement) e.preventDefault(); });
   document.addEventListener("wheel", e => { if (e.ctrlKey && e.target instanceof HTMLCanvasElement) e.preventDefault(); }, { passive: false });
