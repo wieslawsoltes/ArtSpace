@@ -3,7 +3,7 @@ using ArtSpace.Documents;
 
 namespace ArtSpace.Editing;
 
-/// <summary>Reusable local components with linked instances and explicit text/fill overrides.</summary>
+/// <summary>Reusable local components with linked instances and explicit text, fill and full appearance overrides.</summary>
 public static class ComponentService
 {
     public static void MakeComponent(EditorSession editor)
@@ -36,7 +36,19 @@ public static class ComponentService
     });
     public static void ResetOverrides(EditorSession editor)
     {
-        editor.Edit("Reset instance overrides", () => { foreach (var n in editor.Selection.Where(n => n.Kind == NodeKind.Instance)) n.Overrides.Clear(); Synchronize(editor.Document); });
+        editor.Edit("Reset instance overrides", () =>
+        {
+            foreach (var node in editor.Selection.Where(n => n.Kind == NodeKind.Instance && !n.IsEffectivelyLocked))
+            {
+                // Root placement/transparency historically belong to the instance. Reset only
+                // transparency explicitly captured by a full appearance override.
+                if (node.SourceId is { } source && node.Overrides.TryGetValue(source, out var entry)
+          && entry.Appearance is not null && node.ComponentId is { } componentId
+          && editor.Document.Find(componentId) is { Kind: NodeKind.Component } definition)
+                { node.Opacity = definition.Opacity; node.Blend = definition.Blend; }
+                node.Overrides.Clear();
+            }
+        });
     }
     public static void SetOverride(DesignNode node, string? text = null, string? fill = null)
     {
@@ -51,7 +63,10 @@ public static class ComponentService
         while (instance is not null && instance.Kind != NodeKind.Instance) instance = instance.Parent;
         if (instance is null || node.SourceId is null) return;
         if (!instance.Overrides.TryGetValue(node.SourceId, out var value)) instance.Overrides[node.SourceId] = value = new();
-        value.Appearance = GraphicStyle.Capture(node, "Appearance override");
+        var appearance = GraphicStyle.Capture(node, "Appearance override");
+        // A semantically unchanged override must not introduce a new GUID and undo entry.
+        appearance.Id = value.Appearance?.Id ?? "appearance-" + node.SourceId;
+        value.Appearance = appearance;
         value.Fill = null;
     }
     public static void Synchronize(DesignDocument document)

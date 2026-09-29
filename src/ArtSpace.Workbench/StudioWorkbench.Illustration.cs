@@ -144,11 +144,11 @@ public sealed partial class StudioWorkbench
         }
         root.Children.Add(grid); root.Children.Add(Studio.Rule());
         var fillStroke = new Grid { Height = 53 };
-        var stroke = new StudioButton("", () => Change("Swap fill and stroke", n => { var color = n.Fill; n.Fill = n.Strokes.FirstOrDefault()?.Color ?? "#161616"; n.Strokes = [new() { Color = color, Width = Math.Max(1, Surface.StrokeWidth) }]; })) { Width = 31, Height = 31, Margin = new(18, 14, 0, 0), HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Top, BorderThickness = new(5), BorderBrush = Studio.Brush("#151515"), RestBackground = "#EEEEEE", Background = Studio.Brush("#EEEEEE"), CornerRadius = new(0) };
+        var stroke = new StudioButton("", () => ChangeAppearance("Swap fill and stroke", n => { var color = n.Fill; n.Fill = n.Strokes.FirstOrDefault()?.Color ?? "#161616"; n.Strokes = [new() { Color = color, Width = Math.Max(1, Surface.StrokeWidth) }]; })) { Width = 31, Height = 31, Margin = new(18, 14, 0, 0), HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Top, BorderThickness = new(5), BorderBrush = Studio.Brush("#151515"), RestBackground = "#EEEEEE", Background = Studio.Brush("#EEEEEE"), CornerRadius = new(0) };
         AutomationProperties.SetName(stroke, "Swap fill and stroke");
         var fill = new StudioButton("", () => _illustrationDock.Select("Properties")) { Width = 31, Height = 31, Margin = new(4, 1, 0, 0), HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Top, BorderThickness = new(1), BorderBrush = Studio.Brush("#111111"), RestBackground = "#F0B562", Background = Studio.Brush("#F0B562"), CornerRadius = new(0) };
         AutomationProperties.SetName(fill, "Fill and appearance properties"); fillStroke.Children.Add(stroke); fillStroke.Children.Add(fill); root.Children.Add(fillStroke);
-        root.Children.Add(new StudioButton("None", () => Change("Remove fill", n => n.Fills.Clear())) { FontSize = 9, Height = 22, Padding = new(0) });
+        root.Children.Add(new StudioButton("None", () => ChangeAppearance("Remove fill", n => n.Fills.Clear())) { FontSize = 9, Height = 22, Padding = new(0) });
         root.Children.Add(Studio.Rule());
         root.Children.Add(new IconButton("more", "Quick actions (Ctrl K)", () => RunAsync(ShowQuickActionsAsync)) { HorizontalAlignment = HorizontalAlignment.Center });
         return root;
@@ -158,12 +158,12 @@ public sealed partial class StudioWorkbench
     {
         _selectionLabel.Width = 95; _controlBar.Children.Add(_selectionLabel);
         _controlBar.Children.Add(Studio.Text("Fill", 10, Studio.Muted));
-        _controlBar.Children.Add(_fillControl = new ColorField(Surface.FillColor, color => { Surface.FillColor = color; Change("Fill color", n => n.Fill = color); }) { Width = 108 });
+        _controlBar.Children.Add(_fillControl = new ColorField(Surface.FillColor, color => { Surface.FillColor = color; ChangeAppearance("Fill color", n => n.Fill = color); }) { Width = 108 });
         _controlBar.Children.Add(Studio.Text("Stroke", 10, Studio.Muted));
-        _controlBar.Children.Add(_strokeControl = new ColorField(Surface.StrokeColor, color => { Surface.StrokeColor = color; Change("Stroke color", n => { if (n.Strokes.Count == 0) n.Strokes.Add(new()); n.Strokes[0].Color = color; }); }) { Width = 108 });
-        _controlBar.Children.Add(_strokeWidthControl = Number("pt", Surface.StrokeWidth, width => { Surface.StrokeWidth = Math.Clamp(width, 0, 1000); Change("Stroke width", n => { if (n.Strokes.Count == 0) n.Strokes.Add(new()); n.Strokes[0].Width = Surface.StrokeWidth; }); }, 0, 1000));
+        _controlBar.Children.Add(_strokeControl = new ColorField(Surface.StrokeColor, color => { Surface.StrokeColor = color; ChangeAppearance("Stroke color", n => { if (n.Strokes.Count == 0) n.Strokes.Add(new()); n.Strokes[0].Color = color; n.Strokes[0].Paint = null; }); }) { Width = 108 });
+        _controlBar.Children.Add(_strokeWidthControl = Number("pt", Surface.StrokeWidth, width => { Surface.StrokeWidth = Math.Clamp(width, 0, 1000); ChangeAppearance("Stroke width", n => { if (n.Strokes.Count == 0) n.Strokes.Add(new()); n.Strokes[0].Width = Surface.StrokeWidth; }); }, 0, 1000));
         _controlBar.Children.Add(Studio.Text("Opacity", 10, Studio.Muted));
-        var opacity = Studio.Choice(new[] { "100%", "75%", "50%", "25%", "10%" }, "100%", value => { if (!_syncingAppearance) Change("Opacity", n => n.Opacity = double.Parse(value.TrimEnd('%'), System.Globalization.CultureInfo.InvariantCulture) / 100); }, "Object opacity"); opacity.Width = 78; _opacityControl = opacity; _controlBar.Children.Add(opacity);
+        var opacity = Studio.Choice(new[] { "100%", "75%", "50%", "25%", "10%" }, "100%", value => { if (!_syncingAppearance) ChangeAppearance("Opacity", n => n.Opacity = double.Parse(value.TrimEnd('%'), System.Globalization.CultureInfo.InvariantCulture) / 100); }, "Object opacity"); opacity.Width = 78; _opacityControl = opacity; _controlBar.Children.Add(opacity);
         foreach (var direction in new[] { "left", "center", "right", "top", "middle", "bottom" })
             _controlBar.Children.Add(new IconButton(direction, "Align " + direction, () => Run(() => Session.Align(direction))) { Width = 27, Height = 29, Padding = new(5) });
     }
@@ -243,7 +243,7 @@ public sealed partial class StudioWorkbench
                 yield return Item("Same Object Type", () => { var kind = Session.Primary?.Kind; Session.Select(Session.Page.AllNodes().Where(n => !n.IsEffectivelyLocked && n.Kind == kind).Select(n => n.Id).ToArray()); }, enabled: selected); break;
             case "Effect":
                 foreach (var kind in Enum.GetValues<LiveEffectKind>()) yield return Item(LiveEffect.Name(kind), () => AddLiveEffect(kind), enabled: selected);
-                yield return Item("Remove Shadows", () => Session.UpdateSelection("Remove shadows", n => n.Shadows.Clear()), enabled: selected);
+                yield return Item("Remove Shadows", () => ChangeAppearance("Remove shadows", n => n.Shadows.Clear()), enabled: selected);
                 yield return Item("Linear Gradient", () => SetGradient(false), enabled: selected); yield return Item("Radial Gradient", () => SetGradient(true), enabled: selected); break;
             case "View":
                 yield return Item("Retained Scene Rendering", () => { Surface.Renderer.EnableRetainedScene = !Surface.Renderer.EnableRetainedScene; Surface.Renderer.InvalidateRetainedScene(); Surface.Invalidate(); });
@@ -273,7 +273,7 @@ public sealed partial class StudioWorkbench
 
     private void SetGradient(bool radial)
     {
-        Session.UpdateSelection("Apply gradient", n => n.Fills = [new() { Kind = radial ? FillKind.RadialGradient : FillKind.LinearGradient, Start = new(0, 0), End = new(1, 1), Stops = [new() { Offset = 0, Color = n.Fill }, new() { Offset = 1, Color = "#263F53" }] }]);
+        ChangeAppearance("Apply gradient", n => n.Fills = [new() { Kind = radial ? FillKind.RadialGradient : FillKind.LinearGradient, Start = new(0, 0), End = new(1, 1), Stops = [new() { Offset = 0, Color = n.Fill }, new() { Offset = 1, Color = "#263F53" }] }]);
     }
     private async Task NumberOperation(string title, string initial, Action<double> action)
     {

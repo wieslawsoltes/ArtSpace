@@ -57,8 +57,8 @@ public sealed partial class StudioWorkbench
             if (node.Parent is not null) BuildConstraints(node.Parent.Layout.Direction != LayoutDirection.None);
             Inspect("Appearance", node.Kind is NodeKind.Star ? "star" : node.Kind is NodeKind.Polygon ? "polygon" : "normal", (body, b) =>
             {
-                body.Children.Add(Studio.Columns((b.Number("%", () => InspectedNode.Opacity * 100, v => Change("Opacity", n => n.Opacity = v / 100), 0, 100), -1), (b.Number("R", () => InspectedNode.CornerRadius, v => Change("Corner radius", n => n.CornerRadius = v), 0), -1)));
-                body.Children.Add(b.Choice(Enum.GetNames<BlendKind>(), () => InspectedNode.Blend.ToString(), value => Change("Blend mode", n => n.Blend = Enum.Parse<BlendKind>(value)), "Blend mode"));
+                body.Children.Add(Studio.Columns((b.Number("%", () => InspectedNode.Opacity * 100, v => ChangeAppearance("Opacity", n => n.Opacity = v / 100), 0, 100), -1), (b.Number("R", () => InspectedNode.CornerRadius, v => Change("Corner radius", n => n.CornerRadius = v), 0), -1)));
+                body.Children.Add(b.Choice(Enum.GetNames<BlendKind>(), () => InspectedNode.Blend.ToString(), value => ChangeAppearance("Blend mode", n => n.Blend = Enum.Parse<BlendKind>(value)), "Blend mode"));
                 if (InspectedNode.Kind is NodeKind.Polygon or NodeKind.Star) body.Children.Add(b.Number("N", () => InspectedNode.Sides, v => Change("Polygon sides", n => n.Sides = (int)v), 3, 128));
                 if (InspectedNode.Kind == NodeKind.Star) body.Children.Add(b.Number("Star ratio", () => InspectedNode.StarRatio * 100, v => Change("Star ratio", n => n.StarRatio = v / 100), 1, 100));
             });
@@ -184,7 +184,7 @@ public sealed partial class StudioWorkbench
             for (var index = 0; index < InspectedNode.Strokes.Count; index++)
             {
                 var i = index;
-                body.Children.Add(Studio.Columns((b.Color(() => InspectedNode.Strokes[i].Color, color => ChangeAppearance("Stroke color", n => { if (n.Strokes.Count > i) n.Strokes[i].Color = color; }), "Stroke " + i), -1), (b.Number("W", () => InspectedNode.Strokes[i].Width, v => ChangeAppearance("Stroke width", n => { if (n.Strokes.Count > i) n.Strokes[i].Width = v; }), 0, 1000), 68), (b.Icon(() => "minus", "Remove stroke", () => ChangeAppearance("Remove stroke", n => { if (n.Strokes.Count > i) n.Strokes.RemoveAt(i); })), 24)));
+                body.Children.Add(Studio.Columns((b.Color(() => InspectedNode.Strokes[i].Color, color => ChangeAppearance("Stroke color", n => { if (n.Strokes.Count > i) { n.Strokes[i].Color = color; n.Strokes[i].Paint = null; } }), "Stroke " + i), -1), (b.Number("W", () => InspectedNode.Strokes[i].Width, v => ChangeAppearance("Stroke width", n => { if (n.Strokes.Count > i) n.Strokes[i].Width = v; }), 0, 1000), 68), (b.Icon(() => "minus", "Remove stroke", () => ChangeAppearance("Remove stroke", n => { if (n.Strokes.Count > i) n.Strokes.RemoveAt(i); })), 24)));
                 body.Children.Add(Studio.Columns((b.Number("%", () => InspectedNode.Strokes[i].Opacity * 100, v => ChangeAppearance("Stroke opacity", n => { if (n.Strokes.Count > i) n.Strokes[i].Opacity = v / 100; }), 0, 100), -1), (b.Choice(["Solid", "Dashed", "Dotted"], () => InspectedNode.Strokes[i].Dashes.Count == 0 ? "Solid" : InspectedNode.Strokes[i].Dashes[0] == 1 ? "Dotted" : "Dashed", value => ChangeAppearance("Stroke dash", n => { if (n.Strokes.Count > i) n.Strokes[i].Dashes = value == "Dashed" ? [8, 6] : value == "Dotted" ? [1, 5] : []; }), "Stroke dash"), -1)));
             }
         }, "plus", () => ChangeAppearance("Add stroke", n => n.Strokes.Add(new())));

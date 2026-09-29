@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.5.0-alpha.1 — live appearance and retained rendering
+
+- Add ordered non-destructive Gaussian Blur, Drop Shadow, Outer Glow and Saturation effects, with parameter editing, enablement, reorder, duplicate and delete.
+- Add document-local Graphic Styles with independent paint/effect ownership, vector thumbnails, bounded paged UI, apply, rename and delete.
+- Add retained Appearance and Graphic Styles panels, Effect/Window menu integration, fill/stroke ordering and duplication, and appearance clear/reduce actions.
+- Support gradient strokes, signed dash offsets, odd-length dash patterns and nine additional compositing modes (sixteen total).
+- Retain native fill/stroke paints, dash effects and image-filter graphs; replay unchanged scenes as native vector display lists into Uno's shared Skia canvas, with separate editing overlays and a bounded direct-render fallback.
+- Preserve explicit symbol appearance overrides, restore root opacity/blend on reset, respect locked instances and retain stable override identity for no-op edits.
+- Extend SVG gradient-stroke and dash-phase interchange. Native/PNG retain live effects; SVG export explicitly rejects enabled live effects instead of silently discarding them.
+- Save native schema 4, read schemas 1–4, and validate new appearance before synchronization and transaction completion.
+- Add 36 registered appearance/retention regressions (247 total), three real browser scenarios (21 total), actual-control diagnostics and alternating-order reference-pixel CPU benchmarks.
+
+GPU execution depends on the Uno/Skia host, driver and browser. This increment is not a WebGPU compute rewrite or complete/pixel-identical Illustrator parity. Software benchmark numbers do not establish physical-GPU throughput. See [appearance and rendering](docs/appearance-rendering.md) for semantics, resource limits, workflows and remaining boundaries.
+
 ## 0.4.1-alpha.1 — selection and panel responsiveness
 
 - Retain inspector sections and update values rather than recreating controls on every selection and edit.

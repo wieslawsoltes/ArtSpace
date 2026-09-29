@@ -13,6 +13,7 @@ if (args.Contains("--benchmark")) return PerformanceBenchmarks.Run();
 
 var tests = new List<(string Name, Action Test)>();
 LiveAppearanceTests.Register(Test);
+AppearanceBoundaryTests.Register(Test);
 void Test(string name, Action action) => tests.Add((name, action));
 void Equal(double actual, double expected, double epsilon = .0001) { if (Math.Abs(actual - expected) > epsilon) throw new Exception($"Expected {expected}; got {actual}."); }
 void Check(bool condition, string message = "Assertion failed") { if (!condition) throw new Exception(message); }
