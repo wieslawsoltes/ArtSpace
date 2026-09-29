@@ -12,6 +12,7 @@ public sealed partial class DesignSurface
     private int _widthSide = 1;
     private VariableStrokeGeometry.Location _widthLocation;
 
+    public event Action? WidthHandlesChanged;
     public int ActiveWidthStroke => _widthStroke;
     public void ActivateWidthStroke(int index)
     {
@@ -91,7 +92,7 @@ public sealed partial class DesignSurface
             _widthPoint = index; _widthMovePoint = movePoint; _widthNewPoint = newPoint; _widthSide = side;
             _widthDuplicate = movePoint && e.KeyModifiers.HasFlag(VirtualKeyModifiers.Menu);
             _widthLocation = VariableStrokeGeometry.At(Renderer.StrokeCenterlines(target.Node), _widthContour, position);
-            _gesture = Gesture.PendingWidth; _canvas.Invalidate();
+            _gesture = Gesture.PendingWidth; _canvas.Invalidate(); WidthHandlesChanged?.Invoke();
         }
     }
 
@@ -154,7 +155,7 @@ public sealed partial class DesignSurface
         if (key == VirtualKey.Escape)
         {
             if (editor.IsInteracting || _gesture == Gesture.PendingWidth) { CancelGesture(); return true; }
-            if (_widthPoint >= 0) { _widthPoint = -1; _canvas.Invalidate(); return true; }
+            if (_widthPoint >= 0) { _widthPoint = -1; _canvas.Invalidate(); WidthHandlesChanged?.Invoke(); return true; }
             return false;
         }
         if (key is not VirtualKey.Delete and not VirtualKey.Back and not VirtualKey.Left and not VirtualKey.Right) return false;
@@ -176,7 +177,7 @@ public sealed partial class DesignSurface
         return true;
     }
 
-    private void ResetWidthGesture() { _widthNewPoint = _widthMovePoint = _widthDuplicate = false; }
+    private void ResetWidthGesture() { _widthNewPoint = _widthMovePoint = _widthDuplicate = false; WidthHandlesChanged?.Invoke(); }
     private void DrawWidthHandles(SKCanvas canvas)
     {
         if (Session?.Tool != EditorTool.Width) return;

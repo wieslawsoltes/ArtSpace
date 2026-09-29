@@ -211,6 +211,7 @@ public sealed partial class StudioWorkbench
                 yield return separator;
                 yield return Item("Edit Anchors", Surface.EnterPathEditing, "A", PathEditing.CanEdit(Session.Primary));
                 yield return Item("Anchor Point Tool", () => Session.Tool = EditorTool.AnchorPoint, "Shift C");
+                yield return Item("Width Tool", () => Surface.ActivateWidthStroke(Surface.ActiveWidthStroke), "Shift W");
                 yield return Item("Make Compound Path", () => PathOperations.MakeCompound(Session, Surface.Renderer), enabled: Session.SelectionRoots.Count > 1);
                 yield return Item("Release Compound Path", () => PathOperations.ReleaseCompound(Session, Surface.Renderer), enabled: selected);
                 yield return separator;

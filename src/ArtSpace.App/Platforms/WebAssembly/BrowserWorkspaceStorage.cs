@@ -104,9 +104,9 @@ internal static class BrowserDiagnostics
                 foreach (var handle in workbench.Surface.WidthHandles)
                 {
                     json.WriteStartObject(); json.WriteNumber("index", handle.Index); json.WriteNumber("position", handle.Position);
-                    json.WriteNumber("x", handle.X); json.WriteNumber("y", handle.Y);
-                    json.WriteNumber("leftX", handle.LeftX); json.WriteNumber("leftY", handle.LeftY);
-                    json.WriteNumber("rightX", handle.RightX); json.WriteNumber("rightY", handle.RightY);
+                    json.WriteNumber("x", handle.X + origin.X); json.WriteNumber("y", handle.Y + origin.Y);
+                    json.WriteNumber("leftX", handle.LeftX + origin.X); json.WriteNumber("leftY", handle.LeftY + origin.Y);
+                    json.WriteNumber("rightX", handle.RightX + origin.X); json.WriteNumber("rightY", handle.RightY + origin.Y);
                     json.WriteBoolean("selected", handle.Selected); json.WriteEndObject();
                 }
                 json.WriteEndArray();
@@ -185,6 +185,7 @@ internal static class BrowserDiagnostics
             QueuePublish();
         };
         workbench.UiRefreshed += QueuePublish;
+        workbench.Surface.WidthHandlesChanged += QueuePublish;
         workbench.Surface.FrameRendered += () =>
         {
             if (workbench.IsDisposed) return;

@@ -37,7 +37,26 @@ public static class PathOperations
             for (var i = path.Contours[ci].SegmentCount - 1; i >= 0; i--) path.Split(new(ci, i), .5);
     });
 
-    public static void Reverse(EditorSession editor, SceneRenderer renderer) => Edit(editor, renderer, "Reverse path direction", path => path.Reverse());
+    public static void Reverse(EditorSession editor, SceneRenderer renderer)
+    {
+        var nodes = Vectors(editor);
+        editor.Edit("Reverse path direction", () =>
+        {
+            foreach (var node in nodes)
+            {
+                var path = PathEditing.Read(node, renderer); path.Reverse();
+                // Keep closed-contour start anchors fixed, so normalized width coordinates
+                // are reversed rather than receiving an unintended cyclic phase shift.
+                foreach (var contour in path.Contours)
+                    if (contour.Closed && contour.Points.Count > 1)
+                    {
+                        var first = contour.Points[^1]; contour.Points.RemoveAt(contour.Points.Count - 1); contour.Points.Insert(0, first);
+                    }
+                foreach (var stroke in node.Strokes) stroke.WidthProfile = StrokeProfiles.Reverse(stroke.WidthProfile);
+                PathEditing.Write(node, path); ComponentService.SetAppearanceOverride(node);
+            }
+        });
+    }
     public static void Smooth(EditorSession editor, SceneRenderer renderer, bool smooth) => Edit(editor, renderer, smooth ? "Smooth anchors" : "Corner anchors", path => path.Smooth(path.Addresses.ToArray(), smooth));
     public static void Close(EditorSession editor, SceneRenderer renderer) => Edit(editor, renderer, "Close contours", path => { foreach (var contour in path.Contours.Where(c => c.Points.Count > 1)) contour.Closed = true; });
 

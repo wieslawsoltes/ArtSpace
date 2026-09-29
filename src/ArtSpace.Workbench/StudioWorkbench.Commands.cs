@@ -293,25 +293,49 @@ public sealed partial class StudioWorkbench
     {
         var root = new StackPanel { Spacing = 12, Width = 410 };
         root.Children.Add(Studio.Text("ArtSpace", 24, Studio.Ink, true)); root.Children.Add(Wrapped("An independent, local-first vector design editor built with Uno Platform and SkiaSharp. Original implementation and assets; not affiliated with Adobe.", 12, Studio.Ink));
-        foreach (var (name, shortcut) in new[] { ("Selection / Direct / Rectangle / Ellipse", "V / A / M / L"), ("Pen / Pencil / Brush / Type", "P / N / B / T"), ("Pan / Zoom", "Space-drag / Ctrl-wheel"), ("Select multiple / Deep-select", "Shift-click / Ctrl-click"), ("Constrain / Duplicate while dragging", "Shift / Alt"), ("Undo / Redo", "Ctrl Z / Ctrl Shift Z"), ("Group / Ungroup", "Ctrl G / Ctrl Shift G"), ("Nudge / Large nudge", "Arrows / Shift-arrows"), ("Fit all / Fit selection", "Shift 1 / Shift 2"), ("Save / Open / Quick actions", "Ctrl S / Ctrl O / Ctrl K"), ("Finish path / Close path", "Enter / Click first point"), ("Hide panels / Cancel / Rename", "Tab / Esc / F2") })
+        foreach (var (name, shortcut) in new[] { ("Selection / Direct / Rectangle / Ellipse", "V / A / M / L"), ("Pen / Pencil / Brush / Type", "P / N / B / T"), ("Width / Independent side", "Shift W / Alt-drag"), ("Pan / Zoom", "Space-drag / Ctrl-wheel"), ("Select multiple / Deep-select", "Shift-click / Ctrl-click"), ("Constrain / Duplicate while dragging", "Shift / Alt"), ("Undo / Redo", "Ctrl Z / Ctrl Shift Z"), ("Group / Ungroup", "Ctrl G / Ctrl Shift G"), ("Nudge / Large nudge", "Arrows / Shift-arrows"), ("Fit all / Fit selection", "Shift 1 / Shift 2"), ("Save / Open / Quick actions", "Ctrl S / Ctrl O / Ctrl K"), ("Finish path / Close path", "Enter / Click first point"), ("Hide panels / Cancel / Rename", "Tab / Esc / F2") })
             root.Children.Add(Studio.Columns((Wrapped(name, 11, Studio.Ink), -1), (Wrapped(shortcut, 10, Studio.Muted), 165)));
         root.Children.Add(Studio.Rule()); root.Children.Add(Wrapped("Independent illustration editor, not full Illustrator parity. Native .ai/.eps, CMYK/ICC print production, gradient meshes, perspective tools, image tracing, advanced typography and Adobe plugins are not implemented. Work is saved locally; download a copy for backup. SVG import reports unsupported elements instead of executing them.", 10));
         await Dialog("Keyboard shortcuts & about", Studio.Scroll(root)).ShowAsync();
     }
     private async Task ShowQuickActionsAsync()
     {
-        var root = new StackPanel { Spacing = 10, Width = 410 }; var search = Studio.Input("", "Search quick actions"); search.PlaceholderText = "Search actions…"; search.Height = 38; root.Children.Add(search);
+        var root = new StackPanel { Spacing = 10, Width = 410 };
+        var search = Studio.Input("", "Search quick actions"); search.PlaceholderText = "Search actions…"; search.Height = 38; root.Children.Add(search);
         var results = new StackPanel { Spacing = 3 }; var scroll = Studio.Scroll(results); scroll.MaxHeight = 360; root.Children.Add(scroll);
-        var dialog = Dialog("Quick actions", root);
+        var dialog = Dialog("Quick actions", root); dialog.DefaultButton = ContentDialogButton.None;
+        var commands = Actions().ToArray(); var buttons = new List<StudioButton>(); var matching = new List<QuickAction>();
+        var executed = false;
+        void Execute(int index)
+        {
+            if (executed || index < 0 || index >= matching.Count) return;
+            executed = true; var action = matching[index].Execute; dialog.Hide(); DispatcherQueue.TryEnqueue(() => action());
+        }
         void Filter()
         {
-            results.Children.Clear(); foreach (var item in Actions().Where(a => a.Name.Contains(search.Text, StringComparison.OrdinalIgnoreCase)))
+            results.Children.Clear(); buttons.Clear(); matching.Clear();
+            foreach (var item in commands.Where(a => a.Name.Contains(search.Text, StringComparison.OrdinalIgnoreCase)))
             {
+                var index = matching.Count; matching.Add(item);
                 var button = new StudioButton { Content = Studio.Columns((Studio.Text(item.Name, 12), -1), (Studio.Text(item.Shortcut, 10, Studio.Muted), 110)), HorizontalContentAlignment = HorizontalAlignment.Stretch, Height = 36, Padding = new(8) };
-                AutomationProperties.SetName(button, item.Name); button.Click += (_, _) => { dialog.Hide(); DispatcherQueue.TryEnqueue(() => item.Execute()); }; results.Children.Add(button);
+                AutomationProperties.SetName(button, item.Name); button.Click += (_, _) => Execute(index);
+                button.KeyDown += (_, e) =>
+                {
+                    if (e.Key == VirtualKey.Enter) { Execute(index); e.Handled = true; }
+                    else if (e.Key == VirtualKey.Up) { if (index == 0) search.Focus(FocusState.Keyboard); else buttons[index - 1].Focus(FocusState.Keyboard); e.Handled = true; }
+                    else if (e.Key == VirtualKey.Down) { if (index + 1 < buttons.Count) buttons[index + 1].Focus(FocusState.Keyboard); e.Handled = true; }
+                };
+                buttons.Add(button); results.Children.Add(button);
             }
         }
-        search.TextChanged += (_, _) => Filter(); dialog.Opened += (_, _) => search.Focus(FocusState.Programmatic); Filter(); await dialog.ShowAsync();
+        search.TextChanged += (_, _) => Filter();
+        search.KeyDown += (_, e) =>
+        {
+            if (e.Key == VirtualKey.Enter) { Execute(0); e.Handled = true; }
+            else if (e.Key == VirtualKey.Down && buttons.Count > 0) { buttons[0].Focus(FocusState.Keyboard); e.Handled = true; }
+        };
+        dialog.Opened += (_, _) => search.Focus(FocusState.Programmatic);
+        Filter(); await dialog.ShowAsync();
     }
     private async Task ShowFramePresetsAsync()
     {

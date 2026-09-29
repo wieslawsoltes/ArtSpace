@@ -61,7 +61,7 @@ async function number(page, section, label, value) {
 }
 async function command(page, text) {
   // Actual command palette text input; diagnostics do not expose commands or model mutation.
-  await page.keyboard.press('Control+k'); await page.keyboard.type(text); await page.keyboard.press('Enter'); await frames(page);
+  await page.keyboard.press('Control+k'); await page.waitForTimeout(250); await frames(page); await page.keyboard.type(text); await page.keyboard.press('Enter'); await frames(page);
 }
 
 test('Width tool edits symmetric and asymmetric sides with cancellable single-transaction gestures', async ({ page }) => {
