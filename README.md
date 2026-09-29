@@ -11,6 +11,8 @@ A local-first illustration editor built with **Uno Platform** and **SkiaSharp**,
 [![Build](https://github.com/wieslawsoltes/ArtSpace/actions/workflows/build.yml/badge.svg)](https://github.com/wieslawsoltes/ArtSpace/actions/workflows/build.yml)
 [![Pages](https://github.com/wieslawsoltes/ArtSpace/actions/workflows/pages.yml/badge.svg)](https://github.com/wieslawsoltes/ArtSpace/actions/workflows/pages.yml)
 [![MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![NuGet](https://img.shields.io/nuget/vpre/ArtSpace.Core.svg?label=NuGet)](https://www.nuget.org/packages/ArtSpace.Core)
+[![Downloads](https://img.shields.io/nuget/dt/ArtSpace.Core.svg)](https://www.nuget.org/packages/ArtSpace.Core)
 
 </div>
 
@@ -90,23 +92,317 @@ Every [release](https://github.com/wieslawsoltes/ArtSpace/releases/latest) ships
 
 Extract and run `ArtSpace` (`ArtSpace.exe` on Windows). Builds are not code-signed yet: on macOS clear the quarantine flag with `xattr -d com.apple.quarantine ArtSpace`; on Windows choose **More info → Run anyway** in SmartScreen. Verify downloads against `SHA256SUMS.txt`.
 
-The libraries below are published to [NuGet.org](https://www.nuget.org/packages?q=ArtSpace), e.g. `dotnet add package ArtSpace.Workbench`.
+## NuGet packages
 
-## Reusable libraries
+All nine libraries are MIT-licensed, versioned together with the app and published to [NuGet.org](https://www.nuget.org/packages?q=ArtSpace) on tagged releases, with symbol packages (`.snupkg`) and SourceLink. The first six packages target `net10.0` and do not depend on Uno (only `ArtSpace.Skia` and `ArtSpace.Illustration` need SkiaSharp); `ArtSpace.Controls`, `ArtSpace.Editor` and `ArtSpace.Workbench` are Uno Platform libraries targeting `net10.0-desktop` and `net10.0-browserwasm`. Hosts own lifetime, fonts and an `IWorkspaceStorage` implementation. Skia consumers need compatible native assets for the executing platform.
 
-| Package | Responsibility |
-| --- | --- |
-| `ArtSpace.Core` | Document, appearance, affine geometry and managed editable contours |
-| `ArtSpace.Layout` | Constraints, layout and reference/indexed snapping |
-| `ArtSpace.Documents` | Validated native schemas, clipboard and SVG subset |
-| `ArtSpace.Editing` | Selection, transactions, history and linked components |
-| `ArtSpace.Skia` | Cached paths/text/shaders, compositing, culling, hit testing, glyph paths and raster export |
-| `ArtSpace.Illustration` | Expansion, offsets, compounds, clipping/opacity-mask commands, blends and repeats |
-| `ArtSpace.Controls` | Custom menus, panels, fields, resize grips, vector icons and layer rows |
-| `ArtSpace.Editor` | Embeddable Uno drawing surface and direct-manipulation gestures |
-| `ArtSpace.Workbench` | Application workspace, properties, command routing and storage workflows |
+```bash
+dotnet add package ArtSpace.Core --prerelease
+```
 
-The first six packages do not depend on Uno. Hosts own lifetime, fonts and an `IWorkspaceStorage` implementation. `OpacityMaskOperations`, `PathOperations` and `PathEditing` are reusable independently of the shell.
+| Package | Version | Downloads | Description |
+|---|---|---|---|
+| [ArtSpace.Core](https://www.nuget.org/packages/ArtSpace.Core) | [![NuGet](https://img.shields.io/nuget/vpre/ArtSpace.Core.svg)](https://www.nuget.org/packages/ArtSpace.Core) | [![Downloads](https://img.shields.io/nuget/dt/ArtSpace.Core.svg)](https://www.nuget.org/packages/ArtSpace.Core) | Document, appearance, affine geometry and managed editable contours. |
+| [ArtSpace.Layout](https://www.nuget.org/packages/ArtSpace.Layout) | [![NuGet](https://img.shields.io/nuget/vpre/ArtSpace.Layout.svg)](https://www.nuget.org/packages/ArtSpace.Layout) | [![Downloads](https://img.shields.io/nuget/dt/ArtSpace.Layout.svg)](https://www.nuget.org/packages/ArtSpace.Layout) | Constraints, auto-layout and reference/indexed snapping. |
+| [ArtSpace.Documents](https://www.nuget.org/packages/ArtSpace.Documents) | [![NuGet](https://img.shields.io/nuget/vpre/ArtSpace.Documents.svg)](https://www.nuget.org/packages/ArtSpace.Documents) | [![Downloads](https://img.shields.io/nuget/dt/ArtSpace.Documents.svg)](https://www.nuget.org/packages/ArtSpace.Documents) | Validated native JSON schemas, node clipboard, SVG subset and storage contract. |
+| [ArtSpace.Editing](https://www.nuget.org/packages/ArtSpace.Editing) | [![NuGet](https://img.shields.io/nuget/vpre/ArtSpace.Editing.svg)](https://www.nuget.org/packages/ArtSpace.Editing) | [![Downloads](https://img.shields.io/nuget/dt/ArtSpace.Editing.svg)](https://www.nuget.org/packages/ArtSpace.Editing) | Selection, transactions, undo/redo history, linked components and viewport. |
+| [ArtSpace.Skia](https://www.nuget.org/packages/ArtSpace.Skia) | [![NuGet](https://img.shields.io/nuget/vpre/ArtSpace.Skia.svg)](https://www.nuget.org/packages/ArtSpace.Skia) | [![Downloads](https://img.shields.io/nuget/dt/ArtSpace.Skia.svg)](https://www.nuget.org/packages/ArtSpace.Skia) | Cached paths/text/shaders, compositing, masks, culling, hit testing, Boolean paths and raster export. |
+| [ArtSpace.Illustration](https://www.nuget.org/packages/ArtSpace.Illustration) | [![NuGet](https://img.shields.io/nuget/vpre/ArtSpace.Illustration.svg)](https://www.nuget.org/packages/ArtSpace.Illustration) | [![Downloads](https://img.shields.io/nuget/dt/ArtSpace.Illustration.svg)](https://www.nuget.org/packages/ArtSpace.Illustration) | Expansion, offsets, compounds, clipping/opacity-mask commands, blends, repeats and anchor editing. |
+| [ArtSpace.Controls](https://www.nuget.org/packages/ArtSpace.Controls) | [![NuGet](https://img.shields.io/nuget/vpre/ArtSpace.Controls.svg)](https://www.nuget.org/packages/ArtSpace.Controls) | [![Downloads](https://img.shields.io/nuget/dt/ArtSpace.Controls.svg)](https://www.nuget.org/packages/ArtSpace.Controls) | Custom Uno menus, panel dock, fields, resize grips, vector icons and layer rows. |
+| [ArtSpace.Editor](https://www.nuget.org/packages/ArtSpace.Editor) | [![NuGet](https://img.shields.io/nuget/vpre/ArtSpace.Editor.svg)](https://www.nuget.org/packages/ArtSpace.Editor) | [![Downloads](https://img.shields.io/nuget/dt/ArtSpace.Editor.svg)](https://www.nuget.org/packages/ArtSpace.Editor) | Embeddable Uno/Skia drawing surface with direct-manipulation, pen and anchor tools. |
+| [ArtSpace.Workbench](https://www.nuget.org/packages/ArtSpace.Workbench) | [![NuGet](https://img.shields.io/nuget/vpre/ArtSpace.Workbench.svg)](https://www.nuget.org/packages/ArtSpace.Workbench) | [![Downloads](https://img.shields.io/nuget/dt/ArtSpace.Workbench.svg)](https://www.nuget.org/packages/ArtSpace.Workbench) | Complete illustration workspace: menus, properties, layers, command routing and storage workflows. |
+
+Dependencies follow the project references: `Layout` and `Documents` → `Core`; `Editing` → `Layout` + `Documents`; `Skia` → `Editing` + SkiaSharp; `Illustration` → `Skia`; `Controls` is standalone Uno; `Editor` → `Controls` + `Skia`; `Workbench` → `Editor` + `Illustration`. `OpacityMaskOperations`, `PathOperations` and `PathEditing` are reusable independently of the shell.
+
+### ArtSpace.Core
+
+The serializable illustration model: pages, artboards and nodes with multiple fills/strokes, gradients, blends, shadows, clipping paths and alpha/luminance opacity masks, plus double-precision affine geometry and `EditablePath`, a managed multi-contour cubic path used for anchor editing. No dependencies and no UI.
+
+```bash
+dotnet add package ArtSpace.Core --prerelease
+```
+
+**Key types** (namespace `ArtSpace.Core`)
+
+- `DesignDocument` / `DesignPage` / `DesignNode` – node tree with `Fills`, `Strokes`, `ClipPathId`, `OpacityMaskId`, `WorldBounds`.
+- `FillStyle`, `StrokeStyle`, `GradientStop` – solid and linear/radial gradient paints with spread and transforms.
+- `EditablePath` – contours of `PathPoint`s with `Split`, `Remove`, `Cut`, `Reverse`, `Smooth`, `HitSegment`, `ToSvgPathData`.
+- `Vec2`, `RectD`, `Matrix2D`, `AffineGeometry` – immutable geometry and affine validation.
+
+**Usage**
+
+```csharp
+using ArtSpace.Core;
+
+var document = new DesignDocument { Name = "Poster" };
+var artboard = new DesignNode { Kind = NodeKind.Frame, Name = "A4", Width = 595, Height = 842, Fill = "#FFFFFF" };
+document.Pages[0].Nodes.Add(artboard);
+var sun = artboard.Add(new DesignNode { Kind = NodeKind.Ellipse, Name = "Sun", X = 200, Y = 120, Width = 180, Height = 180 });
+sun.Fills[0] = new FillStyle { Kind = FillKind.RadialGradient };
+sun.Strokes.Add(new StrokeStyle { Color = "#203F49", Width = 3 });
+
+var path = new EditablePath();
+var contour = new EditablePath.Contour { Closed = true };
+contour.Points.Add(new PathPoint { Position = new Vec2(0, 0) });
+contour.Points.Add(new PathPoint { Position = new Vec2(100, 0), ControlIn = new Vec2(60, -40) });
+contour.Points.Add(new PathPoint { Position = new Vec2(50, 80) });
+path.Contours.Add(contour);
+path.Split(new EditablePath.Address(0, 0), 0.5);           // insert an anchor on the first segment
+Console.WriteLine($"{path.AnchorCount} anchors: {path.ToSvgPathData()}");
+```
+
+### ArtSpace.Layout
+
+Auto-layout, constraints and snapping for artboards and groups, including a prebuilt `SnapIndex` so repeated drags do not rescan stationary targets. Depends on `ArtSpace.Core`; no UI.
+
+```bash
+dotnet add package ArtSpace.Layout --prerelease
+```
+
+**Key types**
+
+- `LayoutEngine.Arrange(node)` / `Arrange(roots)` – lays out auto-layout frames.
+- `LayoutEngine.Resize(node, width, height)` – resizes and applies child constraints.
+- `SnapIndex` – indexed stationary targets with `Snap(moving, tolerance, guides)`.
+- `SnapEngine.Snap(...)` – one-shot snapping; `SnapResult` carries the `Correction` and `SnapLine`s.
+
+**Usage**
+
+```csharp
+using ArtSpace.Core;
+using ArtSpace.Layout;
+
+var row = new DesignNode { Kind = NodeKind.Frame, Name = "Swatches" };
+row.Layout = new AutoLayout { Direction = LayoutDirection.Horizontal, Gap = 8, HugWidth = true, HugHeight = true };
+for (var i = 0; i < 3; i++) row.Add(new DesignNode { Name = $"Swatch {i}", Width = 40, Height = 40 });
+LayoutEngine.Arrange(row);
+
+var index = new SnapIndex(row.Children.Select(c => c.WorldBounds));
+SnapResult snap = index.Snap(new RectD(62, 18, 40, 40), tolerance: 4);
+Console.WriteLine($"{row.Width} x {row.Height}, correction {snap.Correction}");
+```
+
+### ArtSpace.Documents
+
+Native JSON (schema 3, reading 1–3) with validation, node clipboard serialization, the supported SVG subset (paths, gradients, masks and affine transforms, returning warnings for anything skipped), the original sample artwork and the `IWorkspaceStorage` host contract. Depends on `ArtSpace.Core`; no UI.
+
+```bash
+dotnet add package ArtSpace.Documents --prerelease
+```
+
+**Key types**
+
+- `DocumentJson` – `Load`, `Save`, `Validate`, `CloneNode`, `SaveNodes`/`LoadNodes`.
+- `SvgFormat` – `Export(roots, bounds)` and `Import(svg)` returning `SvgImportResult` (document + warnings).
+- `IllustrationSample` / `SampleDocument` – the editable Alpine Echoes artwork and a basic sample.
+- `IWorkspaceStorage` – autosave, open and save operations implemented by each host.
+
+**Usage**
+
+```csharp
+using ArtSpace.Core;
+using ArtSpace.Documents;
+
+DesignDocument document = IllustrationSample.Create();
+File.WriteAllText("alpine.artspace", DocumentJson.Save(document));
+var reloaded = DocumentJson.Load(File.ReadAllText("alpine.artspace"));   // validated on load
+
+var artboard = reloaded.Pages[0].Nodes[0];
+File.WriteAllText("artboard.svg", SvgFormat.Export([artboard], artboard.WorldBounds));
+
+SvgImportResult imported = SvgFormat.Import(File.ReadAllText("logo.svg"));
+foreach (var warning in imported.Warnings) Console.WriteLine(warning);
+```
+
+### ArtSpace.Editing
+
+The headless editor: selection, transactional edits with bounded undo/redo, move/duplicate/group/align/distribute, clipboard and linked components, plus a viewport. Depends on `Core`, `Layout` and `Documents`; no UI.
+
+```bash
+dotnet add package ArtSpace.Editing --prerelease
+```
+
+**Key types**
+
+- `EditorSession` – `Document`, `Page`, `Selection`, `Tool`, `Edit(label, action)`, `Undo()`/`Redo()`, `Changed`.
+- `EditorSession.MoveSelection`, `DuplicateSelection`, `GroupSelection`, `Align`, `Distribute`, `CopySelection`/`Paste`.
+- `ComponentService` – `MakeComponent`, `InsertInstance`, `SetOverride`, `Synchronize(document)`.
+- `Viewport` – zoom/pan with `WorldToScreen`, `ScreenToWorld`, `ZoomAt`, `Fit`.
+
+**Usage**
+
+```csharp
+using ArtSpace.Core;
+using ArtSpace.Documents;
+using ArtSpace.Editing;
+
+var session = new EditorSession(IllustrationSample.Create());
+session.Changed += (_, e) => Console.WriteLine($"{e.Kind}: {e.Label}");
+
+var badge = new DesignNode { Kind = NodeKind.Star, Name = "Badge", Width = 120, Height = 120, Fill = "#E6AA67" };
+session.Edit("Add badge", () => session.AddNode(badge));   // one undoable transaction
+session.Select(badge);
+session.DuplicateSelection(offset: 24);
+session.Align("left");
+
+Console.WriteLine($"Undo: {session.UndoLabel}");
+session.Undo();
+```
+
+### ArtSpace.Skia
+
+The SkiaSharp renderer shared by the editor and headless tools: retained path/text/gradient caches, blending, clipping and opacity-mask compositing, culling, hit testing, glyph outlines, Boolean operations, `SKPath` ↔ `EditablePath` conversion and PNG export. Depends on `ArtSpace.Editing` and SkiaSharp; no Uno dependency.
+
+```bash
+dotnet add package ArtSpace.Skia --prerelease
+```
+
+**Key types**
+
+- `SceneRenderer` – `Draw(canvas, nodes)`, `HitTest(roots, point)`, `Geometry(node)`, `CreateTextOutline`, `ExportPng`.
+- `PathEditing` – `Read(node, renderer)` to an `EditablePath` and `Write(node, path)` back to the node.
+- `BooleanOperations.Apply(editor, renderer, BooleanOperation.Union)` – union/subtract/intersect/exclude.
+
+**Usage**
+
+```csharp
+using ArtSpace.Core;
+using ArtSpace.Documents;
+using ArtSpace.Editing;
+using ArtSpace.Skia;
+
+var session = new EditorSession(IllustrationSample.Create());
+using var renderer = new SceneRenderer();
+var artboard = session.Page.Nodes[0];
+File.WriteAllBytes("artboard.png", renderer.ExportPng([artboard], artboard.WorldBounds, 2));
+
+if (renderer.HitTest(session.Page.Nodes, new Vec2(200, 150), deep: true) is { } node && PathEditing.CanEdit(node))
+{
+    EditablePath path = PathEditing.Read(node, renderer);
+    path.Reverse();
+    session.Edit("Reverse path", () => PathEditing.Write(node, path));
+}
+```
+
+### ArtSpace.Illustration
+
+Illustrator-style commands that operate on an `EditorSession` selection as single undoable transactions: expand shapes, outline strokes, offset paths, compound paths, clipping and opacity masks, blends, radial repeats, text outlines and anchor editing. Depends on `ArtSpace.Skia`; no Uno dependency.
+
+```bash
+dotnet add package ArtSpace.Illustration --prerelease
+```
+
+**Key types**
+
+- `IllustrationOperations` – `ExpandShapes`, `OutlineStrokes`, `OffsetPaths`, `Blend`, `RadialRepeat`.
+- `PathOperations` – `MakeCompound`/`ReleaseCompound`, `CreateOutlines`, `AddAnchors`, `Reverse`, `Close`.
+- `ClippingOperations` – `Make`/`Release` clipping groups, edit mask or contents.
+- `OpacityMaskOperations` – `Make(editor, mode)`, `Release`, `Invert`, `ToggleEnabled`, `SetMode`.
+
+**Usage**
+
+```csharp
+using ArtSpace.Core;
+using ArtSpace.Documents;
+using ArtSpace.Editing;
+using ArtSpace.Illustration;
+using ArtSpace.Skia;
+
+var document = new DesignDocument();
+var back = new DesignNode { Kind = NodeKind.Ellipse, Name = "Back", Width = 120, Height = 120, Fill = "#E6AA67" };
+var front = new DesignNode { Kind = NodeKind.Ellipse, Name = "Front", X = 300, Width = 60, Height = 60, Fill = "#203F49" };
+document.Pages[0].Nodes.AddRange([back, front]);
+var session = new EditorSession(document);
+using var renderer = new SceneRenderer();
+
+session.Select([back.Id, front.Id]);
+IllustrationOperations.Blend(session, steps: 5);            // each call is one undoable edit
+session.Undo();
+
+session.Select([back.Id, front.Id]);
+PathOperations.MakeCompound(session, renderer);
+IllustrationOperations.OffsetPaths(session, renderer, 6);
+Console.WriteLine(string.Join(", ", session.History));
+```
+
+### ArtSpace.Controls
+
+Compact dark-theme Uno Platform controls with shared design tokens: a keyboard-navigable command menu bar, tabbed panel dock with resize grips, scrubbable numeric fields, color fields with a spectrum picker, segmented controls, inspector sections, retained inspector bindings, layer rows and original vector icons. It has no document or editor dependency; requires Uno Platform (Skia renderer).
+
+```bash
+dotnet add package ArtSpace.Controls --prerelease
+```
+
+**Key types**
+
+- `Studio` – tokens and helpers such as `Font`, `Brush`, `Text`, `Input`, `Columns`, `Surface`.
+- `CommandMenuBar` / `MenuCommand` – application menus with shortcuts and enablement.
+- `PanelDock` / `DockResizeGrip` – tabbed side panels and drag-resizable docks.
+- `NumericField`, `ColorField`, `SegmentedControl`, `InspectorSection`, `IconButton`, `LayerRow`.
+
+**Usage**
+
+```csharp
+using ArtSpace.Controls;
+using Microsoft.UI.Xaml.Controls;
+
+var menu = new CommandMenuBar();
+menu.Add("Object", () => [new MenuCommand("Group", () => Console.WriteLine("group"), "Ctrl+G")]);
+
+var stroke = new InspectorSection("Stroke");
+stroke.Body.Children.Add(new ColorField("#203F49", hex => Console.WriteLine(hex)));
+stroke.Body.Children.Add(new NumericField("Weight", 1, w => Console.WriteLine(w)) { Minimum = 0 });
+
+var dock = new PanelDock();
+dock.Add("Properties", stroke);
+window.Content = new StackPanel { Children = { menu, dock } };
+```
+
+### ArtSpace.Editor
+
+The embeddable drawing surface: an Uno `SKCanvasElement`-based canvas with selection and direct-selection, pen/pencil/brush/shape/text tools, anchor and handle editing, rulers, snapping and artboard presentation. Bind it to an `EditorSession` and add your own chrome. Depends on `ArtSpace.Controls` and `ArtSpace.Skia`; requires Uno Platform.
+
+```bash
+dotnet add package ArtSpace.Editor --prerelease
+```
+
+**Key types**
+
+- `DesignSurface` – `Session`, `Renderer`, `FillColor`/`StrokeColor`/`StrokeWidth`, `Fit()`, `ZoomTo`, `Invalidate()`, `StatusChanged`.
+- `DesignSurface.EnterPathEditing`, `GetPathAnchors`, `EditSelectedAnchors`, `RemoveSelectedAnchors` – contour editing.
+- `AnchorInfo` – anchor/handle state exposed for panels and diagnostics.
+- `Keyboard` – current modifier-key state (`Control`, `Shift`, `Alt`).
+
+**Usage**
+
+```csharp
+using ArtSpace.Documents;
+using ArtSpace.Editing;
+using ArtSpace.Editor;
+
+var session = new EditorSession(IllustrationSample.Create());
+var surface = new DesignSurface { Session = session, FillColor = "#E6AA67", StrokeWidth = 2 };
+surface.StatusChanged += message => Console.WriteLine(message);
+session.Tool = EditorTool.Pen;
+window.Content = surface;
+```
+
+### ArtSpace.Workbench
+
+The complete ArtSpace workspace as one control: menus, appearance bar, toolbox, rulers, artboards, layers/properties/history panels, command routing, clipboard and storage workflows. The host supplies an `EditorSession` and an `IWorkspaceStorage` (browser, desktop or your own). Depends on `ArtSpace.Editor` and `ArtSpace.Illustration`; requires Uno Platform.
+
+```bash
+dotnet add package ArtSpace.Workbench --prerelease
+```
+
+**Key types**
+
+- `StudioWorkbench(EditorSession session, IWorkspaceStorage storage)` – the workbench `UserControl`.
+- `StudioWorkbench.Surface` – the hosted `DesignSurface` (renderer, typeface, focus).
+- `StudioWorkbench.ShowStatus(message, error)` and `HandleHostNavigation(key)`.
+- `IWorkspaceStorage` – implement for autosave, open and save.
+
+**Usage**
 
 ```csharp
 using ArtSpace.Documents;
@@ -114,10 +410,12 @@ using ArtSpace.Editing;
 using ArtSpace.Workbench;
 
 var session = new EditorSession(IllustrationSample.Create());
-window.Content = new StudioWorkbench(session, storage);
+// Supply an IWorkspaceStorage implementation for autosave, open and save.
+var workbench = new StudioWorkbench(session, storage);
+window.Content = workbench;
+window.Closed += (_, _) => workbench.Dispose();
+window.Activate();
 ```
-
-Skia consumers need compatible native assets for the executing platform. Tagged releases publish all nine packages, with symbols, to NuGet.org.
 
 ## Verification and performance
 
