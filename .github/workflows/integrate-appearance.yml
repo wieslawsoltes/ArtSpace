@@ -16,6 +16,7 @@ jobs:
       - name: Integrate reviewed source changes
         run: |
           python3 scripts/integrate-appearance.py
+          sed -i 's/[[:blank:]]*$//' src/ArtSpace.Illustration/AppearanceOperations.cs
           git diff --check
           rm scripts/integrate-appearance.py .github/workflows/integrate-appearance.yml
           git config user.name 'github-actions[bot]'
