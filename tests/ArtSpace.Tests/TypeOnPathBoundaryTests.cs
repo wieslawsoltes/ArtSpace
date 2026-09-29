@@ -85,16 +85,23 @@ internal static class TypeOnPathBoundaryTests
             var imported = SvgFormat.Import(svg).Document;
             Check(PixelError(r.ExportPng([n], region), r.ExportPng(imported.Pages[0].Nodes, region)) < .003);
         });
-        test("path text gradient and affine SVG outlines preserve painted placement", () =>
+        foreach (var coordinateSpace in Enum.GetValues<GradientSpace>())
         {
-            var n = Node(); n.AffineTransform = new(1, .08, .2, 1, 12, 5);
-            n.Fills = [new() { Kind = FillKind.LinearGradient, GradientSpace = GradientSpace.UserSpaceOnUse,
-                Start = new(0, 0), End = new(400, 0), Stops = [new() { Offset = 0, Color = "#FF0000" }, new() { Offset = 1, Color = "#0000FF" }] }];
-            using var r = new SceneRenderer(); var region = new RectD(0, 0, 520, 300);
-            var svg = IllustrationSvgExport.Export([n], region, r); var imported = SvgFormat.Import(svg).Document;
-            var error = PixelError(r.ExportPng([n], region), r.ExportPng(imported.Pages[0].Nodes, region));
-            Check(error < .005, $"Gradient path-text export pixel error {error:P5}");
-        });
+            test("path text gradient outlines preserve " + coordinateSpace + " painted placement", () =>
+            {
+                var n = Node(); n.AffineTransform = new(1, .08, .2, 1, 12, 5);
+                n.Fills = [new() { Kind = FillKind.LinearGradient, GradientSpace = coordinateSpace,
+                    Start = new(0, 0), End = coordinateSpace == GradientSpace.UserSpaceOnUse ? new(400, 0) : new(1, 0),
+                    Stops = [new() { Offset = 0, Color = "#FF0000" }, new() { Offset = 1, Color = "#0000FF" }] }];
+                using var r = new SceneRenderer(); var region = new RectD(0, 0, 520, 300);
+                var reference = r.ExportPng([n], region);
+                var svg = IllustrationSvgExport.Export([n], region, r); var imported = SvgFormat.Import(svg).Document;
+                var error = PixelError(reference, r.ExportPng(imported.Pages[0].Nodes, region));
+                Check(error < .005, $"Gradient path-text export pixel error {error:P5}");
+                var editor = Editor(n); editor.Select(n); PathOperations.CreateOutlines(editor, r);
+                Check(PixelError(reference, r.ExportPng([n], region)) < .005, "Create Outlines changed the gradient coordinate system.");
+            });
+        }
         test("unsupported native SVG textPath never silently imports as straight text", () =>
         {
             Reject(() => SvgFormat.Import("<svg><defs><path id='p' d='M0 0L100 0'/></defs><text><textPath href='#p'>Curved</textPath></text></svg>"));
@@ -105,7 +112,7 @@ internal static class TypeOnPathBoundaryTests
             var n = Node(); n.TextPath!.BaselineShift = 220; using var r = new SceneRenderer();
             var bounds = r.GetArtworkBounds(n); Check(bounds.Y < -100 && bounds.Bottom >= n.WorldBounds.Bottom);
         });
-        test("path text GPU-compatible retained replay preserves live effect pixels", () =>
+        test("path text retained replay preserves live effect pixels", () =>
         {
             var n = Node(); n.Effects = [new() { Kind = LiveEffectKind.GaussianBlur, Radius = 2 }];
             using var r = new SceneRenderer(); using var a = new SKBitmap(440, 240); using var b = new SKBitmap(440, 240);
