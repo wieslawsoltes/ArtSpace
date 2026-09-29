@@ -21,8 +21,9 @@ public sealed partial class SceneRenderer : IDisposable
     public void PruneCache(IEnumerable<DesignNode> roots)
     {
         var nodes = roots.SelectMany(n => n.DescendantsAndSelf()).ToArray();
-        PruneGradients(nodes);
+        InvalidateRetainedScene(); PrunePaints(nodes); PruneGradients(nodes);
         var retained = nodes.Select(n => n.Id).ToHashSet(StringComparer.Ordinal);
+        PruneEffects(retained);
         foreach (var id in _paths.Keys.Where(id => !retained.Contains(id)).ToArray())
         { _paths[id].Path.Dispose(); _paths.Remove(id); }
         foreach (var id in _textLayouts.Keys.Where(id => !retained.Contains(id)).ToArray())
@@ -32,10 +33,11 @@ public sealed partial class SceneRenderer : IDisposable
     {
         ArgumentNullException.ThrowIfNull(typeface);
         if (ReferenceEquals(typeface, _customTypeface)) return;
-        ClearTextLayouts(); _customTypeface?.Dispose(); _customTypeface = typeface;
+        InvalidateRetainedScene(); ClearTextLayouts(); _customTypeface?.Dispose(); _customTypeface = typeface;
     }
     public void ClearCache()
     {
+        InvalidateRetainedScene(); ClearPaints(); ClearEffects();
         foreach (var p in _paths.Values) p.Path.Dispose(); _paths.Clear(); ClearTextLayouts(); ClearGradients();
     }
     public static SKColor Color(string? hex, double opacity = 1)
@@ -72,7 +74,7 @@ public sealed partial class SceneRenderer : IDisposable
         if (!node.Visible || node.Opacity <= 0 || node.Kind == NodeKind.Slice) return;
         VisitedNodes++;
         canvas.Save(); canvas.Concat(Matrix(node.LocalMatrix));
-        var filtered = filteredAncestor || node.Shadows.Any(s => s.Visible);
+        var filtered = filteredAncestor || node.Shadows.Any(s => s.Visible) || HasVisibleEffects(node);
         // Groups may overflow their nominal box; filtered sources can cast visible offscreen shadows.
         if (EnableCulling && !filtered && node.Children.Count == 0 && node.Kind != NodeKind.Text)
         {
@@ -88,13 +90,12 @@ public sealed partial class SceneRenderer : IDisposable
         RenderedNodes++;
         var masked = !Outlines && node.OpacityMaskEnabled && node.OpacityMask is not null;
         if (masked && node.OpacityMaskRegion is { } region) canvas.ClipRect(Rect(region));
-        var layer = masked || node.Opacity < .999 || node.Blend != BlendKind.Normal || node.Shadows.Any(s => s.Visible);
+        var filter = Outlines ? null : EffectFilter(node);
+        var layer = masked || node.Opacity < .999 || node.Blend != BlendKind.Normal || filter is not null;
         if (layer)
         {
-            using var paint = new SKPaint { Color = SKColors.White.WithAlpha((byte)Math.Clamp(node.Opacity * 255, 0, 255)), BlendMode = Blend(node.Blend) };
-            var shadow = node.Shadows.FirstOrDefault(s => s.Visible);
-            using var filter = shadow is null ? null : SKImageFilter.CreateDropShadow((float)shadow.X, (float)shadow.Y, (float)Math.Clamp(shadow.Blur / 2, 0, 256), (float)Math.Clamp(shadow.Blur / 2, 0, 256), Color(shadow.Color, shadow.Opacity));
-            paint.ImageFilter = filter; canvas.SaveLayer(paint);
+            using var paint = new SKPaint { Color = SKColors.White.WithAlpha((byte)Math.Clamp(node.Opacity * 255, 0, 255)), BlendMode = Blend(node.Blend), ImageFilter = filter };
+            canvas.SaveLayer(paint);
         }
         if (Outlines && node.Kind != NodeKind.Text)
         {
@@ -103,17 +104,16 @@ public sealed partial class SceneRenderer : IDisposable
         }
         else
         {
-            foreach (var fill in node.Fills.Where(f => f.Visible))
+            foreach (var fill in node.Fills)
             {
-                using var paint = new SKPaint { IsAntialias = true, Color = Color(fill.Color, fill.Opacity), Style = SKPaintStyle.Fill };
-                var shader = Shader(fill, node); paint.Shader = shader;
-                if (shader is not null) paint.Color = SKColors.White.WithAlpha((byte)Math.Clamp(Math.Round(fill.Opacity * 255), 0, 255));
+                if (!fill.Visible) continue;
+                var paint = FillPaint(fill, node);
                 if (node.Kind == NodeKind.Text) DrawText(canvas, node, paint); else canvas.DrawPath(Geometry(node), paint);
             }
-            foreach (var stroke in node.Strokes.Where(s => s.Visible && s.Width > 0))
+            foreach (var stroke in node.Strokes)
             {
-                using var paint = new SKPaint { IsAntialias = true, Color = Color(stroke.Color, stroke.Opacity), Style = SKPaintStyle.Stroke, StrokeWidth = (float)stroke.Width, StrokeCap = (SKStrokeCap)stroke.Cap, StrokeJoin = (SKStrokeJoin)stroke.Join, StrokeMiter = (float)stroke.MiterLimit };
-                using var dash = stroke.Dashes.Count >= 2 && stroke.Dashes.All(d => d > 0) ? SKPathEffect.CreateDash(stroke.Dashes.Select(d => (float)d).ToArray(), 0) : null; paint.PathEffect = dash;
+                if (!stroke.Visible || stroke.Width <= 0 || stroke.Paint?.Visible == false) continue;
+                var paint = StrokePaint(stroke, node);
                 if (node.Kind == NodeKind.Text) DrawText(canvas, node, paint); else canvas.DrawPath(Geometry(node), paint);
             }
         }
@@ -187,7 +187,7 @@ public sealed partial class SceneRenderer : IDisposable
         finally { Outlines = outlines; }
         using var image = surface.Snapshot(); using var data = image.Encode(SKEncodedImageFormat.Png, 100); return data.ToArray();
     }
-    private static SKBlendMode Blend(BlendKind kind) => kind switch { BlendKind.Multiply => SKBlendMode.Multiply, BlendKind.Screen => SKBlendMode.Screen, BlendKind.Overlay => SKBlendMode.Overlay, BlendKind.Darken => SKBlendMode.Darken, BlendKind.Lighten => SKBlendMode.Lighten, BlendKind.Difference => SKBlendMode.Difference, _ => SKBlendMode.SrcOver };
+    private static SKBlendMode Blend(BlendKind kind) => kind switch { BlendKind.Multiply => SKBlendMode.Multiply, BlendKind.Screen => SKBlendMode.Screen, BlendKind.Overlay => SKBlendMode.Overlay, BlendKind.Darken => SKBlendMode.Darken, BlendKind.Lighten => SKBlendMode.Lighten, BlendKind.Difference => SKBlendMode.Difference, BlendKind.ColorDodge => SKBlendMode.ColorDodge, BlendKind.ColorBurn => SKBlendMode.ColorBurn, BlendKind.HardLight => SKBlendMode.HardLight, BlendKind.SoftLight => SKBlendMode.SoftLight, BlendKind.Exclusion => SKBlendMode.Exclusion, BlendKind.Hue => SKBlendMode.Hue, BlendKind.Saturation => SKBlendMode.Saturation, BlendKind.Color => SKBlendMode.Color, BlendKind.Luminosity => SKBlendMode.Luminosity, _ => SKBlendMode.SrcOver };
     public void Dispose()
     {
         ClearCache(); DisposeMasks(); foreach (var face in _typefaces.Values.Distinct()) if (face != SKTypeface.Default) face.Dispose(); _typefaces.Clear(); _customTypeface?.Dispose(); _customTypeface = null;

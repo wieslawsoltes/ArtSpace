@@ -19,16 +19,16 @@ internal static class PerformanceBenchmarks
     private static void VerifyBoundaryRegressions()
     {
         static void Require(bool success, string message) { if (!success) throw new InvalidOperationException(message); }
-        var legacy = DocumentJson.Save(new DesignDocument()).Replace("\"formatVersion\":3", "\"formatVersion\":1", StringComparison.Ordinal);
+        var legacy = DocumentJson.Save(new DesignDocument()).Replace("\"formatVersion\":4", "\"formatVersion\":1", StringComparison.Ordinal);
         var migrated = DocumentJson.Load(legacy);
         Require(migrated.FormatVersion == 1, "Legacy schema must still load.");
         var saved = DocumentJson.Save(migrated);
-        Require(migrated.FormatVersion == 3 && saved.Contains("\"formatVersion\":3", StringComparison.Ordinal), "Native saves must advertise clipping-aware schema 3.");
+        Require(migrated.FormatVersion == 4 && saved.Contains("\"formatVersion\":4", StringComparison.Ordinal), "Native saves must advertise clipping-aware schema 4.");
         var node = new DesignNode();
         var editor = new EditorSession(new() { Pages = [new() { Nodes = [node] }] }); editor.Select(node);
         var before = DocumentJson.Save(editor.Document); var failed = false;
         try { editor.Edit("invalid serialization", () => node.X = double.NaN); }
-        catch (ArgumentException) { failed = true; }
+        catch (Exception ex) when (ex is ArgumentException or InvalidDataException) { failed = true; }
         Require(failed && !editor.IsInteracting && !editor.CanUndo && DocumentJson.Save(editor.Document) == before && double.IsFinite(editor.Primary!.X), "Serialization failure must restore the transaction snapshot and selection.");
         var a = new DesignNode(); var mask = new DesignNode();
         editor = new(new() { Pages = [new() { Nodes = [a, mask] }] }); editor.SelectAll(); ClippingOperations.Make(editor);

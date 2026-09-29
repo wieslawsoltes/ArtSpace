@@ -32,12 +32,17 @@ root = Path('artifacts/ui-performance')
 a = json.loads((root / 'baseline.json').read_text())
 b = json.loads((root / 'optimized.json').read_text())
 assert a['nodes'] == b['nodes']
+assert len(a['samplesMs']) == len(b['samplesMs'])
+import statistics
+assert a['medianMs'] == statistics.median(a['samplesMs'])
+assert b['medianMs'] == statistics.median(b['samplesMs'])
 report = {
   'baseline': a,
   'optimized': b,
   'medianRatio': a['medianMs'] / b['medianMs'],
   'p95Ratio': a['p95Ms'] / b['p95Ms'],
-  'note': 'One paired CI experiment, software graphics, 12 samples per variant. Baseline runs after optimized. Optimized also waits for matching inspector control diagnostics; not a hardware presentation or stable FPS claim.'
+  'samplesPerVariant': len(a['samplesMs']),
+  'note': 'One sequential paired CI experiment on software graphics. Baseline runs after optimized. Both variants wait for matching inspector controls when available. Diagnostics implementation differs between builds, so this is not an instrumentation-neutral benchmark or a hardware presentation/FPS claim.'
 }
 (root / 'comparison.json').write_text(json.dumps(report, indent=2))
 print('PAIRED_UI_SELECTION ' + json.dumps(report))

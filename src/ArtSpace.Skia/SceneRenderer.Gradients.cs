@@ -96,7 +96,7 @@ public sealed partial class SceneRenderer
     private static SKPoint ToPoint(Vec2 point) => new((float)point.X, (float)point.Y);
     private void PruneGradients(IEnumerable<DesignNode> nodes)
     {
-        var retained = nodes.SelectMany(n => n.Fills).ToHashSet(ReferenceEqualityComparer.Instance);
+        var retained = nodes.SelectMany(n => n.Fills.Concat(n.Strokes.Select(s => s.Paint).OfType<FillStyle>())).ToHashSet(ReferenceEqualityComparer.Instance);
         foreach (var fill in _gradients.Keys.Where(f => !retained.Contains(f)).ToArray())
         { _gradients[fill].Shader.Dispose(); _gradients.Remove(fill); }
     }

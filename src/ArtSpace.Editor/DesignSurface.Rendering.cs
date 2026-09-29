@@ -16,7 +16,8 @@ public sealed partial class DesignSurface
         Renderer.Outlines = editor.OutlinesVisible;
         var worldRect = new RectD(-viewport.Pan.X / zoom, -viewport.Pan.Y / zoom, size.Width / zoom, size.Height / zoom);
         if (IsPresenting && editor.Document.Find(_presentedFrame) is { } frame) Renderer.DrawWorldNode(canvas, frame);
-        else Renderer.Draw(canvas, editor.Page.Nodes, worldRect);
+        else if (editor.IsInteracting) Renderer.Draw(canvas, editor.Page.Nodes, worldRect);
+        else Renderer.DrawRetained(canvas, editor.Page, worldRect);
         if (!IsPresenting)
         {
             using var guidePaint = new SKPaint { Color = new(242, 72, 34, 170), StrokeWidth = 1 / zoom, IsAntialias = true };
@@ -61,6 +62,7 @@ public sealed partial class DesignSurface
             if (editor.RulersVisible) DrawRulers(canvas, size);
         }
         canvas.Restore();
+        FrameRendered?.Invoke();
     }
     private void DrawGrid(SKCanvas canvas, Size size)
     {

@@ -13,7 +13,7 @@ public sealed class PanelDock : UserControl
         HorizontalContentAlignment = HorizontalAlignment.Stretch;
         VerticalContentAlignment = VerticalAlignment.Stretch;
         var grid = new Grid();
-        grid.RowDefinitions.Add(new() { Height = new(31) });
+        grid.RowDefinitions.Add(new() { Height = GridLength.Auto });
         grid.RowDefinitions.Add(new() { Height = new(1, GridUnitType.Star) });
         grid.Children.Add(_tabs); Grid.SetRow(_body, 1); grid.Children.Add(_body); Content = grid;
     }
@@ -22,8 +22,9 @@ public sealed class PanelDock : UserControl
         if (_panels.Any(p => p.Name == name)) throw new ArgumentException("Panel names must be unique.", nameof(name));
         var button = new StudioButton(name, () => Select(name)) { FontSize = 10, Padding = new(5, 3), Height = 31, CornerRadius = new(0), HorizontalAlignment = HorizontalAlignment.Stretch };
         AutomationProperties.SetName(button, name + " panel");
-        _tabs.ColumnDefinitions.Add(new() { Width = new(1, GridUnitType.Star) });
-        Grid.SetColumn(button, _panels.Count); _tabs.Children.Add(button); _panels.Add((name, content, button));
+        if (_panels.Count < 4) _tabs.ColumnDefinitions.Add(new() { Width = new(1, GridUnitType.Star) });
+        if (_panels.Count % 4 == 0) _tabs.RowDefinitions.Add(new() { Height = new(31) });
+        Grid.SetRow(button, _panels.Count / 4); Grid.SetColumn(button, _panels.Count % 4); _tabs.Children.Add(button); _panels.Add((name, content, button));
         if (_panels.Count == 1) Select(name);
     }
     public void Select(string name)

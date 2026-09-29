@@ -3,7 +3,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <LangVersion>14</LangVersion>
-    <Version>0.4.1-alpha.1</Version>
+    <Version>0.5.0-alpha.1</Version>
     <!-- Uno 6.7's managed and native Skia dependencies must share one ABI version. -->
     <ArtSpaceSkiaVersion>3.119.2</ArtSpaceSkiaVersion>
     <SkiaSharpVersion>$(ArtSpaceSkiaVersion)</SkiaSharpVersion>

@@ -56,6 +56,7 @@ public sealed partial class DesignSurface : UserControl, IDisposable
     public event Action<Point>? CanvasContextRequested;
     public event Action<bool>? PresentationChanged;
     public event Action<string>? StatusChanged;
+    public event Action? FrameRendered;
     public EditorSession? Session
     {
         get => _session;
@@ -63,6 +64,7 @@ public sealed partial class DesignSurface : UserControl, IDisposable
         {
             if (_session == value) return;
             if (_session is not null) _session.Changed -= SessionChanged;
+            Renderer.InvalidateRetainedScene();
             _session = value;
             if (_session is not null) _session.Changed += SessionChanged;
             _canvas.Invalidate();
@@ -101,6 +103,7 @@ public sealed partial class DesignSurface : UserControl, IDisposable
     }
     private void SessionChanged(object? sender, EditorChangedEventArgs e)
     {
+        if (e.Kind is EditorChangeKind.Document or EditorChangeKind.Preview) Renderer.InvalidateRetainedScene();
         if (e.Kind == EditorChangeKind.Document)
         {
             // Undo/load can replace every node while a pen or pointer gesture is active.
@@ -452,7 +455,7 @@ public sealed partial class DesignSurface : UserControl, IDisposable
     }
     public new void Dispose()
     {
-        if (_disposed) return; _disposed = true; if (_session is not null) _session.Changed -= SessionChanged; Renderer.Dispose();
+        if (_disposed) return; _disposed = true; if (_session is not null) _session.Changed -= SessionChanged; FrameRendered = null; Renderer.Dispose();
     }
 }
 

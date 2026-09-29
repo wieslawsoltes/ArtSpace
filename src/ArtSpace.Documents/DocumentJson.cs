@@ -10,12 +10,12 @@ namespace ArtSpace.Documents;
 [JsonSerializable(typeof(List<DesignNode>))]
 public partial class ArtSpaceJsonContext : JsonSerializerContext;
 
-public static class DocumentJson
+public static partial class DocumentJson
 {
-    public const int CurrentFormatVersion = 3;
+    public const int CurrentFormatVersion = 4;
     public const int MaxDocumentCharacters = 32 * 1024 * 1024;
     public const int MaxNodes = 100_000;
-    /// <summary>Save using schema 3. Legacy schema 1 is upgraded so older readers cannot silently discard clipping semantics.</summary>
+    /// <summary>Save using schema 4. Older documents upgrade so earlier readers cannot silently discard live appearance semantics.</summary>
     public static string Save(DesignDocument document)
     {
         ArgumentNullException.ThrowIfNull(document);
@@ -61,6 +61,7 @@ public static class DocumentJson
     {
         if (document.FormatVersion is < 1 or > CurrentFormatVersion) throw new InvalidDataException($"Unsupported ArtSpace format version {document.FormatVersion}.");
         if (document.Pages is null || document.Pages.Count is < 1 or > 1000) throw new InvalidDataException("A document must have between 1 and 1000 pages.");
+        ValidateGraphicStyles(document);
         var ids = new HashSet<string>(StringComparer.Ordinal); var count = 0;
         foreach (var page in document.Pages)
         {
@@ -73,6 +74,7 @@ public static class DocumentJson
             if (n is null || string.IsNullOrWhiteSpace(n.Id) || !ids.Add(n.Id)) throw new InvalidDataException("Invalid or duplicate layer identifier.");
             if (!double.IsFinite(n.X) || !double.IsFinite(n.Y) || !double.IsFinite(n.Width) || !double.IsFinite(n.Height) || !double.IsFinite(n.Rotation) || n.Width < 0 || n.Height < 0 || n.Width > 1e7 || n.Height > 1e7 || Math.Abs(n.X) > 1e9 || Math.Abs(n.Y) > 1e9) throw new InvalidDataException("A layer has invalid geometry.");
             if (n.Children is null || n.Fills is null || n.Strokes is null || n.Shadows is null || n.Layout is null || n.Points is null || n.Overrides is null) throw new InvalidDataException("A layer is missing required data.");
+            ValidateLiveAppearance(n);
             if (n.ClipPathId is { } clip)
             {
                 var mask = n.Children.Find(child => child?.Id == clip);
@@ -91,6 +93,7 @@ public static class DocumentJson
                 throw new InvalidDataException("Invalid opacity mask region.");
             foreach (var fill in n.Fills)
             {
+                if (fill is not null) ValidatePaint(fill);
                 if (fill is null || fill.Stops is null || fill.Stops.Count > 4096 || !double.IsFinite(fill.Opacity) || !fill.Start.IsFinite || !fill.End.IsFinite || !double.IsFinite(fill.GradientRadius) || fill.GradientRadius < 0 || !Enum.IsDefined(fill.GradientSpace) || !Enum.IsDefined(fill.GradientSpread) || !AffineGeometry.IsInvertible(fill.GradientTransform) || (fill.GradientFocus.HasValue && !fill.GradientFocus.Value.IsFinite) || fill.Stops.Any(s => s is null || !double.IsFinite(s.Offset) || !double.IsFinite(s.Opacity)))
                     throw new InvalidDataException("Invalid gradient appearance.");
             }
@@ -101,7 +104,7 @@ public static class DocumentJson
             if (n.Points.Any(p => !p.Position.IsFinite || (p.ControlIn.HasValue && !p.ControlIn.Value.IsFinite) || (p.ControlOut.HasValue && !p.ControlOut.Value.IsFinite))) throw new InvalidDataException("A path contains invalid points.");
             foreach (var stroke in n.Strokes)
             {
-                if (stroke is null || !double.IsFinite(stroke.Width) || stroke.Width < 0 || stroke.Width > 1e6 || !double.IsFinite(stroke.MiterLimit) || stroke.MiterLimit < 1 || stroke.MiterLimit > 1e6 || !Enum.IsDefined(stroke.Cap) || !Enum.IsDefined(stroke.Join) || stroke.Dashes is null || stroke.Dashes.Count > 4096 || stroke.Dashes.Any(d => !double.IsFinite(d) || d <= 0))
+                if (stroke is null || !double.IsFinite(stroke.Opacity) || !double.IsFinite(stroke.Width) || stroke.Width < 0 || stroke.Width > 1e6 || !double.IsFinite(stroke.MiterLimit) || stroke.MiterLimit < 1 || stroke.MiterLimit > 1e6 || !Enum.IsDefined(stroke.Cap) || !Enum.IsDefined(stroke.Join) || stroke.Dashes is null || stroke.Dashes.Count > 4096 || stroke.Dashes.Any(d => !double.IsFinite(d) || d <= 0))
                     throw new InvalidDataException("Invalid stroke appearance.");
             }
             if (!double.IsFinite(n.PathWidth) || !double.IsFinite(n.PathHeight) || n.PathWidth < 0 || n.PathHeight < 0) throw new InvalidDataException("Invalid path dimensions.");
