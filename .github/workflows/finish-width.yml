@@ -1,0 +1,119 @@
+name: Finish width interaction
+on:
+  push:
+    branches: [feat/variable-width-strokes]
+    paths: ['.github/workflows/finish-width.yml']
+permissions:
+  contents: write
+jobs:
+  finish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feat/variable-width-strokes
+      - name: Complete input integration
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          def r(path, old, new):
+              p=Path(path); text=p.read_text()
+              if new in text: return
+              assert text.count(old)==1, (path,old[:80],text.count(old))
+              p.write_text(text.replace(old,new,1))
+          p='src/ArtSpace.Editor/DesignSurface.Width.cs'
+          r(p,'    public int ActiveWidthStroke => _widthStroke;','    public event Action? WidthHandlesChanged;\n    public int ActiveWidthStroke => _widthStroke;')
+          r(p,'_gesture = Gesture.PendingWidth; _canvas.Invalidate();','_gesture = Gesture.PendingWidth; _canvas.Invalidate(); WidthHandlesChanged?.Invoke();')
+          r(p,'    private void ResetWidthGesture() { _widthNewPoint = _widthMovePoint = _widthDuplicate = false; }','    private void ResetWidthGesture() { _widthNewPoint = _widthMovePoint = _widthDuplicate = false; WidthHandlesChanged?.Invoke(); }')
+          r(p,'if (_widthPoint >= 0) { _widthPoint = -1; _canvas.Invalidate(); return true; }','if (_widthPoint >= 0) { _widthPoint = -1; _canvas.Invalidate(); WidthHandlesChanged?.Invoke(); return true; }')
+          p='src/ArtSpace.App/Platforms/WebAssembly/BrowserWorkspaceStorage.cs'
+          for axis in ['X','Y']:
+              for member in [axis, 'Left'+axis, 'Right'+axis]:
+                  r(p,'handle.'+member+');','handle.'+member+' + origin.'+axis+');')
+          r(p,'        workbench.UiRefreshed += QueuePublish;','        workbench.UiRefreshed += QueuePublish;\n        workbench.Surface.WidthHandlesChanged += QueuePublish;')
+          p='src/ArtSpace.Workbench/StudioWorkbench.Commands.cs'
+          file=Path(p); text=file.read_text(); a=text.index('    private async Task ShowQuickActionsAsync()'); b=text.index('    private async Task ShowFramePresetsAsync()',a)
+          text=text[:a]+'''    private async Task ShowQuickActionsAsync()
+              {
+                  var root = new StackPanel { Spacing = 10, Width = 410 };
+                  var search = Studio.Input("", "Search quick actions"); search.PlaceholderText = "Search actions…"; search.Height = 38; root.Children.Add(search);
+                  var results = new StackPanel { Spacing = 3 }; var scroll = Studio.Scroll(results); scroll.MaxHeight = 360; root.Children.Add(scroll);
+                  var dialog = Dialog("Quick actions", root); dialog.DefaultButton = ContentDialogButton.None;
+                  var commands = Actions().ToArray(); var buttons = new List<StudioButton>(); var matching = new List<QuickAction>();
+                  var executed = false;
+                  void Execute(int index)
+                  {
+                      if (executed || index < 0 || index >= matching.Count) return;
+                      executed = true; var action = matching[index].Execute; dialog.Hide(); DispatcherQueue.TryEnqueue(() => action());
+                  }
+                  void Filter()
+                  {
+                      results.Children.Clear(); buttons.Clear(); matching.Clear();
+                      foreach (var item in commands.Where(a => a.Name.Contains(search.Text, StringComparison.OrdinalIgnoreCase)))
+                      {
+                          var index = matching.Count; matching.Add(item);
+                          var button = new StudioButton { Content = Studio.Columns((Studio.Text(item.Name, 12), -1), (Studio.Text(item.Shortcut, 10, Studio.Muted), 110)), HorizontalContentAlignment = HorizontalAlignment.Stretch, Height = 36, Padding = new(8) };
+                          AutomationProperties.SetName(button, item.Name); button.Click += (_, _) => Execute(index);
+                          button.KeyDown += (_, e) =>
+                          {
+                              if (e.Key == VirtualKey.Enter) { Execute(index); e.Handled = true; }
+                              else if (e.Key == VirtualKey.Up) { if (index == 0) search.Focus(FocusState.Keyboard); else buttons[index - 1].Focus(FocusState.Keyboard); e.Handled = true; }
+                              else if (e.Key == VirtualKey.Down) { if (index + 1 < buttons.Count) buttons[index + 1].Focus(FocusState.Keyboard); e.Handled = true; }
+                          };
+                          buttons.Add(button); results.Children.Add(button);
+                      }
+                  }
+                  search.TextChanged += (_, _) => Filter();
+                  search.KeyDown += (_, e) =>
+                  {
+                      if (e.Key == VirtualKey.Enter) { Execute(0); e.Handled = true; }
+                      else if (e.Key == VirtualKey.Down && buttons.Count > 0) { buttons[0].Focus(FocusState.Keyboard); e.Handled = true; }
+                  };
+                  dialog.Opened += (_, _) => search.Focus(FocusState.Programmatic);
+                  Filter(); await dialog.ShowAsync();
+              }
+          '''+text[b:]; file.write_text(text)
+          r(p,'("Pan / Zoom", "Space-drag / Ctrl-wheel")','("Width / Independent side", "Shift W / Alt-drag"), ("Pan / Zoom", "Space-drag / Ctrl-wheel")')
+          p='src/ArtSpace.Workbench/StudioWorkbench.Illustration.cs'
+          r(p,'                yield return Item("Anchor Point Tool", () => Session.Tool = EditorTool.AnchorPoint, "Shift C");','                yield return Item("Anchor Point Tool", () => Session.Tool = EditorTool.AnchorPoint, "Shift C");\n                yield return Item("Width Tool", () => Surface.ActivateWidthStroke(Surface.ActiveWidthStroke), "Shift W");')
+          p='src/ArtSpace.Illustration/PathOperations.cs'
+          r(p,'    public static void Reverse(EditorSession editor, SceneRenderer renderer) => Edit(editor, renderer, "Reverse path direction", path => path.Reverse());','''    public static void Reverse(EditorSession editor, SceneRenderer renderer)
+              {
+                  var nodes = Vectors(editor);
+                  editor.Edit("Reverse path direction", () =>
+                  {
+                      foreach (var node in nodes)
+                      {
+                          var path = PathEditing.Read(node, renderer); path.Reverse();
+                          // Keep closed-contour start anchors fixed, so normalized width coordinates
+                          // are reversed rather than receiving an unintended cyclic phase shift.
+                          foreach (var contour in path.Contours)
+                              if (contour.Closed && contour.Points.Count > 1)
+                              {
+                                  var first = contour.Points[^1]; contour.Points.RemoveAt(contour.Points.Count - 1); contour.Points.Insert(0, first);
+                              }
+                          foreach (var stroke in node.Strokes) stroke.WidthProfile = StrokeProfiles.Reverse(stroke.WidthProfile);
+                          PathEditing.Write(node, path); ComponentService.SetAppearanceOverride(node);
+                      }
+                  });
+              }''')
+          p='tests/browser/width.spec.mjs'
+          r(p,"await page.keyboard.press('Control+k'); await page.keyboard.type(text);", "await page.keyboard.press('Control+k'); await page.waitForTimeout(250); await frames(page); await page.keyboard.type(text);")
+          PY
+          git diff --check
+          node --check tests/browser/width.spec.mjs
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src tests
+          git diff --cached --quiet || git commit -m 'Finish Width handle state, reverse-path profile ownership and keyboard command palette'
+          git push origin HEAD:feat/variable-width-strokes
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+      - name: Geometry and transaction regressions
+        run: dotnet run --project tests/ArtSpace.Tests -c Release
+      - name: Shared desktop compilation
+        run: |
+          python3 scripts/fetch-assets.py
+          dotnet build src/ArtSpace.App -c Release -f net10.0-desktop -p:ArtSpaceDesktopOnly=true
