@@ -107,10 +107,17 @@ internal static class TypeOnPathBoundaryTests
             Reject(() => SvgFormat.Import("<svg><defs><path id='p' d='M0 0L100 0'/></defs><text><textPath href='#p'>Curved</textPath></text></svg>"));
             Reject(() => SvgFormat.Export([Node()], new(0, 0, 440, 240)));
         });
-        test("path text export bounds include large baseline shifts", () =>
+        test("path text export bounds include shifted ink without expanding clipped artboards", () =>
         {
             var n = Node(); n.TextPath!.BaselineShift = 220; using var r = new SceneRenderer();
             var bounds = r.GetArtworkBounds(n); Check(bounds.Y < -100 && bounds.Bottom >= n.WorldBounds.Bottom);
+            var frame = new DesignNode { Kind = NodeKind.Frame, Width = 400, Height = 180, ClipContent = true };
+            frame.Add(n);
+            Check(r.GetArtworkBounds(frame) == frame.WorldBounds, "Clipped artboard dimensions must not grow with hidden text ink.");
+            Check(r.GetArtworkBounds(n).Y < -100, "Independent text export must not inherit an external artboard clip.");
+            var root = new DesignNode { Kind = NodeKind.Group, Width = 400, Height = 180, Fills = [] };
+            root.Add(frame);
+            Check(r.GetArtworkBounds(root) == root.WorldBounds, "Nested frame clips must constrain exported descendant ink.");
         });
         test("path text retained replay preserves live effect pixels", () =>
         {

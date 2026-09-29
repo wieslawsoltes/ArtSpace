@@ -1,67 +1,63 @@
 # Feature matrix — 0.6.0-alpha.1
 
-ArtSpace is an independent illustration editor. Similar workspace conventions do not imply complete Illustrator behavior, native format compatibility or pixel parity.
+ArtSpace is an independent illustration editor. Familiar workspace conventions do not imply complete Illustrator behavior, native format compatibility or pixel parity.
 
 | Capability | Status | Boundary |
 | --- | --- | --- |
 | Shared Uno desktop/browser application | Implemented | One C# engine/workbench; native compilation differs from interactive certification |
-| Dark custom workspace | Implemented | Menus, controls, toolbox, artboards and right panel group; not a pixel-identical skin |
-| Reusable controls/libraries | Implemented | Nine packages, built on Uno input/layout/text primitives |
-| GPU-integrated painting | Implemented | SKCanvasElement/Skia, host-dependent acceleration; geometry remains CPU-side |
+| Dark custom workspace | Implemented | Custom menus, toolbox, artboards and right panel group; not a pixel-identical skin |
+| Reusable controls/libraries | Implemented | Nine packages using Uno input/layout/text primitives |
+| GPU-integrated painting | Implemented | SKCanvasElement/Skia; physical acceleration depends on host/driver; geometry remains CPU-side |
 | Primitive and pen drawing | Implemented | Shapes, lines, arrows and cubic paths |
-| Direct contour editing | Implemented with limits | Native/imported/compound/expanded/glyph geometry; one object's contours at a time; rational conic approximation |
-| Multi-anchor tools | Implemented with limits | Marquee, drag/nudge, handles, insertion, removal/cutting, smoothing; no cross-object anchor lasso or full path toolkit |
-| Pathfinder/compounds | Limited | Union/subtract/intersect/exclude and make/release compound paths; no complete live Shape Builder/divide/trim suite |
+| Direct contour editing | Implemented with limits | Native/imported/compound/expanded/glyph geometry and text baselines; one object at a time; rational conic approximation |
+| Multi-anchor tools | Implemented with limits | Marquee, drag/nudge, handles, insertion, removal/cutting and smoothing; no cross-object anchor lasso |
+| Pathfinder/compounds | Limited | Union/subtract/intersect/exclude and compounds; no complete live Shape Builder/divide/trim suite |
 | Expansion/offset | Implemented | Shape/stroke outlines and positive/negative offsets |
-| Pencil/paintbrush | Limited | Fixed-width sampled strokes, not pressure/art/pattern/scatter brush parity |
-| Transforms | Implemented with limits | Move/resize/rotate/flip and retained affine skew/group scale; no full perspective/envelope workflow |
-| Linear/radial gradients | Implemented with limits | Stop opacity, overall opacity, spread, coordinates, affine transform, radial center/focus/radius; no freeform/mesh gradients |
-| On-canvas gradients | Implemented with limits | Imported coordinate spaces respected; radial drag resets focus; no independent focal handle |
-| Appearance stack/effects | Implemented with limits | Ordered object-level blur, shadow, glow and saturation; sixteen blends; independent fill/stroke ordering; no arbitrary interleaved per-paint effects or complete Illustrator effect catalog |
-| Graphic Styles | Implemented with limits | Document-local independent appearance presets, native previews, apply/rename/delete and twelve-slot paging; not globally linked styles or Adobe library interchange |
-| Gradient/dashed strokes | Implemented with limits | Linear/radial stroke paint, stop opacity, spread, dash phase and odd-pattern normalization; no variable-width profiles or art/pattern brushes |
+| Pencil/paintbrush | Limited | Fixed-width sampled strokes; no pressure/art/pattern/scatter parity |
+| Transforms | Implemented with limits | Move/resize/rotate/flip, retained affine skew/group scale; no full perspective/envelope workflow |
+| Linear/radial gradients | Implemented with limits | Opacity, stops, spread, coordinates, affine transforms, center/focus/radius; no freeform/mesh gradients |
+| On-canvas gradients | Implemented with limits | Imported spaces respected; radial drag resets focus; no independent focal handle |
+| Appearance and effects | Implemented with limits | Ordered object-level blur/shadow/glow/saturation, sixteen blends and paint ordering; no arbitrary per-paint effect graph |
+| Graphic Styles | Implemented with limits | Local independent presets, vector previews, apply/rename/delete and paged controls; no Adobe library interchange |
+| Gradient/dashed strokes | Implemented with limits | Gradient paint, stop opacity, spread, dash phase and odd-pattern normalization; no variable width/art/pattern brushes |
 | Vector clipping | Implemented with limits | Editable direct-child mask, holes, nesting, picking and supported SVG subset |
-| Alpha/luminance masks | Implemented with limits | Retained editable source, nesting, mode, inversion, enable/release; explicit-source selection rather than full Illustrator isolation/thumbnail UI |
-| SVG mask interoperability | Limited | Supported multi-object user-space source masks and regions; no object-box mask units, active/image/use content or general filters; inverted SVG export rejected |
-| SVG paint interoperability | Limited | Local linear/radial fill definitions, inheritance/stops, spread, focus and affine coordinates; gradient strokes and dash phase supported; no linear-light interpolation or complete CSS cascade |
-| Affine interchange | Implemented with limits | Nested group scaling/skew/reflection preserved, strict transform syntax; singular transforms rejected; Skia uses float geometry |
+| Alpha/luminance masks | Implemented with limits | Editable source, nesting, inversion, enable/release; no complete Illustrator isolation/thumbnail UI |
+| SVG masks/paints | Limited | Supported user-space source masks and gradient definitions; no object-box mask units, inverted-mask export, arbitrary filters, linear-light interpolation or complete CSS cascade |
+| Affine interchange | Implemented with limits | Group scale/skew/reflection, strict syntax; singular matrices rejected; Skia geometry is float-based |
 | Artboards | Implemented | Multiple frame-based artboards with editing/navigation/export |
 | Multiple documents | Not implemented | One active document session |
-| Docking | Limited | Resizable right panel tabs, no arbitrary native/browser floating windows |
+| Docking | Limited | Resizable right tabs; no arbitrary floating workspaces |
 | Layers | Implemented | Hierarchy, filtering, visibility/locking, selection and ordering |
-| Symbols | Limited | Linked local components, mask remapping and explicit full appearance overrides/reset; not full dynamic symbols |
-| Basic typography | Limited | Wrapping, tracking/alignment, configured Skia fonts |
-| Create Outlines | Implemented with limits | Shared glyph layout, retained identity/appearance/placement and undo; no advanced shaping upgrade |
-| Advanced typography | Not implemented | Complex-script/bidi/fallback certification, variable axes, glyph panel and type-on-path remain absent |
+| Symbols | Limited | Local linked components, mask remapping, text and appearance overrides; no full dynamic symbol semantics |
+| Basic typography | Limited | Configured fonts, wrapping, tracking and alignment; no general shaping/bidi/fallback certification |
+| Type on a Path | Implemented with limits | One open/closed contour, create/attach, editable baseline, Start/End/center brackets, flip, metric alignment, baseline shift and overflow |
+| Path-text threading/warps | Not implemented | No cross-seam wrapping, multiple-contour flow or Skew/Ribbon/Stair/Gravity variants |
+| Create Outlines | Implemented with limits | Shared glyph geometry/layout, retained identity/appearance/placement and undo; no advanced shaping upgrade |
+| Advanced typography | Not implemented | Variable-font axes, glyph panel, general ligature/kerning resolution, complex-script/bidi and fallback |
 | Raster placement/tracing | Not implemented | No links manager, Image Trace or raster editor |
 | RGB/PNG | Implemented | Screen-oriented, not press production |
-| CMYK/ICC/spot/overprint | Not implemented | No print proofing or separations guarantee |
-| Native ArtSpace persistence | Implemented | Read schemas 1–5; new saves schema 5; previous readers reject new schema |
-| SVG interchange | Limited | Editable safe subset, not lossless Illustrator roundtripping |
+| CMYK/ICC/spot/overprint | Not implemented | No proofing or separations guarantee |
+| Native ArtSpace persistence | Implemented | Read schemas 1–5; saves schema 5; older readers reject new semantics |
+| SVG path-text interchange | Limited | Workbench exports detached glyph outlines without mutating text; native SVG textPath import/export remains unsupported |
+| Other SVG interchange | Limited | Safe editable subset, not lossless Illustrator roundtrip; unsupported live effects rejected |
 | AI/EPS/PDF interchange | Not implemented | No native format parity claim |
-| Undo/local recovery | Implemented | Bounded snapshot transactions, IndexedDB/native storage; not a cloud backup |
-| Retained rendering caches | Implemented | Exact geometry/text/gradient caches plus retained paints, dashes, filters and selection snapshots; owned-resource pruning |
-| Retained native scene | Implemented with limits | Vector SKPicture playback into the host canvas; separate overlays, explicit mutation invalidation, 32 MiB approximate command-storage budget; recording/edits remain CPU-side |
-| Retained property panels | Implemented | Visible-panel routing, topology-keyed sections, current-target bindings, input ownership and incremental layer rows |
-| Indexed snapping | Implemented with limits | Reference-equivalent stationary targets; cold build and auto-layout rebuild costs remain |
-| Conservative culling | Implemented with limits | Leaf painting skipped; full hierarchy still visited; text/shadows conservative |
-| Affine bounds hot path | Implemented | No per-call managed corner arrays; exact property tests |
-| Large-document GPU compute | Not implemented | No million-object throughput or physical-GPU guarantee |
-| Collaboration/Adobe services/plugins | Not implemented | Local-first application, no Adobe integration |
+| Undo/local recovery | Implemented | Bounded transactions and IndexedDB/native recovery, not cloud backup |
+| Retained rendering caches | Implemented | Exact geometry/text/gradient/paint/filter/selection caches with owned-resource pruning |
+| Retained path typography | Implemented | Cached glyph layout, separate native arc-length measurement and lazy projection table; approximate bounded accounting |
+| Native scene replay | Implemented with limits | R-tree SKPicture playback, separate overlays and direct editing; recording remains CPU work |
+| Retained panels | Implemented | Visible-panel routing, topology-keyed sections, current-target bindings and incremental layer rows |
+| Indexed snapping | Implemented with limits | Stationary-target equivalence; cold construction and dynamic-layout rebuilds remain |
+| Conservative culling | Implemented with limits | Leaf painting skipped; hierarchy still visited, text/shadows conservative |
+| Affine bounds | Implemented | No per-call corner arrays; tested against corner reference |
+| Large-document GPU compute | Not implemented | No million-object or physical-GPU throughput guarantee |
+| Collaboration/Adobe plugins/services | Not implemented | Local-first, no Adobe service integration |
 
 ## Validation
 
-256 registered engine cases, five additional benchmark safety checks and 21 real Uno browser scenarios are defined. Build and Pages reports determine which commit passed, including new mask source movement, recovery, SVG radial/affine metadata, gradient manipulation and shader retention. Retained screenshots are evidence of captured frames, not complete visual parity.
+The repository registers 301 engine cases, five additional benchmark safety checks and 24 real Uno browser scenarios. Workflow conclusions and artifacts identify the tested commit; the existence of tests alone is not a claim that a particular build passed.
 
-Benchmarks compare exact reference snapping/bounds and output pixels. The legacy appearance report records five warmed CPU samples. The new retained-scene report alternates measurement order over seven samples, checks exact reference pixels, and verifies unchanged native resources are not rebuilt. Both use software Skia; scene recording cost is excluded. Cleared-cache comparisons intentionally force rebuilds and are not old-release application FPS measurements. Native build success does not certify every native interaction.
+Type-on-path tests cover measurement/projection, alignment, flip, Unicode scalar indices, overflow, transactions, caches, baseline editing, invalid input, symbols, gradients, export bounds and outlines. Browser scenarios exercise real menu/prompt input, retained field values, bracket manipulation, cancellation, baseline editing, outlines and recovery.
 
-Guides: [live appearance/rendering](appearance-rendering.md), [UI responsiveness](ui-performance.md), [path editing](path-editing.md), [clipping/performance](clipping-and-performance.md), [opacity masks/gradients](opacity-masks-and-gradients.md).
+Cache/replay reference comparisons require exact output pixels. Serialized outlines normalize float coordinates and use bounded coverage/color-error tests; this is distinct from exact cached replay. The CPU reports retain all samples and rebuild counts. Forced-cold comparisons deliberately rebuild caches and are not older-release or physical-GPU FPS comparisons. Screenshots show captured frames, not complete UI parity; native compilation is not interactive certification.
 
-
-## Type on a Path — implemented boundary
-
-The tangent-oriented single-contour workflow is implemented in 0.6: creation/attachment, editable baseline, start/end/center brackets, flip, metric alignment, baseline shift, overflow, native persistence, cached rendering/picking and reversible outlines. Any broader typography row above must not be read as saying this basic workflow is absent.
-
-General shaping/bidi/fallback, multi-contour threading, seam-wrapping intervals, warp variants and native SVG textPath interchange remain unsupported. The workbench exports vector outlines on a detached snapshot; malformed native baselines remain inspectable but cannot silently export missing text. See [Type on a Path](type-on-path.md).
-
-The current suite registers 301 engine cases and 24 browser scenarios. The completed workflow for a commit, not this count, establishes which tests passed. New software-Skia measurements compare retained path text against forced cache rebuilds; they are not hardware-GPU or older-release FPS claims.
+Guides: [Type on a Path](type-on-path.md), [Appearance/rendering](appearance-rendering.md), [UI responsiveness](ui-performance.md), [path editing](path-editing.md), [clipping/performance](clipping-and-performance.md), [opacity/gradients](opacity-masks-and-gradients.md).

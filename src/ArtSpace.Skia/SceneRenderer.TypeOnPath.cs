@@ -79,13 +79,29 @@ public sealed partial class SceneRenderer
     /// <summary>Geometric export bounds including path-text ink; excludes general live-effect expansion.</summary>
     public RectD GetArtworkBounds(DesignNode node)
     {
+        ArgumentNullException.ThrowIfNull(node);
         var bounds = node.WorldBounds;
+        // An artboard export keeps its chosen dimensions even when text extends past its clip.
+        if (node.IsContainer && node.ClipContent) return bounds;
         foreach (var child in node.DescendantsAndSelf())
         {
             if (child.TextPath is null || !child.IsEffectivelyVisible) continue;
             var status = GetTypeOnPathStatus(child);
-            if (status.Error is not null) continue;
-            if (!status.InkBounds.IsEmpty) bounds = RectD.Union(bounds, child.WorldMatrix.Map(status.InkBounds));
+            if (status.Error is not null || status.InkBounds.IsEmpty) continue;
+            var ink = child.WorldMatrix.Map(status.InkBounds);
+            // Respect frame clips inside this exported subtree. Ancestors outside a selected root
+            // are deliberately excluded, matching DrawWorldNode's independent-selection export.
+            for (var parent = ReferenceEquals(child, node) ? null : child.Parent; parent is not null; parent = parent.Parent)
+            {
+                if (parent.ClipContent)
+                {
+                    var clip = parent.WorldBounds;
+                    var left = Math.Max(ink.X, clip.X); var top = Math.Max(ink.Y, clip.Y);
+                    ink = new(left, top, Math.Max(0, Math.Min(ink.Right, clip.Right) - left), Math.Max(0, Math.Min(ink.Bottom, clip.Bottom) - top));
+                }
+                if (ReferenceEquals(parent, node)) break;
+            }
+            if (!ink.IsEmpty) bounds = RectD.Union(bounds, ink);
         }
         return bounds;
     }
