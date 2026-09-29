@@ -125,10 +125,12 @@ public static class PathEditing
         var paints = node.Fills.Concat(node.Strokes.Select(s => s.Paint).OfType<FillStyle>()).ToArray();
         var gradients = basis.Fills.Concat(basis.Strokes.Select(s => s.Paint).OfType<FillStyle>()).Select(f => (f.Start, f.End, f.GradientSpace, f.GradientTransform, f.GradientFocus, f.GradientRadius)).ToArray();
         var oldBounds = basis.LocalBounds;
-        if (gradients.Any(f => f.GradientSpace == GradientSpace.ObjectBoundingBox))
+        // Text paint coordinates use its local layout box, not the baseline's tight bounds.
+        // Match SceneRenderer.GradientBounds when outlining text or editing a path-text baseline.
+        if (basis.Kind != NodeKind.Text && gradients.Any(f => f.GradientSpace == GradientSpace.ObjectBoundingBox))
         {
             using var oldPath = SKPath.ParseSvgPathData(VectorPath.Build(basis)) ?? new SKPath();
-            if ((basis.Kind == NodeKind.Path || basis.TextPath is not null) && basis.PathWidth > 0 && basis.PathHeight > 0)
+            if (basis.Kind == NodeKind.Path && basis.PathWidth > 0 && basis.PathHeight > 0)
                 oldPath.Transform(SKMatrix.CreateScale((float)(oldWidth / basis.PathWidth), (float)(oldHeight / basis.PathHeight)));
             var old = oldPath.TightBounds; oldBounds = new(old.Left, old.Top, old.Width, old.Height);
         }
