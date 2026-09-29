@@ -38,14 +38,14 @@ public static class IllustrationOperations
     public static void OutlineStrokes(EditorSession editor, SceneRenderer renderer)
     {
         var nodes = Vectors(editor);
-        if (!nodes.Any(n => n.Strokes.Any(s => s.Visible && s.Width > 0)))
+        if (!nodes.Any(n => n.Strokes.Any(s => s.Visible && s.Width > 0 && s.Paint?.Visible != false)))
             throw new InvalidOperationException("The selection has no visible strokes.");
         editor.Edit("Outline stroke", () =>
         {
             var selected = new List<string>();
             foreach (var node in nodes)
             {
-                var strokes = node.Strokes.Where(s => s.Visible && s.Width > 0).ToArray();
+                var strokes = node.Strokes.Where(s => s.Visible && s.Width > 0 && s.Paint?.Visible != false).ToArray();
                 if (strokes.Length == 0) { selected.Add(node.Id); continue; }
                 var parent = node.Parent;
                 var siblings = parent?.Children ?? editor.Page.Nodes;
@@ -55,13 +55,13 @@ public static class IllustrationOperations
                     Kind = NodeKind.Group, Name = node.Name + " expanded", X = node.X, Y = node.Y,
                     Width = node.Width, Height = node.Height, Rotation = node.Rotation,
                     FlipX = node.FlipX, FlipY = node.FlipY, Opacity = node.Opacity, Blend = node.Blend,
-                    Fills = [], Shadows = node.Shadows
+                    Fills = [], Shadows = node.Shadows, Effects = node.Effects, AffineTransform = node.AffineTransform
                 };
                 if (node.Fills.Any(f => f.Visible))
                 {
                     var fill = DocumentJson.CloneNode(node, true);
                     fill.X = fill.Y = fill.Rotation = 0; fill.FlipX = fill.FlipY = false;
-                    fill.Opacity = 1; fill.Blend = BlendKind.Normal; fill.Shadows = []; fill.Strokes = [];
+                    fill.Opacity = 1; fill.Blend = BlendKind.Normal; fill.Shadows = []; fill.Effects = []; fill.AffineTransform = null; fill.Strokes = [];
                     group.Add(fill);
                 }
                 foreach (var stroke in strokes)
@@ -71,6 +71,23 @@ public static class IllustrationOperations
                         ?? throw new InvalidOperationException("This stroke could not be expanded.");
                     var outlined = PathNode(path, stroke.Color, "Stroke outline");
                     outlined.Opacity = stroke.Opacity;
+                    if (stroke.Paint is { } sourcePaint)
+                    {
+                        var fill = GraphicStyle.CloneFill(sourcePaint);
+                        if (fill.Kind != FillKind.Solid)
+                        {
+                            if (fill.GradientSpace == GradientSpace.Legacy)
+                            {
+                                fill.Start = new(fill.Start.X * node.Width, fill.Start.Y * node.Height);
+                                fill.End = new(fill.End.X * node.Width, fill.End.Y * node.Height);
+                                fill.GradientFocus = fill.Start; fill.GradientRadius = Math.Max(1, fill.Start.DistanceTo(fill.End));
+                            }
+                            else fill.GradientTransform = renderer.GradientCoordinateMatrix(node, sourcePaint);
+                            fill.GradientSpace = GradientSpace.UserSpaceOnUse;
+                            fill.GradientTransform *= Matrix2D.Translation(-outlined.X, -outlined.Y);
+                        }
+                        outlined.Fills = [fill];
+                    }
                     group.Add(outlined);
                 }
                 editor.RemoveNode(node); editor.AddNode(group, parent);
@@ -89,12 +106,8 @@ public static class IllustrationOperations
             StrokeCap = (SKStrokeCap)stroke.Cap, StrokeJoin = (SKStrokeJoin)stroke.Join,
             StrokeMiter = (float)stroke.MiterLimit
         };
-        if (stroke.Dashes.Count > 0)
-        {
-            var dashes = stroke.Dashes.Select(x => (float)Math.Max(.01, x)).ToArray();
-            if (dashes.Length % 2 != 0) dashes = [.. dashes, .. dashes];
-            paint.PathEffect = SKPathEffect.CreateDash(dashes, 0);
-        }
+        using var dash = SceneRenderer.CreateStrokeDash(stroke);
+        paint.PathEffect = dash;
         return paint;
     }
 

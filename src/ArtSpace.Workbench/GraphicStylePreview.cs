@@ -11,7 +11,7 @@ public sealed class GraphicStylePreview : SKCanvasElement
     private readonly SceneRenderer _renderer = new();
     private readonly DesignNode _sample = new() { X = 24, Y = 14, Width = 112, Height = 36, CornerRadius = 7 };
     private GraphicStyle? _style;
-    public GraphicStyle? Style
+    public new GraphicStyle? Style
     {
         get => _style;
         set

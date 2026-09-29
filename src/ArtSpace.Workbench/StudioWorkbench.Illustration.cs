@@ -71,6 +71,7 @@ public sealed partial class StudioWorkbench
         _illustrationDock.Add("Layers", layers);
         _illustrationDock.Add("Artboards", Studio.Scroll(_artboards));
         _illustrationDock.Add("History", Studio.Scroll(_historyPanel));
+        ConfigureAppearancePanels();
         var dockRoot = new Grid(); dockRoot.Children.Add(_illustrationDock);
         var grip = new DockResizeGrip(); grip.DragDelta += delta => { _dockWidth = Math.Clamp(_dockWidth - delta, 268, 510); ResizeIllustrationWorkspace(); };
         dockRoot.Children.Add(grip); _rightPanel.Child = dockRoot; Put(_rightPanel, 3, 2);
@@ -83,12 +84,15 @@ public sealed partial class StudioWorkbench
         _illustrationDock.SelectionChanged += name =>
         {
             if (name != "Properties") _inspectorView?.SuspendEditing();
+            SuspendAppearanceEditing();
             RequestUi(name switch
             {
                 "Properties" => UiDirty.Inspector,
                 "Layers" => UiDirty.Layers | UiDirty.LayerSelection | UiDirty.Assets,
                 "Artboards" => UiDirty.Artboards,
                 "History" => UiDirty.History,
+                "Appearance" => UiDirty.Appearance,
+                "Graphic Styles" => UiDirty.GraphicStyles,
                 _ => UiDirty.None
             });
         };
@@ -110,7 +114,7 @@ public sealed partial class StudioWorkbench
         var wasVisible = _rightPanel.Visibility == Visibility.Visible;
         _rightPanel.Visibility = showRight ? Visibility.Visible : Visibility.Collapsed;
         if (showRight && !wasVisible) RequestUi(UiDirty.All);
-        else if (!showRight) _inspectorView?.SuspendEditing();
+        else if (!showRight) { _inspectorView?.SuspendEditing(); SuspendAppearanceEditing(); }
     }
 
     private UIElement BuildIllustrationTools()
@@ -238,10 +242,11 @@ public sealed partial class StudioWorkbench
                 yield return Item("Same Fill Color", () => { var fill = Session.Primary?.Fill; Session.Select(Session.Page.AllNodes().Where(n => !n.IsEffectivelyLocked && n.Fill == fill).Select(n => n.Id).ToArray()); }, enabled: selected);
                 yield return Item("Same Object Type", () => { var kind = Session.Primary?.Kind; Session.Select(Session.Page.AllNodes().Where(n => !n.IsEffectivelyLocked && n.Kind == kind).Select(n => n.Id).ToArray()); }, enabled: selected); break;
             case "Effect":
-                yield return Item("Drop Shadow", () => Session.UpdateSelection("Add drop shadow", n => n.Shadows.Add(new() { X = 5, Y = 8, Blur = 12, Opacity = .3 })), enabled: selected);
+                foreach (var kind in Enum.GetValues<LiveEffectKind>()) yield return Item(LiveEffect.Name(kind), () => AddLiveEffect(kind), enabled: selected);
                 yield return Item("Remove Shadows", () => Session.UpdateSelection("Remove shadows", n => n.Shadows.Clear()), enabled: selected);
                 yield return Item("Linear Gradient", () => SetGradient(false), enabled: selected); yield return Item("Radial Gradient", () => SetGradient(true), enabled: selected); break;
             case "View":
+                yield return Item("Retained Scene Rendering", () => { Surface.Renderer.EnableRetainedScene = !Surface.Renderer.EnableRetainedScene; Surface.Renderer.InvalidateRetainedScene(); Surface.Invalidate(); });
                 yield return Item("Outline / Preview", () => { Session.OutlinesVisible = !Session.OutlinesVisible; Surface.Invalidate(); }, "Ctrl Y");
                 yield return Item("Fit Artboard in Window", () => Surface.Fit(firstFrame: true), "Ctrl 0"); yield return Item("Actual Size", () => Surface.ZoomTo(1), "Ctrl 1");
                 yield return Item("Fit Selection", () => Surface.Fit(true), "Shift 2"); yield return Item("Fit All Artboards", () => Surface.Fit(), "Shift 1"); yield return separator;
@@ -250,7 +255,7 @@ public sealed partial class StudioWorkbench
                 yield return Item("Smart Guides / Snapping", () => Session.SnapEnabled = !Session.SnapEnabled);
                 yield return Item("Clear Guides", () => Session.Edit("Clear guides", () => Session.Page.Guides.Clear())); break;
             case "Window":
-                foreach (var name in new[] { "Properties", "Layers", "Artboards", "History" }) yield return Item(name, () => { _uiVisible = true; ResizeIllustrationWorkspace(); _illustrationDock.Select(name); });
+                foreach (var name in new[] { "Properties", "Layers", "Artboards", "History", "Appearance", "Graphic Styles" }) yield return Item(name, () => { _uiVisible = true; ResizeIllustrationWorkspace(); _illustrationDock.Select(name); });
                 yield return Item("Symbols", () => { _assets = true; RefreshLeftContent(); _illustrationDock.Select("Layers"); });
                 yield return Item("Show Layers", () => { _assets = false; RefreshLeftContent(); _illustrationDock.Select("Layers"); });
                 yield return Item("Make Symbol", () => ComponentService.MakeComponent(Session), enabled: selected);

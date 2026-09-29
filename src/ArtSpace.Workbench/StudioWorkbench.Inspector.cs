@@ -20,7 +20,7 @@ public sealed partial class StudioWorkbench
 
     private void Change(string label, Action<DesignNode> change) => Run(() => Session.UpdateSelection(label, change));
     private void Inspect(string title, object? shape, Action<StackPanel, InspectorBindings> build, string? glyph = null, Action? action = null)
-        => _inspectorView!.Section(title, shape, build, glyph, action);
+        => (_activeInspector ?? _inspectorView)!.Section(title, shape, build, glyph, action);
 
     private void RefreshInspector()
     {
@@ -163,18 +163,18 @@ public sealed partial class StudioWorkbench
             for (var index = 0; index < InspectedNode.Fills.Count; index++)
             {
                 var i = index;
-                body.Children.Add(Studio.Columns((b.Color(() => InspectedNode.Fills[i].Color, c => Change("Fill color", n => { if (n.Fills.Count > i) { n.Fills[i].Color = c; ComponentService.SetOverride(n, fill: c); } }), "Fill " + i), -1), (b.Number("%", () => InspectedNode.Fills[i].Opacity * 100, v => Change("Fill opacity", n => { if (n.Fills.Count > i) n.Fills[i].Opacity = v / 100; }), 0, 100), 65), (b.Icon(() => InspectedNode.Fills[i].Visible ? "eye" : "eye-off", "Toggle fill", () => Change("Toggle fill", n => { if (n.Fills.Count > i) n.Fills[i].Visible = !n.Fills[i].Visible; })), 23), (b.Icon(() => "minus", "Remove fill", () => Change("Remove fill", n => { if (n.Fills.Count > i) n.Fills.RemoveAt(i); })), 23)));
-                body.Children.Add(b.Choice(Enum.GetNames<FillKind>(), () => InspectedNode.Fills[i].Kind.ToString(), value => Change("Fill type", n => { if (n.Fills.Count > i) n.Fills[i].Kind = Enum.Parse<FillKind>(value); }), "Fill type"));
+                body.Children.Add(Studio.Columns((b.Color(() => InspectedNode.Fills[i].Color, c => ChangeAppearance("Fill color", n => { if (n.Fills.Count > i) { n.Fills[i].Color = c; ComponentService.SetOverride(n, fill: c); } }), "Fill " + i), -1), (b.Number("%", () => InspectedNode.Fills[i].Opacity * 100, v => ChangeAppearance("Fill opacity", n => { if (n.Fills.Count > i) n.Fills[i].Opacity = v / 100; }), 0, 100), 65), (b.Icon(() => InspectedNode.Fills[i].Visible ? "eye" : "eye-off", "Toggle fill", () => ChangeAppearance("Toggle fill", n => { if (n.Fills.Count > i) n.Fills[i].Visible = !n.Fills[i].Visible; })), 23), (b.Icon(() => "minus", "Remove fill", () => ChangeAppearance("Remove fill", n => { if (n.Fills.Count > i) n.Fills.RemoveAt(i); })), 23)));
+                body.Children.Add(b.Choice(Enum.GetNames<FillKind>(), () => InspectedNode.Fills[i].Kind.ToString(), value => ChangeAppearance("Fill type", n => { if (n.Fills.Count > i) n.Fills[i].Kind = Enum.Parse<FillKind>(value); }), "Fill type"));
                 if (InspectedNode.Fills[i].Kind == FillKind.Solid) continue;
                 for (var stopIndex = 0; stopIndex < InspectedNode.Fills[i].Stops.Count; stopIndex++)
                 {
                     var s = stopIndex;
-                    body.Children.Add(Studio.Columns((b.Color(() => InspectedNode.Fills[i].Stops[s].Color, value => Change("Gradient stop color", n => { if (n.Fills.Count > i && n.Fills[i].Stops.Count > s) n.Fills[i].Stops[s].Color = value; }), "Stop " + s), -1), (b.Number("%", () => InspectedNode.Fills[i].Stops[s].Offset * 100, value => Change("Gradient stop position", n => { if (n.Fills.Count > i && n.Fills[i].Stops.Count > s) n.Fills[i].Stops[s].Offset = value / 100; }), 0, 100), 75)));
+                    body.Children.Add(Studio.Columns((b.Color(() => InspectedNode.Fills[i].Stops[s].Color, value => ChangeAppearance("Gradient stop color", n => { if (n.Fills.Count > i && n.Fills[i].Stops.Count > s) n.Fills[i].Stops[s].Color = value; }), "Stop " + s), -1), (b.Number("%", () => InspectedNode.Fills[i].Stops[s].Offset * 100, value => ChangeAppearance("Gradient stop position", n => { if (n.Fills.Count > i && n.Fills[i].Stops.Count > s) n.Fills[i].Stops[s].Offset = value / 100; }), 0, 100), 75)));
                 }
-                body.Children.Add(b.Button(() => "Add gradient stop", () => Change("Add gradient stop", n => { if (n.Fills.Count > i) n.Fills[i].Stops.Add(new() { Offset = .5, Color = "#FFFFFF" }); })));
-                body.Children.Add(Studio.Columns((b.Number("X1", () => InspectedNode.Fills[i].Start.X, v => Change("Gradient start", n => { if (n.Fills.Count > i) n.Fills[i].Start = n.Fills[i].Start with { X = v }; })), -1), (b.Number("Y1", () => InspectedNode.Fills[i].Start.Y, v => Change("Gradient start", n => { if (n.Fills.Count > i) n.Fills[i].Start = n.Fills[i].Start with { Y = v }; })), -1)));
+                body.Children.Add(b.Button(() => "Add gradient stop", () => ChangeAppearance("Add gradient stop", n => { if (n.Fills.Count > i) n.Fills[i].Stops.Add(new() { Offset = .5, Color = "#FFFFFF" }); })));
+                body.Children.Add(Studio.Columns((b.Number("X1", () => InspectedNode.Fills[i].Start.X, v => ChangeAppearance("Gradient start", n => { if (n.Fills.Count > i) n.Fills[i].Start = n.Fills[i].Start with { X = v }; })), -1), (b.Number("Y1", () => InspectedNode.Fills[i].Start.Y, v => ChangeAppearance("Gradient start", n => { if (n.Fills.Count > i) n.Fills[i].Start = n.Fills[i].Start with { Y = v }; })), -1)));
             }
-        }, "plus", () => Change("Add fill", n => n.Fills.Add(new())));
+        }, "plus", () => ChangeAppearance("Add fill", n => n.Fills.Add(new())));
     }
 
     private void BuildStrokes(DesignNode node)
@@ -184,10 +184,10 @@ public sealed partial class StudioWorkbench
             for (var index = 0; index < InspectedNode.Strokes.Count; index++)
             {
                 var i = index;
-                body.Children.Add(Studio.Columns((b.Color(() => InspectedNode.Strokes[i].Color, color => Change("Stroke color", n => { if (n.Strokes.Count > i) n.Strokes[i].Color = color; }), "Stroke " + i), -1), (b.Number("W", () => InspectedNode.Strokes[i].Width, v => Change("Stroke width", n => { if (n.Strokes.Count > i) n.Strokes[i].Width = v; }), 0, 1000), 68), (b.Icon(() => "minus", "Remove stroke", () => Change("Remove stroke", n => { if (n.Strokes.Count > i) n.Strokes.RemoveAt(i); })), 24)));
-                body.Children.Add(Studio.Columns((b.Number("%", () => InspectedNode.Strokes[i].Opacity * 100, v => Change("Stroke opacity", n => { if (n.Strokes.Count > i) n.Strokes[i].Opacity = v / 100; }), 0, 100), -1), (b.Choice(["Solid", "Dashed", "Dotted"], () => InspectedNode.Strokes[i].Dashes.Count == 0 ? "Solid" : InspectedNode.Strokes[i].Dashes[0] == 1 ? "Dotted" : "Dashed", value => Change("Stroke dash", n => { if (n.Strokes.Count > i) n.Strokes[i].Dashes = value == "Dashed" ? [8, 6] : value == "Dotted" ? [1, 5] : []; }), "Stroke dash"), -1)));
+                body.Children.Add(Studio.Columns((b.Color(() => InspectedNode.Strokes[i].Color, color => ChangeAppearance("Stroke color", n => { if (n.Strokes.Count > i) n.Strokes[i].Color = color; }), "Stroke " + i), -1), (b.Number("W", () => InspectedNode.Strokes[i].Width, v => ChangeAppearance("Stroke width", n => { if (n.Strokes.Count > i) n.Strokes[i].Width = v; }), 0, 1000), 68), (b.Icon(() => "minus", "Remove stroke", () => ChangeAppearance("Remove stroke", n => { if (n.Strokes.Count > i) n.Strokes.RemoveAt(i); })), 24)));
+                body.Children.Add(Studio.Columns((b.Number("%", () => InspectedNode.Strokes[i].Opacity * 100, v => ChangeAppearance("Stroke opacity", n => { if (n.Strokes.Count > i) n.Strokes[i].Opacity = v / 100; }), 0, 100), -1), (b.Choice(["Solid", "Dashed", "Dotted"], () => InspectedNode.Strokes[i].Dashes.Count == 0 ? "Solid" : InspectedNode.Strokes[i].Dashes[0] == 1 ? "Dotted" : "Dashed", value => ChangeAppearance("Stroke dash", n => { if (n.Strokes.Count > i) n.Strokes[i].Dashes = value == "Dashed" ? [8, 6] : value == "Dotted" ? [1, 5] : []; }), "Stroke dash"), -1)));
             }
-        }, "plus", () => Change("Add stroke", n => n.Strokes.Add(new())));
+        }, "plus", () => ChangeAppearance("Add stroke", n => n.Strokes.Add(new())));
     }
 
     private void BuildEffects(DesignNode node)
@@ -195,11 +195,11 @@ public sealed partial class StudioWorkbench
         Inspect("Effects", node.Shadows.Count > 0, (body, b) =>
         {
             if (InspectedNode.Shadows.Count == 0) return;
-            body.Children.Add(Studio.Columns((Studio.Text("Drop shadow", 11), -1), (b.Icon(() => InspectedNode.Shadows[0].Visible ? "eye" : "eye-off", "Toggle shadow", () => Change("Toggle shadow", n => { if (n.Shadows.Count > 0) n.Shadows[0].Visible = !n.Shadows[0].Visible; })), 24), (b.Icon(() => "minus", "Remove shadow", () => Change("Remove shadow", n => n.Shadows.Clear())), 24)));
-            body.Children.Add(Studio.Columns((b.Number("X", () => InspectedNode.Shadows[0].X, v => Change("Shadow X", n => { if (n.Shadows.Count > 0) n.Shadows[0].X = v; })), -1), (b.Number("Y", () => InspectedNode.Shadows[0].Y, v => Change("Shadow Y", n => { if (n.Shadows.Count > 0) n.Shadows[0].Y = v; })), -1)));
-            body.Children.Add(Studio.Columns((b.Number("Blur", () => InspectedNode.Shadows[0].Blur, v => Change("Shadow blur", n => { if (n.Shadows.Count > 0) n.Shadows[0].Blur = v; }), 0, 512), -1), (b.Number("%", () => InspectedNode.Shadows[0].Opacity * 100, v => Change("Shadow opacity", n => { if (n.Shadows.Count > 0) n.Shadows[0].Opacity = v / 100; }), 0, 100), -1)));
-            body.Children.Add(b.Color(() => InspectedNode.Shadows[0].Color, c => Change("Shadow color", n => { if (n.Shadows.Count > 0) n.Shadows[0].Color = c; })));
-        }, "plus", () => Change("Add shadow", n => { if (n.Shadows.Count == 0) n.Shadows.Add(new()); }));
+            body.Children.Add(Studio.Columns((Studio.Text("Drop shadow", 11), -1), (b.Icon(() => InspectedNode.Shadows[0].Visible ? "eye" : "eye-off", "Toggle shadow", () => ChangeAppearance("Toggle shadow", n => { if (n.Shadows.Count > 0) n.Shadows[0].Visible = !n.Shadows[0].Visible; })), 24), (b.Icon(() => "minus", "Remove shadow", () => ChangeAppearance("Remove shadow", n => n.Shadows.Clear())), 24)));
+            body.Children.Add(Studio.Columns((b.Number("X", () => InspectedNode.Shadows[0].X, v => ChangeAppearance("Shadow X", n => { if (n.Shadows.Count > 0) n.Shadows[0].X = v; })), -1), (b.Number("Y", () => InspectedNode.Shadows[0].Y, v => ChangeAppearance("Shadow Y", n => { if (n.Shadows.Count > 0) n.Shadows[0].Y = v; })), -1)));
+            body.Children.Add(Studio.Columns((b.Number("Blur", () => InspectedNode.Shadows[0].Blur, v => ChangeAppearance("Shadow blur", n => { if (n.Shadows.Count > 0) n.Shadows[0].Blur = v; }), 0, 512), -1), (b.Number("%", () => InspectedNode.Shadows[0].Opacity * 100, v => ChangeAppearance("Shadow opacity", n => { if (n.Shadows.Count > 0) n.Shadows[0].Opacity = v / 100; }), 0, 100), -1)));
+            body.Children.Add(b.Color(() => InspectedNode.Shadows[0].Color, c => ChangeAppearance("Shadow color", n => { if (n.Shadows.Count > 0) n.Shadows[0].Color = c; })));
+        }, "plus", () => ChangeAppearance("Add shadow", n => { if (n.Shadows.Count == 0) n.Shadows.Add(new()); }));
     }
 
     private void AddExportSection()

@@ -45,6 +45,15 @@ public static class ComponentService
         if (!instance.Overrides.TryGetValue(node.SourceId, out var value)) instance.Overrides[node.SourceId] = value = new();
         if (text is not null) value.Text = text; if (fill is not null) value.Fill = fill;
     }
+    public static void SetAppearanceOverride(DesignNode node)
+    {
+        var instance = node;
+        while (instance is not null && instance.Kind != NodeKind.Instance) instance = instance.Parent;
+        if (instance is null || node.SourceId is null) return;
+        if (!instance.Overrides.TryGetValue(node.SourceId, out var value)) instance.Overrides[node.SourceId] = value = new();
+        value.Appearance = GraphicStyle.Capture(node, "Appearance override");
+        value.Fill = null;
+    }
     public static void Synchronize(DesignDocument document)
     {
         var components = document.AllNodes().Where(n => n.Kind == NodeKind.Component).ToDictionary(n => n.Id);
@@ -56,7 +65,7 @@ public static class ComponentService
             foreach (var n in copy.DescendantsAndSelf())
             {
                 var source = n.SourceId!; n.Id = existing.GetValueOrDefault(source) ?? Guid.NewGuid().ToString("N");
-                if (instance.Overrides.TryGetValue(source, out var o)) { if (o.Text is not null) n.Text = o.Text; if (o.Fill is not null) n.Fill = o.Fill; if (o.Visible.HasValue) n.Visible = o.Visible.Value; }
+                if (instance.Overrides.TryGetValue(source, out var o)) { o.Appearance?.ApplyTo(n); if (o.Text is not null) n.Text = o.Text; if (o.Fill is not null) n.Fill = o.Fill; if (o.Visible.HasValue) n.Visible = o.Visible.Value; }
             }
             var remapped = copy.DescendantsAndSelf().ToDictionary(n => n.SourceId!, n => n.Id);
             foreach (var n in copy.DescendantsAndSelf())
@@ -70,8 +79,11 @@ public static class ComponentService
             instance.OpacityMaskRegion = copy.OpacityMaskRegion;
             instance.ClipPathId = copy.ClipPathId;
             instance.Children = copy.Children; foreach (var child in instance.Children) child.Parent = instance;
-            instance.Fills = copy.Fills; instance.Strokes = copy.Strokes; instance.Shadows = copy.Shadows; instance.CornerRadius = copy.CornerRadius;
+            instance.Fills = copy.Fills; instance.Strokes = copy.Strokes; instance.Shadows = copy.Shadows; instance.Effects = copy.Effects; instance.CornerRadius = copy.CornerRadius;
             instance.Layout = copy.Layout;
+            if (instance.SourceId is { } rootSource && instance.Overrides.TryGetValue(rootSource, out var rootOverride)
+                && rootOverride.Appearance is not null)
+            { instance.Opacity = copy.Opacity; instance.Blend = copy.Blend; }
         }
     }
     private static void SetSources(DesignNode node) { foreach (var n in node.DescendantsAndSelf()) n.SourceId = n.Id; }

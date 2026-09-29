@@ -73,6 +73,16 @@ internal static class BrowserDiagnostics
                 json.WriteBoolean("opacityMaskEnabled", primary?.OpacityMaskEnabled ?? false);
                 json.WriteNumber("opacityMasks", session.Page.AllNodes().Count(n => n.OpacityMaskId is not null));
                 json.WriteNumber("gradientBuilds", workbench.Surface.Renderer.GradientBuilds);
+                json.WriteNumber("effects", primary?.Effects.Count ?? 0);
+                json.WriteNumber("effectRadius", primary?.Effects.FirstOrDefault()?.Radius ?? 0);
+                json.WriteNumber("graphicStyles", session.Document.GraphicStyles.Count);
+                json.WriteNumber("appearanceBuilds", workbench.AppearancePanelBuilds);
+                json.WriteNumber("sceneRecordings", workbench.Surface.Renderer.SceneRecordings);
+                json.WriteNumber("sceneReplays", workbench.Surface.Renderer.SceneReplays);
+                json.WriteNumber("sceneBytes", workbench.Surface.Renderer.RetainedSceneBytes);
+                json.WriteNumber("paintBuilds", workbench.Surface.Renderer.PaintBuilds);
+                json.WriteNumber("dashBuilds", workbench.Surface.Renderer.DashBuilds);
+                json.WriteNumber("effectFilterBuilds", workbench.Surface.Renderer.EffectFilterBuilds);
                 json.WriteNumber("clipGroups", session.Page.AllNodes().Count(n => n.ClipPathId is not null));
                 json.WriteNumber("geometryBuilds", workbench.Surface.Renderer.GeometryBuilds);
                 json.WriteNumber("culledNodes", workbench.Surface.Renderer.CulledNodes);
@@ -101,7 +111,7 @@ internal static class BrowserDiagnostics
                 foreach (var id in workbench.SelectedLayerIds) json.WriteStringValue(id);
                 json.WriteEndArray();
                 json.WriteStartArray("inspectorFields");
-                foreach (var field in workbench.InspectorFields)
+                foreach (var field in workbench.InspectorFields.Concat(workbench.AppearanceFields))
                 {
                     json.WriteStartObject(); json.WriteString("section", field.Section); json.WriteString("label", field.Label); json.WriteString("value", field.Value);
                     json.WriteNumber("x", field.X); json.WriteNumber("y", field.Y); json.WriteNumber("width", field.Width); json.WriteNumber("height", field.Height); json.WriteEndObject();
@@ -131,6 +141,7 @@ internal static class BrowserDiagnostics
         }
         session.Changed += (_, _) => QueuePublish();
         workbench.UiRefreshed += QueuePublish;
+        workbench.Surface.FrameRendered += QueuePublish;
         workbench.LayoutUpdated += (_, _) => QueuePublish();
         workbench.Surface.SizeChanged += (_, _) => QueuePublish();
         workbench.Surface.PresentationChanged += _ => QueuePublish();

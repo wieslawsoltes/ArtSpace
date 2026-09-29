@@ -118,7 +118,8 @@ public static class PathEditing
         if (!float.IsFinite(bounds.Left) || !float.IsFinite(bounds.Top) || !float.IsFinite(bounds.Right) || !float.IsFinite(bounds.Bottom))
             throw new InvalidOperationException("Edited path has invalid bounds.");
         var width = Math.Max(.001, bounds.Width); var height = Math.Max(.001, bounds.Height);
-        var gradients = basis.Fills.Select(f => (f.Start, f.End, f.GradientSpace, f.GradientTransform, f.GradientFocus, f.GradientRadius)).ToArray();
+        var paints = node.Fills.Concat(node.Strokes.Select(s => s.Paint).OfType<FillStyle>()).ToArray();
+        var gradients = basis.Fills.Concat(basis.Strokes.Select(s => s.Paint).OfType<FillStyle>()).Select(f => (f.Start, f.End, f.GradientSpace, f.GradientTransform, f.GradientFocus, f.GradientRadius)).ToArray();
         var oldBounds = basis.LocalBounds;
         if (gradients.Any(f => f.GradientSpace == GradientSpace.ObjectBoundingBox))
         {
@@ -133,11 +134,11 @@ public static class PathEditing
         node.Kind = NodeKind.Path; node.PathData = normalized.ToSvgPathData(); node.Points = []; node.Closed = false;
         node.Width = node.PathWidth = width; node.Height = node.PathHeight = height;
         NodeGeometry.SetLocalMatrix(node, Matrix2D.Translation(bounds.Left, bounds.Top) * oldMatrix);
-        for (var i = 0; i < Math.Min(node.Fills.Count, gradients.Length); i++)
+        for (var i = 0; i < Math.Min(paints.Length, gradients.Length); i++)
         {
-            if (node.Fills[i].Kind == FillKind.Solid) continue;
+            if (paints[i].Kind == FillKind.Solid) continue;
             var old = gradients[i];
-            var fill = node.Fills[i];
+            var fill = paints[i];
             if (old.GradientSpace == GradientSpace.Legacy && old.GradientTransform == Matrix2D.Identity)
             {
                 fill.Start = new((old.Start.X * oldWidth - bounds.Left) / width, (old.Start.Y * oldHeight - bounds.Top) / height);

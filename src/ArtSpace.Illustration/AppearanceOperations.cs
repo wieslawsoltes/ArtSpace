@@ -10,7 +10,7 @@ public static class AppearanceOperations
     public static void AddEffect(EditorSession session, LiveEffectKind kind)
     {
         if (!Enum.IsDefined(kind)) throw new ArgumentOutOfRangeException(nameof(kind));
-        session.UpdateSelection("Add " + LiveEffect.Name(kind), node =>
+        UpdateSelection(session, "Add " + LiveEffect.Name(kind), node =>
         {
             if (node.Effects.Count >= DocumentJson.MaxEffectsPerNode)
                 throw new InvalidOperationException("This object's effect stack is full.");
@@ -26,19 +26,19 @@ public static class AppearanceOperations
     {
         ArgumentNullException.ThrowIfNull(update);
         ArgumentOutOfRangeException.ThrowIfNegative(index);
-        session.UpdateSelection(label, node => { if (index < node.Effects.Count) update(node.Effects[index]); });
+        UpdateSelection(session, label, node => { if (index < node.Effects.Count) update(node.Effects[index]); });
     }
 
     public static void RemoveEffect(EditorSession session, int index)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(index);
-        session.UpdateSelection("Remove live effect", node => { if (index < node.Effects.Count) node.Effects.RemoveAt(index); });
+        UpdateSelection(session, "Remove live effect", node => { if (index < node.Effects.Count) node.Effects.RemoveAt(index); });
     }
 
     public static void DuplicateEffect(EditorSession session, int index)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(index);
-        session.UpdateSelection("Duplicate live effect", node =>
+        UpdateSelection(session, "Duplicate live effect", node =>
         {
             if (index >= node.Effects.Count) return;
             if (node.Effects.Count >= DocumentJson.MaxEffectsPerNode)
@@ -51,7 +51,7 @@ public static class AppearanceOperations
     {
         ArgumentOutOfRangeException.ThrowIfNegative(index);
         if (direction is not (-1 or 1)) throw new ArgumentOutOfRangeException(nameof(direction));
-        session.UpdateSelection("Reorder live effect", node =>
+        UpdateSelection(session, "Reorder live effect", node =>
         {
             var target = index + direction;
             if (index >= node.Effects.Count || target < 0 || target >= node.Effects.Count) return;
@@ -59,7 +59,7 @@ public static class AppearanceOperations
         });
     }
 
-    public static void Clear(EditorSession session, bool basic = false) => session.UpdateSelection(
+    public static void Clear(EditorSession session, bool basic = false) => UpdateSelection(session,
         basic ? "Reduce to basic appearance" : "Clear appearance", node =>
         {
             var fill = node.Fill;
@@ -83,7 +83,7 @@ public static class AppearanceOperations
     public static void ApplyStyle(EditorSession session, string id)
     {
         var style = FindStyle(session, id);
-        session.UpdateSelection("Apply " + style.Name, style.ApplyTo);
+        UpdateSelection(session, "Apply " + style.Name, style.ApplyTo);
     }
 
     public static void RenameStyle(EditorSession session, string id, string name)
@@ -100,6 +100,9 @@ public static class AppearanceOperations
         var style = FindStyle(session, id);
         session.Edit("Delete graphic style", () => session.Document.GraphicStyles.Remove(style));
     }
+
+    private static void UpdateSelection(EditorSession session, string label, Action<DesignNode> update) =>
+        session.UpdateSelection(label, node => { update(node); ComponentService.SetAppearanceOverride(node); });
 
     private static GraphicStyle FindStyle(EditorSession session, string id) =>
         session.Document.GraphicStyles.Find(style => style.Id == id)

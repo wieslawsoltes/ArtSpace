@@ -20,6 +20,16 @@ public static partial class DocumentJson
                 || !double.IsFinite(effect.Amount) || effect.Amount is < 0 or > 4 || effect.Color is null)
                 throw new InvalidDataException("Invalid live effect: radius 0–256, offsets ±4096, opacity 0–1 and saturation 0–4 are supported.");
         }
+        foreach (var entry in node.Overrides.Values)
+        {
+            if (entry is null) throw new InvalidDataException("Invalid symbol override.");
+            if (entry.Appearance is { } appearance)
+                Validate(new DesignDocument { Pages = [new() { Nodes = [new()
+                {
+                    Fills = appearance.Fills, Strokes = appearance.Strokes, Shadows = appearance.Shadows,
+                    Effects = appearance.Effects, Opacity = appearance.Opacity, Blend = appearance.Blend
+                }] }] });
+        }
         foreach (var stroke in node.Strokes)
         {
             if (stroke is null || !double.IsFinite(stroke.DashOffset) || Math.Abs(stroke.DashOffset) > 1e9)

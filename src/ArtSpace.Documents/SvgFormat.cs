@@ -24,8 +24,9 @@ public static partial class SvgFormat
     private static XElement? ExportNode(DesignNode node, XElement defs, bool world = false)
     {
         if (!node.Visible || node.Kind == NodeKind.Slice) return null;
+        if (node.Effects.Any(effect => effect.Enabled)) throw new InvalidOperationException("Live effects require native or PNG export; SVG filter interchange is not yet supported.");
         var group = new XElement(Ns + "g", new XAttribute("id", "layer-" + node.Id), new XAttribute("data-name", node.Name), new XAttribute("transform", Transform(world ? node.WorldMatrix : node.LocalMatrix)), new XAttribute("opacity", F(node.Opacity)));
-        if (node.Blend != BlendKind.Normal) group.SetAttributeValue("style", "mix-blend-mode:" + node.Blend.ToString().ToLowerInvariant());
+        if (node.Blend != BlendKind.Normal) group.SetAttributeValue("style", "mix-blend-mode:" + SvgBlendName(node.Blend));
         var shadow = node.Shadows.FirstOrDefault(s => s.Visible);
         if (shadow is not null)
         {
@@ -44,10 +45,18 @@ public static partial class SvgFormat
             }
             var shape = Shape(node); shape.SetAttributeValue("fill", color); shape.SetAttributeValue("fill-opacity", F(fill.Opacity)); shape.SetAttributeValue("stroke", "none"); group.Add(shape);
         }
-        foreach (var stroke in node.Strokes.Where(s => s.Visible))
+        for (var strokeIndex = 0; strokeIndex < node.Strokes.Count; strokeIndex++)
         {
-            var shape = Shape(node); shape.SetAttributeValue("fill", "none"); shape.SetAttributeValue("stroke", stroke.Color); shape.SetAttributeValue("stroke-width", F(stroke.Width)); shape.SetAttributeValue("stroke-opacity", F(stroke.Opacity)); shape.SetAttributeValue("stroke-linejoin", stroke.Join.ToString().ToLowerInvariant()); shape.SetAttributeValue("stroke-linecap", stroke.Cap.ToString().ToLowerInvariant()); shape.SetAttributeValue("stroke-miterlimit", F(stroke.MiterLimit));
-            if (stroke.Dashes.Count > 0) shape.SetAttributeValue("stroke-dasharray", string.Join(" ", stroke.Dashes.Select(F))); group.Add(shape);
+            var stroke = node.Strokes[strokeIndex];
+            if (!stroke.Visible || stroke.Paint?.Visible == false) continue;
+            var strokeColor = stroke.Paint?.Color ?? stroke.Color;
+            if (stroke.Paint is { Kind: not FillKind.Solid } paint)
+            {
+                var id = $"stroke-paint-{node.Id}-{strokeIndex}";
+                defs.Add(ExportGradient(paint, node, id)); strokeColor = "url(#" + id + ")";
+            }
+            var shape = Shape(node); shape.SetAttributeValue("fill", "none"); shape.SetAttributeValue("stroke", strokeColor); shape.SetAttributeValue("stroke-width", F(stroke.Width)); shape.SetAttributeValue("stroke-opacity", F(stroke.Opacity * (stroke.Paint?.Opacity ?? 1))); shape.SetAttributeValue("stroke-linejoin", stroke.Join.ToString().ToLowerInvariant()); shape.SetAttributeValue("stroke-linecap", stroke.Cap.ToString().ToLowerInvariant()); shape.SetAttributeValue("stroke-miterlimit", F(stroke.MiterLimit));
+            if (stroke.Dashes.Count > 0) { shape.SetAttributeValue("stroke-dasharray", string.Join(" ", stroke.Dashes.Select(F))); shape.SetAttributeValue("stroke-dashoffset", F(stroke.DashOffset)); } group.Add(shape);
         }
         var children = new XElement(Ns + "g");
         if (node.ClipContent)
@@ -150,6 +159,21 @@ public static partial class SvgFormat
                 node.Fills.Add(appearance);
             }
             var stroke = Attribute("stroke"); if (stroke is not null && stroke != "none") node.Strokes.Add(new() { Color = stroke, Width = Numbers.Parse(Attribute("stroke-width") ?? "1", 1), Opacity = Numbers.Parse(Attribute("stroke-opacity") ?? "1", 1), Cap = Enum.TryParse<StrokeCap>(Attribute("stroke-linecap"), true, out var cap) ? cap : StrokeCap.Butt, Join = Enum.TryParse<StrokeJoin>(Attribute("stroke-linejoin"), true, out var join) ? join : StrokeJoin.Miter, MiterLimit = Numbers.Parse(Attribute("stroke-miterlimit") ?? "4", 4), Dashes = (Attribute("stroke-dasharray") ?? "").Split(new[] { ' ', ',' }, StringSplitOptions.RemoveEmptyEntries).Where(x => x != "none").Select(x => Numbers.Parse(x, 0)).Where(x => x > 0).ToList() });
+            if (node.Strokes.Count > 0)
+            {
+                var appearance = node.Strokes[0];
+                appearance.DashOffset = Scalar(Attribute("stroke-dashoffset"), 0);
+                if (stroke!.StartsWith("url", StringComparison.OrdinalIgnoreCase))
+                {
+                    appearance.Paint = ReadGradient(stroke, node, gradients, viewBox.Length == 4 ? viewBox[2] : width, viewBox.Length == 4 ? viewBox[3] : height);
+                    appearance.Color = appearance.Paint.Color;
+                }
+            }
+            if (Own(element, "mix-blend-mode") is { } blend)
+            {
+                if (Enum.TryParse<BlendKind>(blend.Replace("-", ""), true, out var parsed) && Enum.IsDefined(parsed)) node.Blend = parsed;
+                else warnings.Add("Unsupported SVG blend mode: " + blend);
+            }
             node.Opacity = Math.Clamp(Scalar(Own(element, "opacity"), 1), 0, 1); node.Visible = Attribute("display") != "none" && Attribute("visibility") != "hidden";
             if (kind is "g" or "svg") foreach (var child in element.Elements()) { var c = Read(child, depth + 1); if (c is not null) node.Add(c); }
             var clipReference = element.Attribute("clip-path")?.Value ?? Style(element, "clip-path");
@@ -222,6 +246,12 @@ public static partial class SvgFormat
         if (text[end..].Any(c => !char.IsWhiteSpace(c) && c != ',')) throw new InvalidDataException("Unsupported SVG transform syntax.");
         return result;
     }
+    private static string SvgBlendName(BlendKind blend) => blend switch
+    {
+        BlendKind.ColorDodge => "color-dodge", BlendKind.ColorBurn => "color-burn",
+        BlendKind.HardLight => "hard-light", BlendKind.SoftLight => "soft-light",
+        _ => blend.ToString().ToLowerInvariant()
+    };
     private static string Transform(Matrix2D m) => $"matrix({F(m.M11)} {F(m.M12)} {F(m.M21)} {F(m.M22)} {F(m.DX)} {F(m.DY)})";
     private static string F(double number) => number.ToString("G17", CultureInfo.InvariantCulture);
     [GeneratedRegex(@"[-+]?(?:\d*\.\d+|\d+\.?\d*)(?:[eE][-+]?\d+)?")] private static partial Regex NumberRegex();

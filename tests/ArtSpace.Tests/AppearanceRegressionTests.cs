@@ -97,13 +97,13 @@ internal static class AppearanceRegressionTests
             var expected = Matrix2D.Scale(2, 3) * new Matrix2D(1, 0, Math.Tan(Math.PI / 6), 1, 0, 0) * Matrix2D.Translation(12, 8);
             Check(actual.Map(new Vec2(10, 20)).DistanceTo(expected.Map(new Vec2(10, 20))) < 1e-8);
         });
-        test("schemas one and two upgrade to schema three on save", () =>
+        test("schemas one and two upgrade to schema four on save", () =>
         {
             foreach (var version in new[] { 1, 2 })
             {
-                var json = DocumentJson.Save(new DesignDocument()).Replace("\"formatVersion\":3", "\"formatVersion\":" + version, StringComparison.Ordinal);
+                var json = DocumentJson.Save(new DesignDocument()).Replace("\"formatVersion\":4", "\"formatVersion\":" + version, StringComparison.Ordinal);
                 var document = DocumentJson.Load(json); Check(document.FormatVersion == version);
-                Check(DocumentJson.Save(document).Contains("\"formatVersion\":3", StringComparison.Ordinal));
+                Check(DocumentJson.Save(document).Contains("\"formatVersion\":4", StringComparison.Ordinal));
             }
         });
     }

@@ -95,9 +95,11 @@ public sealed partial class EditorSession
     public void CommitInteraction()
     {
         if (_before is null) return;
+        DocumentJson.Validate(Document);
         ComponentService.Synchronize(Document);
         foreach (var page in Document.Pages) LayoutEngine.Arrange(page.Nodes);
         // Retain the rollback snapshot until serialization has succeeded.
+        DocumentJson.Validate(Document);
         var before = _before; var after = Capture(); _before = null;
         if (before.Json != after.Json)
         {

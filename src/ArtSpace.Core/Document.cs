@@ -6,7 +6,7 @@ public enum NodeKind { Frame, Group, Rectangle, Ellipse, Line, Arrow, Polygon, S
 public enum StrokeCap { Butt, Round, Square }
 public enum StrokeJoin { Miter, Round, Bevel }
 public enum FillKind { Solid, LinearGradient, RadialGradient }
-public enum BlendKind { Normal, Multiply, Screen, Overlay, Darken, Lighten, Difference }
+public enum BlendKind { Normal, Multiply, Screen, Overlay, Darken, Lighten, Difference, ColorDodge, ColorBurn, HardLight, SoftLight, Exclusion, Hue, Saturation, Color, Luminosity }
 public enum LayoutDirection { None, Horizontal, Vertical }
 public enum AxisConstraint { Start, Center, End, Stretch, Scale }
 public enum LayoutAlignment { Start, Center, End, Stretch }
@@ -43,6 +43,8 @@ public sealed class StrokeStyle
     public double Opacity { get; set; } = 1;
     public bool Visible { get; set; } = true;
     public List<double> Dashes { get; set; } = [];
+    public double DashOffset { get; set; }
+    public FillStyle? Paint { get; set; }
 }
 public sealed class ShadowStyle
 {
@@ -76,6 +78,7 @@ public sealed class InstanceOverride
     public string? Text { get; set; }
     public string? Fill { get; set; }
     public bool? Visible { get; set; }
+    public GraphicStyle? Appearance { get; set; }
 }
 
 /// <summary>A serializable scene node. Coordinates are relative to the parent, not the canvas.</summary>
@@ -114,6 +117,7 @@ public sealed class DesignNode
     public List<FillStyle> Fills { get; set; } = [new()];
     public List<StrokeStyle> Strokes { get; set; } = [];
     public List<ShadowStyle> Shadows { get; set; } = [];
+    public List<LiveEffect> Effects { get; set; } = [];
     public string Text { get; set; } = "Text";
     public string FontFamily { get; set; } = "Inter";
     public double FontSize { get; set; } = 24;
@@ -199,6 +203,7 @@ public sealed class DesignDocument
     public List<DesignPage> Pages { get; set; } = [new()];
     public List<CommentThread> Comments { get; set; } = [];
     public Dictionary<string, string> ColorStyles { get; set; } = [];
+    public List<GraphicStyle> GraphicStyles { get; set; } = [];
     public IEnumerable<DesignNode> AllNodes() => Pages.SelectMany(p => p.AllNodes());
     public DesignNode? Find(string? id) => id is null ? null : AllNodes().FirstOrDefault(n => n.Id == id);
     public void RebuildParents()

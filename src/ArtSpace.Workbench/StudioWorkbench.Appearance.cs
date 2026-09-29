@@ -12,6 +12,10 @@ public sealed partial class StudioWorkbench
     private DesignDocument? _appearanceDocument, _stylesDocument;
     private readonly HashSet<string> _appearanceSelection = [];
     private LiveEffectKind _newEffectKind;
+    private int _stylePage;
+    private const int StylesPerPage = 12;
+    private void ChangeAppearance(string label, Action<DesignNode> update) => Run(() =>
+        Session.UpdateSelection(label, node => { update(node); ComponentService.SetAppearanceOverride(node); }));
     public long AppearancePanelBuilds => (_appearanceView?.SectionBuilds ?? 0) + (_graphicStylesView?.SectionBuilds ?? 0);
     public IEnumerable<InspectorFieldState> AppearanceFields => ActivePanel switch
     {
@@ -68,9 +72,9 @@ public sealed partial class StudioWorkbench
                 {
                     body.Children.Add(b.Text(() => InspectedNode.Name, 12, Studio.Ink, true));
                     body.Children.Add(Studio.Columns((b.Number("Opacity", () => InspectedNode.Opacity * 100,
-                        value => Change("Object opacity", n => n.Opacity = value / 100), 0, 100), -1),
+                        value => ChangeAppearance("Object opacity", n => n.Opacity = value / 100), 0, 100), -1),
                         (b.Choice(Enum.GetNames<BlendKind>(), () => InspectedNode.Blend.ToString(),
-                        value => Change("Blend mode", n => n.Blend = Enum.Parse<BlendKind>(value)), "Blend mode"), -1)));
+                        value => ChangeAppearance("Blend mode", n => n.Blend = Enum.Parse<BlendKind>(value)), "Blend mode"), -1)));
                 });
                 BuildLiveEffects(node);
                 BuildFills(node); BuildStrokes(node); BuildAdvancedStrokes(node); BuildEffects(node);
@@ -138,7 +142,7 @@ public sealed partial class StudioWorkbench
             Inspect("Stroke options " + (i + 1), (source?.Kind, source?.Stops.Count ?? 0), (body, b) =>
             {
                 StrokeStyle Current() => InspectedNode.Strokes[i];
-                void Update(string label, Action<StrokeStyle> edit) => Change(label, n => { if (i < n.Strokes.Count) edit(n.Strokes[i]); });
+                void Update(string label, Action<StrokeStyle> edit) => ChangeAppearance(label, n => { if (i < n.Strokes.Count) edit(n.Strokes[i]); });
                 body.Children.Add(b.Input("Dash pattern", () => string.Join(" ", Current().Dashes.Select(Numbers.Format)), value =>
                 {
                     try
@@ -168,7 +172,7 @@ public sealed partial class StudioWorkbench
                 for (var stopIndex = 0; stopIndex < paint.Stops.Count; stopIndex++)
                 {
                     var s = stopIndex;
-                    void Stop(Action<GradientStop> edit) => Update("Stroke gradient stop", stroke => { if (stroke.Paint is { } p && s < p.Stops.Count) edit(p.Stops[s]); });
+                    void Stop(Action<ArtSpace.Core.GradientStop> edit) => Update("Stroke gradient stop", stroke => { if (stroke.Paint is { } p && s < p.Stops.Count) edit(p.Stops[s]); });
                     body.Children.Add(Studio.Columns((b.Color(() => Current().Paint!.Stops[s].Color, value => Stop(stop => stop.Color = value), "Stop " + s), -1),
                         (b.Number("Position " + s, () => Current().Paint!.Stops[s].Offset * 100, value => Stop(stop => stop.Offset = value / 100), 0, 100), 80)));
                     body.Children.Add(b.Number("Stop opacity " + s, () => Current().Paint!.Stops[s].Opacity * 100, value => Stop(stop => stop.Opacity = value / 100), 0, 100));
@@ -186,17 +190,17 @@ public sealed partial class StudioWorkbench
             {
                 var i = index;
                 body.Children.Add(Studio.Columns((b.Text(() => "Stroke " + (i + 1)), -1),
-                    (b.Icon(() => "top", "Raise stroke", () => Change("Raise stroke", n => Move(n.Strokes, i, 1))), 28),
-                    (b.Icon(() => "bottom", "Lower stroke", () => Change("Lower stroke", n => Move(n.Strokes, i, -1))), 28),
-                    (b.Button(() => "Duplicate", () => Change("Duplicate stroke", n => { if (i < n.Strokes.Count) n.Strokes.Insert(i + 1, GraphicStyle.CloneStroke(n.Strokes[i])); })), 80)));
+                    (b.Icon(() => "top", "Raise stroke", () => ChangeAppearance("Raise stroke", n => Move(n.Strokes, i, 1))), 28),
+                    (b.Icon(() => "bottom", "Lower stroke", () => ChangeAppearance("Lower stroke", n => Move(n.Strokes, i, -1))), 28),
+                    (b.Button(() => "Duplicate", () => ChangeAppearance("Duplicate stroke", n => { if (i < n.Strokes.Count) n.Strokes.Insert(i + 1, GraphicStyle.CloneStroke(n.Strokes[i])); })), 80)));
             }
             for (var index = InspectedNode.Fills.Count - 1; index >= 0; index--)
             {
                 var i = index;
                 body.Children.Add(Studio.Columns((b.Text(() => "Fill " + (i + 1)), -1),
-                    (b.Icon(() => "top", "Raise fill", () => Change("Raise fill", n => Move(n.Fills, i, 1))), 28),
-                    (b.Icon(() => "bottom", "Lower fill", () => Change("Lower fill", n => Move(n.Fills, i, -1))), 28),
-                    (b.Button(() => "Duplicate", () => Change("Duplicate fill", n => { if (i < n.Fills.Count) n.Fills.Insert(i + 1, GraphicStyle.CloneFill(n.Fills[i])); })), 80)));
+                    (b.Icon(() => "top", "Raise fill", () => ChangeAppearance("Raise fill", n => Move(n.Fills, i, 1))), 28),
+                    (b.Icon(() => "bottom", "Lower fill", () => ChangeAppearance("Lower fill", n => Move(n.Fills, i, -1))), 28),
+                    (b.Button(() => "Duplicate", () => ChangeAppearance("Duplicate fill", n => { if (i < n.Fills.Count) n.Fills.Insert(i + 1, GraphicStyle.CloneFill(n.Fills[i])); })), 80)));
             }
         });
         static void Move<T>(List<T> values, int index, int direction)
@@ -210,6 +214,9 @@ public sealed partial class StudioWorkbench
     private void RefreshGraphicStyles()
     {
         _graphicStylesView ??= new(_graphicStylesHost);
+        if (!ReferenceEquals(_stylesDocument, Session.Document)) _stylePage = 0;
+        var pages = Math.Max(1, (Session.Document.GraphicStyles.Count + StylesPerPage - 1) / StylesPerPage);
+        _stylePage = Math.Clamp(_stylePage, 0, pages - 1);
         _graphicStylesView.Begin(!ReferenceEquals(_stylesDocument, Session.Document)); _activeInspector = _graphicStylesView;
         try
         {
@@ -218,11 +225,17 @@ public sealed partial class StudioWorkbench
                 body.Children.Add(Wrapped("Save the selected object's fills, strokes, transparency and live effects. Applying a style leaves geometry and mask relationships intact."));
                 var create = b.Button(() => "New Graphic Style", () => Run(() => AppearanceOperations.CaptureStyle(Session)));
                 b.Observe(_ => create.IsEnabled = Session.Primary is not null); body.Children.Add(create);
+                var previous = b.Button(() => "Previous", () => { _stylePage--; RequestUi(UiDirty.GraphicStyles); });
+                var next = b.Button(() => "Next", () => { _stylePage++; RequestUi(UiDirty.GraphicStyles); });
+                b.Observe(_ => { previous.IsEnabled = _stylePage > 0; next.IsEnabled = (_stylePage + 1) * StylesPerPage < Session.Document.GraphicStyles.Count; });
+                body.Children.Add(Studio.Columns((previous, -1), (next, -1)));
+                body.Children.Add(b.Text(() => "Page " + (_stylePage + 1) + " · " + Session.Document.GraphicStyles.Count + " styles"));
             });
-            for (var index = 0; index < Session.Document.GraphicStyles.Count; index++)
+            var first = _stylePage * StylesPerPage;
+            for (var index = first; index < Math.Min(first + StylesPerPage, Session.Document.GraphicStyles.Count); index++)
             {
                 var i = index; var id = Session.Document.GraphicStyles[i].Id;
-                Inspect("Graphic style " + (i + 1), id, (body, b) =>
+                Inspect("Graphic style " + (i - first + 1), id, (body, b) =>
                 {
                     GraphicStyle Current() => Session.Document.GraphicStyles.Find(s => s.Id == id)!;
                     var preview = new GraphicStylePreview { Height = 64, HorizontalAlignment = HorizontalAlignment.Stretch };

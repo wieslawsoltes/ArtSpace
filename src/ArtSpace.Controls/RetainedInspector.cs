@@ -218,6 +218,7 @@ public sealed class InspectorBindings
     public StudioButton Button(Func<string> read, Action write)
     {
         var field = new StudioButton(read(), () => { if (CanWrite) write(); });
+        _fields.Add((read(), field, () => field.Content?.ToString() ?? ""));
         Observe(_ =>
         {
             var value = read();
@@ -230,6 +231,7 @@ public sealed class InspectorBindings
     public IconButton Icon(Func<string> read, string label, Action write)
     {
         var field = new IconButton(read(), label, () => { if (CanWrite) write(); });
+        _fields.Add((label, field, () => field.Glyph));
         Observe(_ => { var value = read(); if (field.Glyph != value) field.Glyph = value; });
         return field;
     }
