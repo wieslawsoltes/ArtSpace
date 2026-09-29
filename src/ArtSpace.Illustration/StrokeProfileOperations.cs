@@ -19,17 +19,7 @@ public static class StrokeProfileOperations
         Edit(editor, renderer, strokeIndex, "Add width point", stroke => Insert(stroke, position));
     }
 
-    public static int Insert(StrokeStyle stroke, double position)
-    {
-        StrokeProfiles.Validate(stroke.WidthProfile);
-        if (!double.IsFinite(position) || position is < 0 or > 1) throw new ArgumentOutOfRangeException(nameof(position));
-        var list = stroke.WidthProfile;
-        for (var i = 0; i < list.Count; i++) if (Math.Abs(list[i].Position - position) < 1e-6) return i;
-        if (list.Count >= StrokeProfiles.MaxPoints) throw new InvalidOperationException("The 64-point stroke profile limit has been reached.");
-        var width = StrokeProfiles.Evaluate(list, position);
-        var index = list.FindIndex(p => p.Position > position); if (index < 0) index = list.Count;
-        list.Insert(index, new() { Position = position, Left = width.Left, Right = width.Right }); return index;
-    }
+    public static int Insert(StrokeStyle stroke, double position) => StrokeProfiles.Insert(stroke.WidthProfile, position);
 
     public static void UpdatePoint(EditorSession editor, SceneRenderer renderer, int strokeIndex, int pointIndex, Action<StrokeWidthPoint> update)
     {

@@ -125,12 +125,12 @@ internal static class LiveAppearanceTests
         test("legacy schemas upgrade while future appearance schemas fail closed", () =>
         {
             var json = DocumentJson.Save(new());
-            foreach (var version in new[] { 1, 2, 3 })
+            foreach (var version in new[] { 1, 2, 3, 4 })
             {
-                var legacy = DocumentJson.Load(json.Replace("\"formatVersion\":4", "\"formatVersion\":" + version));
+                var legacy = DocumentJson.Load(json.Replace("\"formatVersion\":5", "\"formatVersion\":" + version));
                 Check(DocumentJson.Load(DocumentJson.Save(legacy)).FormatVersion == DocumentJson.CurrentFormatVersion);
             }
-            Throws(() => DocumentJson.Load(json.Replace("\"formatVersion\":4", "\"formatVersion\":99")));
+            Throws(() => DocumentJson.Load(json.Replace("\"formatVersion\":5", "\"formatVersion\":99")));
         });
         test("malformed graphic styles are validated even when unused", () =>
         {

@@ -131,7 +131,7 @@ public sealed partial class StudioWorkbench
             (EditorTool.Rectangle,"rectangle","Rectangle (M)"), (EditorTool.Ellipse,"ellipse","Ellipse (L)"),
             (EditorTool.Polygon,"polygon","Polygon"), (EditorTool.Star,"star","Star"),
             (EditorTool.Brush,"brush","Paintbrush (B)"), (EditorTool.Scale,"scale","Scale (S)"),
-            (EditorTool.Width,"scale","Width (Shift W)"), (EditorTool.AnchorPoint,"directselect","Anchor Point (Shift C)"),
+            (EditorTool.Width,"width","Width (Shift W)"), (EditorTool.AnchorPoint,"directselect","Anchor Point (Shift C)"),
             (EditorTool.Gradient,"gradient","Gradient (G)"), (EditorTool.Eyedropper,"eyedropper","Eyedropper (I)"),
             (EditorTool.Frame,"frame","Artboard (Shift O)"), (EditorTool.Slice,"slice","Slice"),
             (EditorTool.Hand,"hand","Hand (H / Space)"), (EditorTool.Zoom,"search","Zoom (Z)")

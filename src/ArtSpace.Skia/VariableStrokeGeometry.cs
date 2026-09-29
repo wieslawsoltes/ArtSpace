@@ -13,6 +13,7 @@ public static class VariableStrokeGeometry
     public sealed record Contour(Sample[] Samples, bool Closed)
     {
         public double Length => Samples.Length == 0 ? 0 : Samples[^1].Distance;
+        public bool HasSegments { get; init; } = true;
     }
     public readonly record struct Location(int ContourIndex, double Position, Vec2 Point, Vec2 Normal, double Distance);
 
@@ -32,7 +33,7 @@ public static class VariableStrokeGeometry
                 var a = contour.Points[i]; var b = contour.Points[(i + 1) % contour.Points.Count];
                 Subdivide(a.Position, a.ControlOut ?? a.Position, b.ControlIn ?? b.Position, b.Position, 0);
             }
-            contours.Add(new(samples.ToArray(), contour.Closed));
+            contours.Add(new(samples.ToArray(), contour.Closed) { HasSegments = count > 0 });
             if (contours.Count > 4096) throw new InvalidOperationException("Stroke contour limit exceeded.");
             void Add(Vec2 p)
             {
@@ -99,7 +100,18 @@ public static class VariableStrokeGeometry
         {
             foreach (var contour in contours)
             {
-                if (contour.Length <= 1e-10 || stroke.Width <= 0) continue;
+                if (stroke.Width <= 0) continue;
+                if (contour.Length <= 1e-10)
+                {
+                    if (contour.HasSegments && !contour.Closed && contour.Samples.Length > 0)
+                    {
+                        var width = StrokeProfiles.Evaluate(stroke.WidthProfile, 0);
+                        var sides = (width.Left * stroke.Width, width.Right * stroke.Width);
+                        Cap(contour.Samples[0].Point, new(-1, 0), sides, true);
+                        Cap(contour.Samples[0].Point, new(1, 0), sides, false);
+                    }
+                    continue;
+                }
                 var runs = Runs(contour, stroke);
                 foreach (var run in runs)
                 {

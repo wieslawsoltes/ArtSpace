@@ -7,6 +7,8 @@ using ArtSpace.Editing;
 using ArtSpace.Layout;
 using ArtSpace.Skia;
 
+if (args.Contains("--stroke-benchmark")) return VariableStrokeBenchmarks.Run();
+
 if (args.Contains("--spatial-benchmark")) return SceneSpatialIndexBenchmarks.Run();
 
 if (args.Contains("--appearance-benchmark")) return LiveAppearanceBenchmarks.Run();
@@ -16,6 +18,7 @@ if (args.Contains("--benchmark")) return PerformanceBenchmarks.Run();
 var tests = new List<(string Name, Action Test)>();
 LiveAppearanceTests.Register(Test);
 VariableStrokeTests.Register(Test);
+StrokeBoundaryTests.Register(Test);
 SceneSpatialIndexTests.Register(Test);
 AppearanceBoundaryTests.Register(Test);
 void Test(string name, Action action) => tests.Add((name, action));

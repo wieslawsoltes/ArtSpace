@@ -83,7 +83,7 @@ public sealed partial class DesignSurface
             var side = (local.X - location.Point.X) * location.Normal.X + (local.Y - location.Point.Y) * location.Normal.Y >= 0 ? 1 : -1;
             Prepare(target.Value, -1, location.Position, false, true, side); return true;
         }
-        catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
+        catch (Exception ex) when (ex is InvalidOperationException or InvalidDataException or ArgumentException)
         { CancelGesture(); StatusChanged?.Invoke(ex.Message); return true; }
 
         void Prepare((DesignNode Node, StrokeStyle Stroke) target, int index, double position, bool movePoint, bool newPoint, int side)
@@ -144,7 +144,7 @@ public sealed partial class DesignSurface
             StrokeProfiles.Validate(points); Renderer.StrokeOutline(target.Node, target.Stroke);
             ComponentService.SetAppearanceOverride(target.Node); editor.Preview();
         }
-        catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
+        catch (Exception ex) when (ex is InvalidOperationException or InvalidDataException or ArgumentException)
         { CancelGesture(); StatusChanged?.Invoke(ex.Message); }
     }
 
@@ -182,13 +182,14 @@ public sealed partial class DesignSurface
         if (Session?.Tool != EditorTool.Width) return;
         using var line = new SKPaint { IsAntialias = true, Color = new SKColor(68, 124, 238), Style = SKPaintStyle.Stroke, StrokeWidth = 1 };
         using var fill = new SKPaint { IsAntialias = true, Color = SKColors.White };
+        using var diamond = new SKPath();
         foreach (var handle in WidthHandles)
         {
             var center = new SKPoint((float)handle.X, (float)handle.Y); var left = new SKPoint((float)handle.LeftX, (float)handle.LeftY); var right = new SKPoint((float)handle.RightX, (float)handle.RightY);
             canvas.DrawLine(left, right, line);
             fill.Color = handle.Selected ? line.Color : SKColors.White;
             canvas.DrawCircle(left, 4, fill); canvas.DrawCircle(left, 4, line); canvas.DrawCircle(right, 4, fill); canvas.DrawCircle(right, 4, line);
-            using var diamond = new SKPath(); diamond.MoveTo(center.X, center.Y - 4); diamond.LineTo(center.X + 4, center.Y); diamond.LineTo(center.X, center.Y + 4); diamond.LineTo(center.X - 4, center.Y); diamond.Close();
+            diamond.Reset(); diamond.MoveTo(center.X, center.Y - 4); diamond.LineTo(center.X + 4, center.Y); diamond.LineTo(center.X, center.Y + 4); diamond.LineTo(center.X - 4, center.Y); diamond.Close();
             canvas.DrawPath(diamond, fill); canvas.DrawPath(diamond, line);
         }
     }

@@ -17,6 +17,7 @@ public sealed partial class SceneRenderer
         public required SKPath Path;
         public SKPath? PickBorder;
         public double PickTolerance;
+        public Matrix2D PickMatrix;
         public LinkedListNode<(string, StrokeStyle)>? Link;
         public void Dispose() { PickBorder?.Dispose(); Path.Dispose(); }
         public bool Matches(DesignNode node, StrokeStyle stroke)
@@ -31,11 +32,13 @@ public sealed partial class SceneRenderer
             return true;
         }
     }
-    private sealed record CenterlineEntry(GeometrySnapshot Geometry, VariableStrokeGeometry.Contour[] Contours);
+    private sealed record CenterlineEntry(GeometrySnapshot Geometry, VariableStrokeGeometry.Contour[] Contours, int SampleCount);
     private readonly Dictionary<(string, StrokeStyle), StrokeGeometryEntry> _strokeGeometry = [];
     private readonly LinkedList<(string, StrokeStyle)> _strokeGeometryLru = [];
     private readonly Dictionary<string, CenterlineEntry> _strokeCenterlines = [];
-    private int _strokeGeometryPoints;
+    private int _strokeGeometryPoints, _strokePickPoints, _strokeCenterlineSamples;
+    public int CachedStrokeCenterlineSamples => _strokeCenterlineSamples;
+    public int CachedStrokePickPoints => _strokePickPoints;
     public long StrokeOutlineBuilds { get; private set; }
     public long StrokeOutlineHits { get; private set; }
     public long StrokeCenterlineBuilds { get; private set; }
@@ -87,25 +90,54 @@ public sealed partial class SceneRenderer
     {
         if (_strokeCenterlines.TryGetValue(node.Id, out var entry) && entry.Geometry.Matches(node)) return entry.Contours;
         var contours = VariableStrokeGeometry.Flatten(Geometry(node));
-        if (_strokeCenterlines.Count >= 256) _strokeCenterlines.Remove(_strokeCenterlines.Keys.First());
-        _strokeCenterlines[node.Id] = new(new(node), contours); StrokeCenterlineBuilds++; return contours;
+        RemoveCenterline(node.Id);
+        var count = contours.Sum(c => c.Samples.Length);
+        while (_strokeCenterlines.Count > 0 && (_strokeCenterlines.Count >= 256 || _strokeCenterlineSamples + count > 250_000))
+            RemoveCenterline(_strokeCenterlines.Keys.First());
+        _strokeCenterlines[node.Id] = new(new(node), contours, count); _strokeCenterlineSamples += count;
+        StrokeCenterlineBuilds++; return contours;
     }
 
-    private bool StrokeContains(DesignNode node, StrokeStyle stroke, Vec2 point, double tolerance)
+    private bool StrokeContains(DesignNode node, StrokeStyle stroke, Vec2 local, Vec2 world, Matrix2D worldMatrix, double tolerance, double localTolerance)
     {
         var path = StrokeOutline(node, stroke); var bounds = path.TightBounds;
-        bounds.Inflate((float)tolerance, (float)tolerance);
-        if (!bounds.Contains((float)point.X, (float)point.Y)) return false;
-        if (path.Contains((float)point.X, (float)point.Y)) return true;
+        bounds.Inflate((float)localTolerance, (float)localTolerance);
+        if (!bounds.Contains((float)local.X, (float)local.Y)) return false;
+        if (path.Contains((float)local.X, (float)local.Y)) return true;
         if (tolerance <= 0) return false;
         var entry = _strokeGeometry[(node.Id, stroke)];
-        if (entry.PickBorder is null || entry.PickTolerance != tolerance)
+        if (entry.PickBorder is null || entry.PickTolerance != tolerance || entry.PickMatrix != worldMatrix)
         {
+            // Offset the transformed coverage, not a locally inflated radius: shear/nonuniform
+            // scale must not turn a four-pixel target into a forty-pixel hit zone.
+            using var transformed = new SKPath(path); transformed.Transform(Matrix(worldMatrix));
             using var paint = new SKPaint { Style = SKPaintStyle.Stroke, StrokeWidth = (float)(tolerance * 2), StrokeCap = SKStrokeCap.Round, StrokeJoin = SKStrokeJoin.Round };
-            var border = paint.GetFillPath(path) ?? throw new InvalidOperationException("Cannot create stroke picking coverage.");
-            entry.PickBorder?.Dispose(); entry.PickBorder = border; entry.PickTolerance = tolerance; StrokePickBuilds++;
+            var border = paint.GetFillPath(transformed) ?? throw new InvalidOperationException("Cannot create stroke picking coverage.");
+            ReleasePickBorder(entry);
+            StrokePickBuilds++;
+            if (border.PointCount > 1_000_000)
+            {
+                using (border) return border.Contains((float)world.X, (float)world.Y);
+            }
+            foreach (var key in _strokeGeometryLru)
+            {
+                if (_strokePickPoints + border.PointCount <= 1_000_000) break;
+                ReleasePickBorder(_strokeGeometry[key]);
+            }
+            entry.PickBorder = border; entry.PickTolerance = tolerance; entry.PickMatrix = worldMatrix;
+            _strokePickPoints += border.PointCount;
         }
-        return entry.PickBorder.Contains((float)point.X, (float)point.Y);
+        return entry.PickBorder.Contains((float)world.X, (float)world.Y);
+    }
+
+    private void ReleasePickBorder(StrokeGeometryEntry entry)
+    {
+        if (entry.PickBorder is not { } border) return;
+        _strokePickPoints -= border.PointCount; border.Dispose(); entry.PickBorder = null;
+    }
+    private void RemoveCenterline(string id)
+    {
+        if (_strokeCenterlines.Remove(id, out var entry)) _strokeCenterlineSamples -= entry.SampleCount;
     }
 
     private static bool Paintable(StrokeStyle stroke) => stroke.Visible && stroke.Width > 0 && stroke.Opacity > 0
@@ -157,12 +189,13 @@ public sealed partial class SceneRenderer
         foreach (var fill in node.Fills)
             if (fill.Visible && path.Contains((float)local.X, (float)local.Y)) return node;
         foreach (var stroke in node.Strokes)
-            if (Paintable(stroke) && StrokeContains(node, stroke, local, localTolerance)) return node;
+            if (Paintable(stroke) && StrokeContains(node, stroke, local, point, matrix, tolerance, localTolerance)) return node;
         return null;
     }
 
     private void RemoveStrokeGeometry((string, StrokeStyle) key, StrokeGeometryEntry entry)
     {
+        ReleasePickBorder(entry);
         _strokeGeometryPoints -= entry.Path.PointCount; _strokeGeometryLru.Remove(entry.Link!); _strokeGeometry.Remove(key); entry.Dispose();
     }
     private void PruneStrokeGeometry(DesignNode[] nodes)
@@ -170,11 +203,11 @@ public sealed partial class SceneRenderer
         var keys = nodes.SelectMany(n => n.Strokes.Select(s => (n.Id, s))).ToHashSet();
         foreach (var pair in _strokeGeometry.ToArray()) if (!keys.Contains(pair.Key)) RemoveStrokeGeometry(pair.Key, pair.Value);
         var ids = nodes.Select(n => n.Id).ToHashSet(StringComparer.Ordinal);
-        foreach (var id in _strokeCenterlines.Keys.ToArray()) if (!ids.Contains(id)) _strokeCenterlines.Remove(id);
+        foreach (var id in _strokeCenterlines.Keys.ToArray()) if (!ids.Contains(id)) RemoveCenterline(id);
     }
     private void ClearStrokeGeometry()
     {
         foreach (var value in _strokeGeometry.Values) value.Dispose();
-        _strokeGeometry.Clear(); _strokeGeometryLru.Clear(); _strokeCenterlines.Clear(); _strokeGeometryPoints = 0;
+        _strokeGeometry.Clear(); _strokeGeometryLru.Clear(); _strokeCenterlines.Clear(); _strokeGeometryPoints = _strokePickPoints = _strokeCenterlineSamples = 0;
     }
 }
