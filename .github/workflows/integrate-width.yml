@@ -13,171 +13,126 @@ jobs:
       - uses: actions/checkout@v7
         with:
           ref: feat/variable-width-strokes
-      - name: Apply reviewed integration
+      - name: Refine reviewed stroke boundaries
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          import re
           def r(path, old, new):
               p=Path(path); text=p.read_text()
-              if text.count(old)!=1:
-                  if new in text: return
-                  raise RuntimeError(f'{path}: expected one occurrence of {old[:90]!r}, got {text.count(old)}')
+              if new in text: return
+              assert text.count(old)==1, (path,old[:80],text.count(old))
               p.write_text(text.replace(old,new,1))
-          r('src/ArtSpace.Core/Document.cs','    public FillStyle? Paint { get; set; }','    public FillStyle? Paint { get; set; }\n    public List<StrokeWidthPoint> WidthProfile { get; set; } = [];')
-          r('src/ArtSpace.Core/LiveAppearance.cs','Dashes = [.. value.Dashes], DashOffset = value.DashOffset,','Dashes = [.. value.Dashes], DashOffset = value.DashOffset,\n        WidthProfile = StrokeProfiles.Copy(value.WidthProfile),')
-          r('src/ArtSpace.Core/StrokeProfiles.cs','    private static StrokeWidthPoint Point(','''    /// <summary>Insert an interpolated knot, retaining strict ordering and avoiding duplicate locations.</summary>
-              public static int Insert(List<StrokeWidthPoint> points, double position)
-              {
-                  Validate(points);
-                  if (!double.IsFinite(position) || position is < 0 or > 1) throw new ArgumentOutOfRangeException(nameof(position));
-                  for (var i = 0; i < points.Count; i++) if (Math.Abs(points[i].Position - position) < 1e-6) return i;
-                  if (points.Count >= MaxPoints) throw new InvalidOperationException("The 64-point stroke profile limit has been reached.");
-                  var width = Evaluate(points, position);
-                  var index = points.FindIndex(p => p.Position > position); if (index < 0) index = points.Count;
-                  points.Insert(index, new() { Position = position, Left = width.Left, Right = width.Right }); return index;
-              }
-              private static StrokeWidthPoint Point(''')
-          r('src/ArtSpace.Documents/DocumentJson.cs','public const int CurrentFormatVersion = 4;','public const int CurrentFormatVersion = 5;')
-          r('src/ArtSpace.Documents/DocumentJson.cs','Save using schema 4.','Save using schema 5.')
-          r('src/ArtSpace.Documents/DocumentJson.Appearance.cs','            if (stroke.Paint is { } paint) ValidatePaint(paint);','''            StrokeProfiles.Validate(stroke.WidthProfile);
-                      if (node.Kind == NodeKind.Text && stroke.WidthProfile.Count != 0)
-                          throw new InvalidDataException("Create text outlines before applying a variable-width stroke.");
-                      if (stroke.Paint is { } paint) ValidatePaint(paint);''')
-          p=Path('src/ArtSpace.Skia/SceneRenderer.cs'); text=p.read_text()
-          a=text.index('    public DesignNode? HitTest('); b=text.index('    public byte[] ExportPng(',a)
-          text=text[:a]+text[b:]; p.write_text(text)
-          r(str(p),'InvalidateRetainedScene(); PrunePaints(nodes); PruneGradients(nodes);','InvalidateRetainedScene(); PrunePaints(nodes); PruneGradients(nodes); PruneStrokeGeometry(nodes);')
-          r(str(p),'InvalidateRetainedScene(); ClearPaints(); ClearEffects();','InvalidateRetainedScene(); ClearPaints(); ClearEffects(); ClearStrokeGeometry();')
-          r(str(p),'stroke.Width * .5 * Math.Max(2, stroke.Join == StrokeJoin.Miter ? stroke.MiterLimit : 2)','stroke.Width * StrokeProfiles.MaximumSide(stroke.WidthProfile) * Math.Max(2, stroke.Join == StrokeJoin.Miter ? stroke.MiterLimit : 2)')
-          r(str(p),'if (node.Kind == NodeKind.Text) DrawText(canvas, node, paint); else canvas.DrawPath(Geometry(node), paint);\n            }\n        }\n        canvas.Save();','if (node.Kind == NodeKind.Text) DrawText(canvas, node, paint); else canvas.DrawPath(stroke.WidthProfile.Count == 0 ? Geometry(node) : StrokeOutline(node, stroke), paint);\n            }\n        }\n        canvas.Save();')
-          p='src/ArtSpace.Skia/SceneRenderer.Paints.cs'
-          r(p,'public double Phase = double.NaN;','public double Phase = double.NaN;\n        public bool Variable;')
-          r(p,'var equal = entry.Phase == stroke.DashOffset && entry.Intervals.Length == stroke.Dashes.Count;','var variable = stroke.WidthProfile.Count != 0;\n        var style = variable ? SKPaintStyle.Fill : SKPaintStyle.Stroke;\n        if (paint.Style != style) paint.Style = style;\n        var equal = entry.Variable == variable && entry.Phase == stroke.DashOffset && entry.Intervals.Length == stroke.Dashes.Count;')
-          r(p,'var dash = CreateStrokeDash(stroke);','var dash = variable ? null : CreateStrokeDash(stroke);')
-          r(p,'entry.Dash = dash; entry.Phase = stroke.DashOffset;','entry.Dash = dash; entry.Variable = variable; entry.Phase = stroke.DashOffset;')
-          p='src/ArtSpace.Documents/SvgFormat.cs'
-          r(p,'    public static string Export(IEnumerable<DesignNode> roots, RectD bounds)\n    {','    public static string Export(IEnumerable<DesignNode> roots, RectD bounds) => Export(roots, bounds, null);\n    public static string Export(IEnumerable<DesignNode> roots, RectD bounds, SvgExportOptions? options)\n    {')
-          r(p,'defs.AddAnnotation(new ExportViewport(bounds));','defs.AddAnnotation(new ExportViewport(bounds));\n        defs.AddAnnotation(options ?? new SvgExportOptions());')
-          r(p,'            var strokeColor = stroke.Paint?.Color ?? stroke.Color;','''            if (stroke.WidthProfile.Count != 0)
-                      {
-                          var expand = defs.Annotation<SvgExportOptions>()?.ExpandStroke
-                              ?? throw new InvalidOperationException("Variable-width SVG export requires a stroke geometry provider. Use SceneRenderer.ExportSvg or Outline Stroke.");
-                          var expanded = expand(node, stroke);
-                          var fill = expanded.Fill; var color = fill.Color;
-                          if (fill.Kind != FillKind.Solid)
-                          {
-                              var id = $"width-paint-{node.Id}-{strokeIndex}";
-                              defs.Add(ExportGradient(fill, node, id)); color = "url(#" + id + ")";
-                          }
-                          group.Add(new XElement(Ns + "path", new XAttribute("d", expanded.PathData),
-                              new XAttribute("fill", color), new XAttribute("fill-opacity", F(stroke.Opacity * fill.Opacity)),
-                              new XAttribute("fill-rule", "nonzero"), new XAttribute("stroke", "none"),
-                              new XAttribute("data-artspace-expanded-stroke", strokeIndex)));
-                          continue;
-                      }
-                      var strokeColor = stroke.Paint?.Color ?? stroke.Color;''')
-          p='src/ArtSpace.Illustration/IllustrationOperations.cs'
-          r(p,'                    using var paint = StrokePaint(stroke);\n                    using var path = paint.GetFillPath(renderer.Geometry(node))\n                        ?? throw new InvalidOperationException("This stroke could not be expanded.");','                    using var path = new SKPath(renderer.StrokeOutline(node, stroke));')
-          r(p,'        editor.Edit("Outline stroke", () =>','        if (nodes.Any(n => n.Parent?.ClipPathId == n.Id)) throw new InvalidOperationException("Release a clipping path before expanding its stroke into a group.");\n        editor.Edit("Outline stroke", () =>')
-          r(p,'Kind = NodeKind.Group, Name = node.Name + " expanded", X = node.X, Y = node.Y,','Id = node.Id, SourceId = node.SourceId, Kind = NodeKind.Group, Name = node.Name + " expanded", X = node.X, Y = node.Y,')
-          r(p,'                editor.RemoveNode(node); editor.AddNode(group, parent);','                var maskOwner = parent?.OpacityMaskId == node.Id ? parent : null;\n                editor.RemoveNode(node); editor.AddNode(group, parent);\n                if (maskOwner is not null) maskOwner.OpacityMaskId = group.Id;')
-          p='src/ArtSpace.Editing/EditorSession.cs'
-          r(p,'DeleteAnchor, AnchorPoint }','DeleteAnchor, AnchorPoint, Width }')
-          p='src/ArtSpace.Editor/DesignSurface.cs'
-          r(p,'PendingTransform, PendingVertex }','PendingTransform, PendingVertex, PendingWidth, Width }')
-          r(p,'            if (IsPathTool)\n','            if (IsPathTool || Session.Tool == EditorTool.Width)\n')
-          r(p,'        if (IllustrationPressed(world, screen, e)) return;','        if (WidthPressed(world, screen, e)) return;\n        if (IllustrationPressed(world, screen, e)) return;')
-          r(p,'        if (_gesture == Gesture.PendingTransform)\n','        if (_gesture is Gesture.PendingWidth or Gesture.Width) { MoveWidth(world, screen, e.KeyModifiers.HasFlag(VirtualKeyModifiers.Menu)); return; }\n        if (_gesture == Gesture.PendingTransform)\n')
-          r(p,'or Gesture.PendingVertex or Gesture.Vertex) Moved(sender, e);','or Gesture.PendingVertex or Gesture.Vertex or Gesture.PendingWidth or Gesture.Width) Moved(sender, e);')
-          r(p,'and not Gesture.PendingVertex) editor.CommitInteraction();','and not Gesture.PendingVertex and not Gesture.PendingWidth) editor.CommitInteraction();')
-          r(p,'ResetPathGesture(); Session?.CancelInteraction();','ResetPathGesture(); ResetWidthGesture(); Session?.CancelInteraction();')
-          r(p,'ResetPathGesture(); _gesture = Gesture.None;','ResetPathGesture(); ResetWidthGesture(); _gesture = Gesture.None;')
-          r(p,'        if (e.Kind == EditorChangeKind.Tool && _gesture is Gesture.PendingTransform or Gesture.PendingVertex)','        if (e.Kind == EditorChangeKind.Tool && _gesture is Gesture.Width or Gesture.PendingWidth) CancelGesture();\n        if (e.Kind == EditorChangeKind.Tool && _gesture is Gesture.PendingTransform or Gesture.PendingVertex)')
-          p='src/ArtSpace.Editor/DesignSurface.Rendering.cs'
-          r(p,'    private void Paint(SKCanvas canvas, Size size)\n    {','''    public string? LastRenderError { get; private set; }
-              private void Paint(SKCanvas canvas, Size size)
-              {
-                  var saveCount = canvas.SaveCount;
-                  try { PaintCore(canvas, size); LastRenderError = null; }
-                  catch (Exception error) when (error is InvalidOperationException or InvalidDataException or ArgumentException)
-                  {
-                      canvas.RestoreToCount(saveCount);
-                      if (LastRenderError != error.Message)
-                      {
-                          LastRenderError = error.Message;
-                          DispatcherQueue.TryEnqueue(() => StatusChanged?.Invoke("Rendering stopped: " + error.Message));
-                      }
-                      using var paint = new SKPaint { IsAntialias = true, Color = SKColors.OrangeRed };
-                      using var font = new SKFont(SKTypeface.Default, 14);
-                      canvas.DrawText("Cannot render this artwork: " + error.Message, 24, 44, font, paint);
-                  }
-                  finally { canvas.RestoreToCount(saveCount); }
-              }
-              private void PaintCore(SKCanvas canvas, Size size)
-              {''')
-          r(p,'            DrawGradientHandles(canvas);','            DrawGradientHandles(canvas);\n            DrawWidthHandles(canvas);')
-          r(p,'|| IsPathTool) return;','|| IsPathTool || editor.Tool == EditorTool.Width) return;')
-          p='src/ArtSpace.Workbench/StudioWorkbench.Refresh.cs'
-          r(p,'Appearance = 1024, GraphicStyles = 2048,','Appearance = 1024, GraphicStyles = 2048, Stroke = 4096,')
-          r(p,'| Assets | Appearance | GraphicStyles\n','| Assets | Appearance | GraphicStyles | Stroke\n')
-          r(p,'dirty |= UiDirty.Appearance | UiDirty.GraphicStyles;','dirty |= UiDirty.Appearance | UiDirty.GraphicStyles | UiDirty.Stroke;')
-          r(p,'            RefreshAppearancePanels(dirty);','            RefreshAppearancePanels(dirty);\n            RefreshStrokePanel(dirty);')
-          p='src/ArtSpace.Workbench/StudioWorkbench.Appearance.cs'
-          r(p,'        "Appearance" when _appearanceView is not null => _appearanceView.DescribeFields(),','        "Stroke" when _strokeInspector is not null => _strokeInspector.DescribeFields(),\n        "Appearance" when _appearanceView is not null => _appearanceView.DescribeFields(),')
-          r(p,'        _illustrationDock.Add("Graphic Styles", Studio.Scroll(_graphicStylesHost));','        _illustrationDock.Add("Graphic Styles", Studio.Scroll(_graphicStylesHost));\n        _illustrationDock.Add("Stroke", Studio.Scroll(_strokePanelHost));')
-          r(p,'_appearanceView?.SuspendEditing(); _graphicStylesView?.SuspendEditing();','_appearanceView?.SuspendEditing(); _graphicStylesView?.SuspendEditing(); _strokeInspector?.SuspendEditing();')
-          r(p,'BuildFills(node); BuildStrokes(node); BuildAdvancedStrokes(node); BuildEffects(node);','BuildFills(node); BuildStrokes(node); BuildAdvancedStrokes(node); BuildVariableStrokes(node); BuildEffects(node);')
-          p='src/ArtSpace.Workbench/StudioWorkbench.Illustration.cs'
-          r(p,'                "Appearance" => UiDirty.Appearance,','                "Stroke" => UiDirty.Stroke,\n                "Appearance" => UiDirty.Appearance,')
-          r(p,'(EditorTool.Brush,"brush","Paintbrush (B)"), (EditorTool.Scale,"scale","Scale (S)"),','(EditorTool.Brush,"brush","Paintbrush (B)"), (EditorTool.Scale,"scale","Scale (S)"),\n            (EditorTool.Width,"scale","Width (Shift W)"), (EditorTool.AnchorPoint,"directselect","Anchor Point (Shift C)"),')
-          r(p,'"Properties", "Layers", "Artboards", "History", "Appearance", "Graphic Styles"','"Properties", "Layers", "Artboards", "History", "Appearance", "Graphic Styles", "Stroke"')
-          p='src/ArtSpace.Workbench/StudioWorkbench.Commands.cs'
-          r(p,'            if (Surface.HandlePathKey(e.Key, control, shift, alt))','            if (Surface.HandleWidthKey(e.Key, control, shift, alt)) { e.Handled = true; return; }\n            if (Surface.HandlePathKey(e.Key, control, shift, alt))')
-          r(p,'                VirtualKey.B => () => Session.Tool = EditorTool.Brush,','                VirtualKey.W when shift => () => Surface.ActivateWidthStroke(Surface.ActiveWidthStroke),\n                VirtualKey.B => () => Session.Tool = EditorTool.Brush,')
-          for p in Path('src/ArtSpace.Workbench').glob('*.cs'):
-              text=p.read_text(); p.write_text(text.replace('SvgFormat.Export(', 'Surface.Renderer.ExportSvg('))
-          p='src/ArtSpace.Workbench/StudioWorkbench.Stroke.cs'
-          r(p,'                var names = presets.Select(StrokeProfiles.Name).Append("Custom").ToArray();','                var names = presets.Select(StrokeProfiles.Name).Append("Custom").ToArray();\n                var profiles = presets.Select(StrokeProfiles.Create).ToArray();')
-          r(p,'                    foreach (var preset in presets)\n                    {\n                        var candidate = StrokeProfiles.Create(preset);','                    for (var p = 0; p < presets.Length; p++)\n                    {\n                        var preset = presets[p]; var candidate = profiles[p];')
-          p='src/ArtSpace.App/Platforms/WebAssembly/BrowserWorkspaceStorage.cs'
-          r(p,'                json.WriteNumber("effects", primary?.Effects.Count ?? 0);','''                json.WriteNumber("strokeOutlineBuilds", workbench.Surface.Renderer.StrokeOutlineBuilds);
-                          json.WriteNumber("strokeCenterlineBuilds", workbench.Surface.Renderer.StrokeCenterlineBuilds);
-                          json.WriteNumber("widthPoints", primary?.Strokes.FirstOrDefault()?.WidthProfile.Count ?? 0);
-                          json.WriteNumber("strokePanelBuilds", workbench.StrokePanelBuilds);
-                          json.WriteString("renderError", workbench.Surface.LastRenderError);
-                          json.WriteStartArray("widthHandles");
-                          foreach (var handle in workbench.Surface.WidthHandles)
-                          {
-                              json.WriteStartObject(); json.WriteNumber("index", handle.Index); json.WriteNumber("position", handle.Position);
-                              json.WriteNumber("x", handle.X); json.WriteNumber("y", handle.Y);
-                              json.WriteNumber("leftX", handle.LeftX); json.WriteNumber("leftY", handle.LeftY);
-                              json.WriteNumber("rightX", handle.RightX); json.WriteNumber("rightY", handle.RightY);
-                              json.WriteBoolean("selected", handle.Selected); json.WriteEndObject();
-                          }
-                          json.WriteEndArray();
-                          json.WriteNumber("effects", primary?.Effects.Count ?? 0);''')
-          r('tests/ArtSpace.Tests/Program.cs','LiveAppearanceTests.Register(Test);','LiveAppearanceTests.Register(Test);\nVariableStrokeTests.Register(Test);')
-          for p in Path('tests').rglob('*'):
-              if p.suffix not in ['.cs','.mjs']: continue
-              text=p.read_text(); text=re.sub(r'FormatVersion\s*==\s*4\b','FormatVersion == DocumentJson.CurrentFormatVersion',text)
-              text=text.replace('formatVersion).toBe(4)', 'formatVersion).toBe(5)')
+          for name in ['LiveAppearanceTests.cs','AppearanceRegressionTests.cs']:
+              p=Path('tests/ArtSpace.Tests')/name; text=p.read_text()
+              text=text.replace('\\"formatVersion\\":4','\\"formatVersion\\":5').replace('schema four on save','the current schema on save')
               p.write_text(text)
-          r('Directory.Build.props','0.5.0-alpha.1','0.6.0-alpha.1')
-          r('src/ArtSpace.App/ArtSpace.App.csproj','<ApplicationDisplayVersion>0.5.0</ApplicationDisplayVersion>','<ApplicationDisplayVersion>0.6.0</ApplicationDisplayVersion>')
-          r('src/ArtSpace.App/ArtSpace.App.csproj','<ApplicationVersion>5</ApplicationVersion>','<ApplicationVersion>6</ApplicationVersion>')
+          p='tests/ArtSpace.Tests/LiveAppearanceTests.cs'
+          r(p,'foreach (var version in new[] { 1, 2, 3 })','foreach (var version in new[] { 1, 2, 3, 4 })')
+          p='tests/ArtSpace.Tests/Program.cs'
+          r(p,'VariableStrokeTests.Register(Test);','VariableStrokeTests.Register(Test);\nStrokeBoundaryTests.Register(Test);')
+          r(p,'if (args.Contains("--spatial-benchmark"))','if (args.Contains("--stroke-benchmark")) return VariableStrokeBenchmarks.Run();\n\nif (args.Contains("--spatial-benchmark"))')
+          p='src/ArtSpace.Skia/SceneRenderer.Strokes.cs'
+          r(p,'        public double PickTolerance;','        public double PickTolerance;\n        public Matrix2D PickMatrix;')
+          r(p,'private sealed record CenterlineEntry(GeometrySnapshot Geometry, VariableStrokeGeometry.Contour[] Contours);','private sealed record CenterlineEntry(GeometrySnapshot Geometry, VariableStrokeGeometry.Contour[] Contours, int SampleCount);')
+          r(p,'    private int _strokeGeometryPoints;','    private int _strokeGeometryPoints, _strokePickPoints, _strokeCenterlineSamples;\n    public int CachedStrokeCenterlineSamples => _strokeCenterlineSamples;\n    public int CachedStrokePickPoints => _strokePickPoints;')
+          r(p,'        if (_strokeCenterlines.Count >= 256) _strokeCenterlines.Remove(_strokeCenterlines.Keys.First());\n        _strokeCenterlines[node.Id] = new(new(node), contours); StrokeCenterlineBuilds++; return contours;','''        RemoveCenterline(node.Id);
+                  var count = contours.Sum(c => c.Samples.Length);
+                  while (_strokeCenterlines.Count > 0 && (_strokeCenterlines.Count >= 256 || _strokeCenterlineSamples + count > 250_000))
+                      RemoveCenterline(_strokeCenterlines.Keys.First());
+                  _strokeCenterlines[node.Id] = new(new(node), contours, count); _strokeCenterlineSamples += count;
+                  StrokeCenterlineBuilds++; return contours;''')
+          file=Path(p); text=file.read_text()
+          a=text.index('    private bool StrokeContains('); b=text.index('    private static bool Paintable(',a)
+          text=text[:a]+'''    private bool StrokeContains(DesignNode node, StrokeStyle stroke, Vec2 local, Vec2 world, Matrix2D worldMatrix, double tolerance, double localTolerance)
+              {
+                  var path = StrokeOutline(node, stroke); var bounds = path.TightBounds;
+                  bounds.Inflate((float)localTolerance, (float)localTolerance);
+                  if (!bounds.Contains((float)local.X, (float)local.Y)) return false;
+                  if (path.Contains((float)local.X, (float)local.Y)) return true;
+                  if (tolerance <= 0) return false;
+                  var entry = _strokeGeometry[(node.Id, stroke)];
+                  if (entry.PickBorder is null || entry.PickTolerance != tolerance || entry.PickMatrix != worldMatrix)
+                  {
+                      // Offset the transformed coverage, not a locally inflated radius: shear/nonuniform
+                      // scale must not turn a four-pixel target into a forty-pixel hit zone.
+                      using var transformed = new SKPath(path); transformed.Transform(Matrix(worldMatrix));
+                      using var paint = new SKPaint { Style = SKPaintStyle.Stroke, StrokeWidth = (float)(tolerance * 2), StrokeCap = SKStrokeCap.Round, StrokeJoin = SKStrokeJoin.Round };
+                      var border = paint.GetFillPath(transformed) ?? throw new InvalidOperationException("Cannot create stroke picking coverage.");
+                      ReleasePickBorder(entry);
+                      StrokePickBuilds++;
+                      if (border.PointCount > 1_000_000)
+                      {
+                          using (border) return border.Contains((float)world.X, (float)world.Y);
+                      }
+                      foreach (var key in _strokeGeometryLru)
+                      {
+                          if (_strokePickPoints + border.PointCount <= 1_000_000) break;
+                          ReleasePickBorder(_strokeGeometry[key]);
+                      }
+                      entry.PickBorder = border; entry.PickTolerance = tolerance; entry.PickMatrix = worldMatrix;
+                      _strokePickPoints += border.PointCount;
+                  }
+                  return entry.PickBorder.Contains((float)world.X, (float)world.Y);
+              }
+
+              private void ReleasePickBorder(StrokeGeometryEntry entry)
+              {
+                  if (entry.PickBorder is not { } border) return;
+                  _strokePickPoints -= border.PointCount; border.Dispose(); entry.PickBorder = null;
+              }
+              private void RemoveCenterline(string id)
+              {
+                  if (_strokeCenterlines.Remove(id, out var entry)) _strokeCenterlineSamples -= entry.SampleCount;
+              }
+
+          '''+text[b:]; file.write_text(text)
+          r(p,'StrokeContains(node, stroke, local, localTolerance)','StrokeContains(node, stroke, local, point, matrix, tolerance, localTolerance)')
+          r(p,'        _strokeGeometryPoints -= entry.Path.PointCount;','        ReleasePickBorder(entry);\n        _strokeGeometryPoints -= entry.Path.PointCount;')
+          r(p,'if (!ids.Contains(id)) _strokeCenterlines.Remove(id);','if (!ids.Contains(id)) RemoveCenterline(id);')
+          r(p,'_strokeCenterlines.Clear(); _strokeGeometryPoints = 0;','_strokeCenterlines.Clear(); _strokeGeometryPoints = _strokePickPoints = _strokeCenterlineSamples = 0;')
+          p='src/ArtSpace.Skia/VariableStrokeGeometry.cs'
+          r(p,'        public double Length => Samples.Length == 0 ? 0 : Samples[^1].Distance;','        public double Length => Samples.Length == 0 ? 0 : Samples[^1].Distance;\n        public bool HasSegments { get; init; } = true;')
+          r(p,'contours.Add(new(samples.ToArray(), contour.Closed));','contours.Add(new(samples.ToArray(), contour.Closed) { HasSegments = count > 0 });')
+          r(p,'                if (contour.Length <= 1e-10 || stroke.Width <= 0) continue;','''                if (stroke.Width <= 0) continue;
+                          if (contour.Length <= 1e-10)
+                          {
+                              if (contour.HasSegments && !contour.Closed && contour.Samples.Length > 0)
+                              {
+                                  var width = StrokeProfiles.Evaluate(stroke.WidthProfile, 0);
+                                  var sides = (width.Left * stroke.Width, width.Right * stroke.Width);
+                                  Cap(contour.Samples[0].Point, new(-1, 0), sides, true);
+                                  Cap(contour.Samples[0].Point, new(1, 0), sides, false);
+                              }
+                              continue;
+                          }''')
+          p='src/ArtSpace.Illustration/StrokeProfileOperations.cs'; file=Path(p); text=file.read_text()
+          a=text.index('    public static int Insert('); b=text.index('    public static void UpdatePoint(',a)
+          text=text[:a]+'''    public static int Insert(StrokeStyle stroke, double position) => StrokeProfiles.Insert(stroke.WidthProfile, position);
+
+          '''+text[b:]; file.write_text(text)
+          p='src/ArtSpace.Editor/DesignSurface.Width.cs'; file=Path(p); text=file.read_text()
+          text=text.replace('ex is InvalidOperationException or ArgumentException','ex is InvalidOperationException or InvalidDataException or ArgumentException')
+          text=text.replace('        foreach (var handle in WidthHandles)\n        {\n            var center', '        using var diamond = new SKPath();\n        foreach (var handle in WidthHandles)\n        {\n            var center')
+          text=text.replace('            using var diamond = new SKPath(); diamond.MoveTo(', '            diamond.Reset(); diamond.MoveTo(')
+          file.write_text(text)
+          r('src/ArtSpace.Controls/IconView.cs','        ["directselect"] =','        ["width"] = "M3 3C10 8 10 16 3 21M21 3C14 8 14 16 21 21M3 12H21M3 12L6 9M3 12L6 15M21 12L18 9M21 12L18 15",\n        ["directselect"] =')
+          r('src/ArtSpace.Workbench/StudioWorkbench.Illustration.cs','(EditorTool.Width,"scale","Width (Shift W)")','(EditorTool.Width,"width","Width (Shift W)")')
+          p='.github/workflows/build.yml'
+          r(p,'          cat artifacts/benchmarks/spatial-replay.json','          cat artifacts/benchmarks/spatial-replay.json\n          dotnet run --project tests/ArtSpace.Tests -c Release --no-build -- --stroke-benchmark > artifacts/benchmarks/stroke-coverage.json\n          cat artifacts/benchmarks/stroke-coverage.json')
           PY
           git diff --check
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add src tests Directory.Build.props
-          git commit -m 'Integrate variable-width strokes, precise picking, Stroke panel and schema-five SVG export'
+          git add src tests .github/workflows/build.yml
+          git diff --cached --quiet || git commit -m 'Bound stroke caches, correct world-space tolerance, and cover degenerate stroke and mask cases'
           git push origin HEAD:feat/variable-width-strokes
       - uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
       - name: Run engine and geometry regressions
         run: dotnet run --project tests/ArtSpace.Tests -c Release
+      - name: Stroke coverage benchmark
+        run: dotnet run --project tests/ArtSpace.Tests -c Release --no-build -- --stroke-benchmark
       - name: Build shared desktop host
         run: |
           python3 scripts/fetch-assets.py
