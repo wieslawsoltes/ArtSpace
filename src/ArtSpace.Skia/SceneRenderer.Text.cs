@@ -13,6 +13,7 @@ public sealed partial class SceneRenderer
     public int CachedTextCount => _textLayouts.Count;
     private void ClearTextLayouts()
     {
+        ClearTypeOnPath();
         foreach (var entry in _textLayouts.Values) entry.Font.Dispose(); _textLayouts.Clear();
     }
     private CachedText TextLayout(DesignNode node)
@@ -41,6 +42,7 @@ public sealed partial class SceneRenderer
     {
         if (node.Kind != NodeKind.Text) throw new ArgumentException("The node must contain text.", nameof(node));
         if (node.Text.Length > 100_000) throw new InvalidOperationException("Outline conversion is limited to 100,000 characters per text object.");
+        if (node.TextPath is not null) return TypeOnPathLayout(node).CreateOutline();
         var path = new SKPath();
         try
         {
@@ -57,6 +59,7 @@ public sealed partial class SceneRenderer
 
     public void DrawText(SKCanvas canvas, DesignNode node, SKPaint paint)
     {
+        if (node.TextPath is not null) { TypeOnPathLayout(node).Draw(canvas, paint); return; }
         var layout = TextLayout(node);
         foreach (var run in layout.Runs) canvas.DrawText(run.Text, run.X, run.Baseline, layout.Font, paint);
     }

@@ -35,7 +35,7 @@ test('opacity mask commands preserve editable source, inversion, undo and schema
   await expect.poll(async () => (await state(page)).opacityMasks).toBe(1);
   expect((await state(page)).opacityMaskMode).toBe('Luminance');
   const id = (await state(page)).opacityMaskId;
-  let document = await saved(page); expect(document.formatVersion).toBe(4);
+  let document = await saved(page); expect(document.formatVersion).toBe(5);
   let owner = document.pages[0].nodes.find(n => n.name === 'opacity-fixture');
   expect(owner.opacityMaskId).toBe(id); expect(owner.children).toHaveLength(2);
   expect(owner.children.find(n => n.id === id).fills[0].kind).toBe('LinearGradient');

@@ -24,6 +24,7 @@ public static partial class SvgFormat
     private static XElement? ExportNode(DesignNode node, XElement defs, bool world = false)
     {
         if (!node.Visible || node.Kind == NodeKind.Slice) return null;
+        if (node.TextPath is not null) throw new InvalidOperationException("Use IllustrationSvgExport or Create Outlines to export type-on-path text as vector geometry.");
         if (node.Effects.Any(effect => effect.Enabled)) throw new InvalidOperationException("Live effects require native or PNG export; SVG filter interchange is not yet supported.");
         var group = new XElement(Ns + "g", new XAttribute("id", "layer-" + node.Id), new XAttribute("data-name", node.Name), new XAttribute("transform", Transform(world ? node.WorldMatrix : node.LocalMatrix)), new XAttribute("opacity", F(node.Opacity)));
         if (node.Blend != BlendKind.Normal) group.SetAttributeValue("style", "mix-blend-mode:" + SvgBlendName(node.Blend));
@@ -107,6 +108,8 @@ public static partial class SvgFormat
         using var text = new StringReader(source); using var reader = XmlReader.Create(text, settings);
         var xml = XDocument.Load(reader); var root = xml.Root ?? throw new InvalidDataException("SVG is empty.");
         if (root.Name.LocalName != "svg") throw new InvalidDataException("The file root must be svg.");
+        if (root.Descendants().Any(e => e.Name.LocalName == "textPath"))
+            throw new InvalidDataException("SVG textPath import is not supported yet. Convert path text to outlines in the source application.");
         var warnings = new HashSet<string>(); var viewBox = Values(root.Attribute("viewBox")?.Value);
         var width = Number(root, "width", viewBox.Length == 4 ? viewBox[2] : 800); var height = Number(root, "height", viewBox.Length == 4 ? viewBox[3] : 600);
         var frame = new DesignNode { Kind = NodeKind.Frame, Name = name, Width = Math.Max(1, width), Height = Math.Max(1, height), Fills = [], ClipContent = true };

@@ -119,7 +119,7 @@ internal static class LiveAppearanceTests
             n.Strokes = [new() { Paint = Gradient(), DashOffset = -3.5, Dashes = [4] }];
             var e = Editor(n); e.Select(n); AppearanceOperations.CaptureStyle(e, "Glow");
             var loaded = DocumentJson.Load(DocumentJson.Save(e.Document));
-            Check(loaded.FormatVersion == 4 && loaded.GraphicStyles.Count == 1);
+            Check(loaded.FormatVersion == DocumentJson.CurrentFormatVersion && loaded.GraphicStyles.Count == 1);
             Check(loaded.Pages[0].Nodes[0].Strokes[0].DashOffset == -3.5 && loaded.GraphicStyles[0].Effects[0].Radius == 14);
         });
         test("legacy schemas upgrade while future appearance schemas fail closed", () =>
@@ -127,10 +127,10 @@ internal static class LiveAppearanceTests
             var json = DocumentJson.Save(new());
             foreach (var version in new[] { 1, 2, 3 })
             {
-                var legacy = DocumentJson.Load(json.Replace("\"formatVersion\":4", "\"formatVersion\":" + version));
-                Check(DocumentJson.Load(DocumentJson.Save(legacy)).FormatVersion == 4);
+                var legacy = DocumentJson.Load(json.Replace("\"formatVersion\":5", "\"formatVersion\":" + version));
+                Check(DocumentJson.Load(DocumentJson.Save(legacy)).FormatVersion == DocumentJson.CurrentFormatVersion);
             }
-            Throws(() => DocumentJson.Load(json.Replace("\"formatVersion\":4", "\"formatVersion\":99")));
+            Throws(() => DocumentJson.Load(json.Replace("\"formatVersion\":5", "\"formatVersion\":99")));
         });
         test("malformed graphic styles are validated even when unused", () =>
         {

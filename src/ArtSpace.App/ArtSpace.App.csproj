@@ -7,8 +7,8 @@
     <UnoFeatures>SkiaRenderer;</UnoFeatures>
     <ApplicationTitle>ArtSpace</ApplicationTitle>
     <ApplicationId>io.github.wieslawsoltes.artspace</ApplicationId>
-    <ApplicationDisplayVersion>0.5.0</ApplicationDisplayVersion>
-    <ApplicationVersion>5</ApplicationVersion>
+    <ApplicationDisplayVersion>0.6.0</ApplicationDisplayVersion>
+    <ApplicationVersion>6</ApplicationVersion>
     <ApplicationPublisher>ArtSpace contributors</ApplicationPublisher>
     <Description>Local-first vector illustration with Uno Platform and SkiaSharp.</Description>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>

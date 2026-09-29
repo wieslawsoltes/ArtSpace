@@ -229,6 +229,9 @@ public sealed partial class StudioWorkbench
                 yield return Item("Close Path", () => PathOperations.Close(Session, Surface.Renderer), enabled: selected);
                 break;
             case "Type":
+                yield return Async("Type on a Path…", CreateTypeOnPathAsync);
+                yield return Item("Edit Path Baseline", Surface.EnterPathEditing, enabled: Session.Primary?.TextPath is not null);
+                yield return Item("Flip Path Text", () => TypeOnPathOperations.Update(Session, "Flip path text", o => o.Flip = !o.Flip), enabled: Session.Primary?.TextPath is not null);
                 yield return Item("Create Outlines", () => PathOperations.CreateOutlines(Session, Surface.Renderer), "Ctrl Shift O", Session.SelectionRoots.Any(n => n.DescendantsAndSelf().Any(c => c.Kind == NodeKind.Text && !c.IsEffectivelyLocked)));
                 yield return Item("Type Tool", () => Session.Tool = EditorTool.Text, "T");
                 yield return Item("Edit Text", () => { if (Session.Primary?.Kind == NodeKind.Text) Surface.BeginTextEdit(Session.Primary); }, "Enter", Session.Primary?.Kind == NodeKind.Text);

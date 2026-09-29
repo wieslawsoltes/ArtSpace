@@ -15,7 +15,7 @@ public sealed partial class DesignSurface : UserControl, IDisposable
         public Action<SKCanvas, Size>? Draw { get; set; }
         protected override void RenderOverride(SKCanvas canvas, Size area) => Draw?.Invoke(canvas, area);
     }
-    private enum Gesture { None, Move, Resize, Rotate, Create, Marquee, Pan, PenControl, Pencil, Guide, Pinch, Vertex, Gradient, AnchorMarquee, PendingTransform, PendingVertex }
+    private enum Gesture { None, Move, Resize, Rotate, Create, Marquee, Pan, PenControl, Pencil, Guide, Pinch, Vertex, Gradient, AnchorMarquee, PendingTransform, PendingVertex, PendingTypePath, TypePath }
     private readonly DrawingCanvas _canvas = new();
     private readonly Canvas _overlay = new();
     private EditorSession? _session;
@@ -110,7 +110,7 @@ public sealed partial class DesignSurface : UserControl, IDisposable
             // Never let transient gesture references survive the transaction they belong to.
             if (Session?.IsInteracting != true)
             {
-                ResetPathGesture(); _gesture = Gesture.None; _created = null; _penNode = null;
+                ResetPathGesture(); ResetTypeOnPathGesture(); _gesture = Gesture.None; _created = null; _penNode = null;
                 _marquee = null; _guide = null; _snapLines = []; _originals.Clear();
                 _canvas.ReleasePointerCaptures();
             }
@@ -162,6 +162,7 @@ public sealed partial class DesignSurface : UserControl, IDisposable
             var comment = editor.Document.Comments.FirstOrDefault(c => c.PageId == editor.Page.Id && !c.Resolved && c.Anchor.DistanceTo(world) * editor.Viewport.Zoom < 16);
             CommentRequested?.Invoke(world, comment); return;
         }
+        if (TypeOnPathPressed(world, screen)) return;
         if (IllustrationPressed(world, screen, e)) return;
         if (editor.Tool is EditorTool.Pen or EditorTool.Pencil or EditorTool.Brush) { StartPath(world, editor.Tool is EditorTool.Pencil or EditorTool.Brush); return; }
         if (editor.Tool is not EditorTool.Move and not EditorTool.Scale)
@@ -257,6 +258,8 @@ public sealed partial class DesignSurface : UserControl, IDisposable
         var shift = e.KeyModifiers.HasFlag(VirtualKeyModifiers.Shift);
         switch (_gesture)
         {
+            case Gesture.PendingTypePath:
+            case Gesture.TypePath: MoveTypeOnPath(world, screen, e.KeyModifiers.HasFlag(VirtualKeyModifiers.Control)); break;
             case Gesture.Pan: editor.Viewport.Pan = _startPan + screen - _startScreen; editor.Notify(EditorChangeKind.Viewport); break;
             case Gesture.Move:
                 var delta = world - _startWorld;
@@ -311,7 +314,7 @@ public sealed partial class DesignSurface : UserControl, IDisposable
     private void Released(object sender, PointerRoutedEventArgs e)
     {
         if (Session is not { } editor) return;
-        if (_gesture is Gesture.PendingTransform or Gesture.Move or Gesture.Resize or Gesture.Rotate or Gesture.PendingVertex or Gesture.Vertex) Moved(sender, e);
+        if (_gesture is Gesture.PendingTransform or Gesture.Move or Gesture.Resize or Gesture.Rotate or Gesture.PendingVertex or Gesture.Vertex or Gesture.PendingTypePath or Gesture.TypePath) Moved(sender, e);
         _touches.Remove(e.Pointer.PointerId);
         var gesture = _gesture; _gesture = Gesture.None;
         _canvas.ReleasePointerCapture(e.Pointer); e.Handled = true;
@@ -329,7 +332,8 @@ public sealed partial class DesignSurface : UserControl, IDisposable
             if (node.Kind == NodeKind.Text) BeginTextEdit(node);
         }
         else if (gesture == Gesture.Pencil) FinishPath(false);
-        else if (gesture is not Gesture.None and not Gesture.Pan and not Gesture.Marquee and not Gesture.AnchorMarquee and not Gesture.PenControl and not Gesture.PendingTransform and not Gesture.PendingVertex) editor.CommitInteraction();
+        else if (gesture is not Gesture.None and not Gesture.Pan and not Gesture.Marquee and not Gesture.AnchorMarquee and not Gesture.PenControl and not Gesture.PendingTransform and not Gesture.PendingVertex and not Gesture.PendingTypePath) editor.CommitInteraction();
+        ResetTypeOnPathGesture();
         _marquee = null; _guide = null; _snapLines = []; _canvas.Invalidate();
     }
     private void ResizeSelection(Vec2 world, bool aspect, bool center)
@@ -373,6 +377,7 @@ public sealed partial class DesignSurface : UserControl, IDisposable
     }
     public void CancelGesture()
     {
+        ResetTypeOnPathGesture();
         _gesture = Gesture.None; _created = null; _marquee = null; _snapLines = []; _guide = null; _penNode = null; _vectorNode = null;
         ResetPathGesture(); Session?.CancelInteraction(); _canvas.Invalidate();
     }

@@ -13,7 +13,10 @@ if (args.Contains("--appearance-benchmark")) return LiveAppearanceBenchmarks.Run
 
 if (args.Contains("--benchmark")) return PerformanceBenchmarks.Run();
 
+if (args.Contains("--type-on-path-benchmark")) return TypeOnPathBenchmarks.Run();
+
 var tests = new List<(string Name, Action Test)>();
+TypeOnPathTests.Register(Test);
 LiveAppearanceTests.Register(Test);
 SceneSpatialIndexTests.Register(Test);
 AppearanceBoundaryTests.Register(Test);
