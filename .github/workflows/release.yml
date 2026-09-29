@@ -3,68 +3,114 @@ on:
   push:
     tags: ['v*']
   workflow_dispatch:
+    inputs:
+      version:
+        description: Version for a dry run (tags publish; manual runs only build and upload artifacts)
+        required: true
+        default: '0.4.1-alpha.1'
 permissions:
   contents: read
 concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
+env:
+  APP_NAME: ArtSpace
+  APP_PROJECT: src/ArtSpace.App
+  DOTNET_NOLOGO: 'true'
+  DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
 jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+    steps:
+      - id: v
+        name: Resolve release version
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+          REF_NAME: ${{ github.ref_name }}
+          REF_TYPE: ${{ github.ref_type }}
+        shell: bash
+        run: |
+          VERSION="$INPUT_VERSION"
+          if [ "$REF_TYPE" = tag ]; then VERSION="${REF_NAME#v}"; fi
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "Invalid version '$VERSION'" >&2; exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
   desktop:
-    if: startsWith(github.ref, 'refs/tags/v')
+    name: Desktop (${{ matrix.rid }})
+    needs: version
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - os: ubuntu-latest
-            rid: linux-x64
-          - os: windows-latest
-            rid: win-x64
-          - os: macos-latest
-            rid: osx-arm64
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
+        rid: [win-x64, win-arm64, linux-x64, linux-arm64, osx-x64, osx-arm64]
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      RID: ${{ matrix.rid }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
-      - name: Publish self-contained native host
+      - name: Fetch licensed assets
+        run: python3 scripts/fetch-assets.py
+      - name: Publish self-contained single-file executable
         shell: bash
-        env:
-          RUNTIME: ${{ matrix.rid }}
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
-          python3 scripts/fetch-assets.py
-          dotnet publish src/ArtSpace.App -c Release -f net10.0-desktop -r "$RUNTIME" --self-contained true -p:ArtSpaceDesktopOnly=true -p:Version="$VERSION" -o artifacts/native
-          python3 - <<'PY'
-          import os,shutil
-          from pathlib import Path
-          version=os.environ['GITHUB_REF_NAME'][1:]
-          runtime=os.environ['RUNTIME']
-          Path('artifacts/release').mkdir(parents=True,exist_ok=True)
-          shutil.make_archive(f'artifacts/release/ArtSpace-{runtime}-{version}','zip','artifacts/native')
-          PY
+          dotnet publish "$APP_PROJECT" -c Release -f net10.0-desktop -r "$RID" --self-contained true \
+            -p:ArtSpaceDesktopOnly=true \
+            -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true \
+            -p:IncludeAllContentForSelfExtract=true -p:EnableCompressionInSingleFile=true \
+            -p:DebugType=none -p:DebugSymbols=false -p:Version="$VERSION" \
+            -o "artifacts/desktop/$RID"
+      - name: Package executable
+        shell: bash
+        run: |
+          OUT="artifacts/desktop/$RID"
+          find "$OUT" -name '*.pdb' -delete
+          mkdir -p artifacts/dist
+          BASE="$APP_NAME-$VERSION-$RID"
+          if [[ "$RID" == win-* ]]; then
+            mv "$OUT/$APP_NAME.App.exe" "$OUT/$APP_NAME.exe"
+            test "$(find "$OUT" -type f | wc -l)" -eq 1
+            (cd "$OUT" && zip -q "$GITHUB_WORKSPACE/artifacts/dist/$BASE.zip" "$APP_NAME.exe")
+          else
+            mv "$OUT/$APP_NAME.App" "$OUT/$APP_NAME"
+            chmod +x "$OUT/$APP_NAME"
+            test "$(find "$OUT" -type f | wc -l)" -eq 1
+            tar -C "$OUT" -czf "artifacts/dist/$BASE.tar.gz" "$APP_NAME"
+          fi
+          ls -la artifacts/dist
       - uses: actions/upload-artifact@v7
         with:
-          name: ArtSpace-release-${{ matrix.rid }}
-          path: artifacts/release/*.zip
+          name: desktop-${{ matrix.rid }}
+          path: artifacts/dist/*
+          if-no-files-found: error
+
   browser:
-    if: startsWith(github.ref, 'refs/tags/v')
+    needs: version
     runs-on: ubuntu-latest
     timeout-minutes: 40
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
       - uses: actions/setup-node@v7
         with:
           node-version: '22'
-      - name: Verify version and toolchain
+      - name: Verify toolchain
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
-          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then exit 1; fi
-          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
           dotnet workload install wasm-tools --skip-manifest-update
           python3 scripts/fetch-assets.py
       - run: dotnet run --project tests/ArtSpace.Tests -c Release
@@ -94,8 +140,11 @@ jobs:
           path: artifacts/release/*.zip
       - uses: actions/upload-artifact@v7
         with:
-          name: ArtSpace-release-nuget
-          path: artifacts/packages/*
+          name: nuget-packages
+          path: |
+            artifacts/packages/*.nupkg
+            artifacts/packages/*.snupkg
+          if-no-files-found: error
       - uses: actions/upload-artifact@v7
         if: always()
         with:
@@ -105,44 +154,77 @@ jobs:
             artifacts/test-results
             artifacts/browser-results.xml
           if-no-files-found: ignore
+
   publish:
-    needs: [desktop, browser]
+    needs: [version, desktop, browser]
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       contents: write
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
     steps:
       - uses: actions/download-artifact@v8
         with:
-          pattern: ArtSpace-release-*
-          path: artifacts
+          name: ArtSpace-release-browser
+          path: release
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: desktop-*
+          path: release
+          merge-multiple: true
       - name: Collect release archives and checksums
         run: |
-          mkdir release
-          find artifacts -name '*.zip' -type f -exec cp {} release/ \;
-          (cd release && sha256sum *.zip > SHA256SUMS.txt)
+          (cd release && sha256sum *.zip *.tar.gz > SHA256SUMS.txt)
+          cat release/SHA256SUMS.txt
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ArtSpace-release
+          path: release/*
+          if-no-files-found: error
       - name: Publish versioned GitHub release
+        if: github.ref_type == 'tag'
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
         run: |
           EXTRA=()
-          case "$GITHUB_REF_NAME" in *-*) EXTRA+=(--prerelease);; esac
-          gh release create "$GITHUB_REF_NAME" release/* --verify-tag --generate-notes --title "ArtSpace ${GITHUB_REF_NAME#v}" "${EXTRA[@]}"
+          case "$VERSION" in *-*) EXTRA+=(--prerelease);; esac
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" release/* --clobber
+          else
+            gh release create "$TAG" release/* --verify-tag --generate-notes --title "ArtSpace $VERSION" "${EXTRA[@]}"
+          fi
+
   nuget:
-    needs: [publish]
+    name: Publish to NuGet.org (Trusted Publishing)
+    needs: [version, publish]
+    if: github.ref_type == 'tag'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     environment: nuget
+    permissions:
+      id-token: write
+      contents: read
     steps:
       - uses: actions/download-artifact@v8
         with:
-          name: ArtSpace-release-nuget
+          name: nuget-packages
           path: packages
       - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '10.0.x'
-      - name: Publish only when explicitly configured
+      - name: Check NuGet user
         env:
-          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
-        run: |
-          if [ -z "$NUGET_API_KEY" ]; then echo 'NuGet publication skipped: NUGET_API_KEY is not configured.'; exit 0; fi
-          dotnet nuget push 'packages/*.nupkg' --api-key "$NUGET_API_KEY" --source https://api.nuget.org/v3/index.json --skip-duplicate
+          NUGET_USER: ${{ vars.NUGET_USER || secrets.NUGET_USER }}
+        run: test -n "$NUGET_USER" || { echo 'Set the NUGET_USER variable (your nuget.org profile name) for this repository or its nuget environment.' >&2; exit 1; }
+      - name: NuGet login (OIDC → short-lived API key)
+        id: login
+        uses: NuGet/login@v1
+        with:
+          user: ${{ vars.NUGET_USER || secrets.NUGET_USER }}
+      - name: Push packages
+        env:
+          NUGET_API_KEY: ${{ steps.login.outputs.NUGET_API_KEY }}
+        run: dotnet nuget push "packages/*.nupkg" --api-key "$NUGET_API_KEY" --source https://api.nuget.org/v3/index.json --skip-duplicate

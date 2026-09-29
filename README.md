@@ -78,6 +78,20 @@ python3 scripts/serve-site.py --directory artifacts/site
 
 Open `http://127.0.0.1:4173/ArtSpace/`. HTTP(S) is required; `file://` is not supported. The asset script retrieves pinned Inter files and their SIL OFL notice. Font binaries are not committed.
 
+## Download
+
+Every [release](https://github.com/wieslawsoltes/ArtSpace/releases/latest) ships a self-contained, single-file desktop app — no .NET install needed:
+
+| OS | x64 | Arm64 |
+| --- | --- | --- |
+| Windows | `ArtSpace-<version>-win-x64.zip` | `ArtSpace-<version>-win-arm64.zip` |
+| macOS | `ArtSpace-<version>-osx-x64.tar.gz` | `ArtSpace-<version>-osx-arm64.tar.gz` |
+| Linux | `ArtSpace-<version>-linux-x64.tar.gz` | `ArtSpace-<version>-linux-arm64.tar.gz` |
+
+Extract and run `ArtSpace` (`ArtSpace.exe` on Windows). Builds are not code-signed yet: on macOS clear the quarantine flag with `xattr -d com.apple.quarantine ArtSpace`; on Windows choose **More info → Run anyway** in SmartScreen. Verify downloads against `SHA256SUMS.txt`.
+
+The libraries below are published to [NuGet.org](https://www.nuget.org/packages?q=ArtSpace), e.g. `dotnet add package ArtSpace.Workbench`.
+
 ## Reusable libraries
 
 | Package | Responsibility |
@@ -103,7 +117,7 @@ var session = new EditorSession(IllustrationSample.Create());
 window.Content = new StudioWorkbench(session, storage);
 ```
 
-Skia consumers need compatible native assets for the executing platform. CI produces package artifacts; this does not imply public NuGet.org publication.
+Skia consumers need compatible native assets for the executing platform. Tagged releases publish all nine packages, with symbols, to NuGet.org.
 
 ## Verification and performance
 
@@ -117,7 +131,7 @@ npx playwright test # after starting the local static server
 dotnet run --project tests/ArtSpace.Tests -c Release --no-build -- --benchmark
 ```
 
-Build validates the engine/benchmarks, Windows/Linux/macOS compilation, browser publication/acceptance and all nine packages. Pages deploys successful main-branch artifacts, verifies `build-info.json` and tests the public application. Release tags produce browser/native/source/package archives and checksums; NuGet publication requires explicitly configured credentials. Workflow results establish which commit passed.
+Build validates the engine/benchmarks, Windows/Linux/macOS compilation, browser publication/acceptance and all nine packages. Pages deploys successful main-branch artifacts, verifies `build-info.json` and tests the public application. Release runs for `v*` tags or a supplied manual version: it repeats the engine and browser gates, publishes self-contained single-file desktop executables for Windows, macOS and Linux (x64 and arm64) plus browser/source/package archives and `SHA256SUMS.txt`. Tags attach them to a GitHub Release and publish the packages to NuGet.org with [Trusted Publishing](https://learn.microsoft.com/nuget/nuget-org/trusted-publishing) (OIDC, no stored API key) from the protected `nuget` environment; manual runs are dry runs that only upload workflow artifacts. Workflow results establish which commit passed.
 
 Rendering uses Uno **SKCanvasElement** and its shared Skia composition path, not an extra application-owned CPU framebuffer. Hardware acceleration depends on the host/browser/driver; path operations remain CPU-side. CI Chromium and benchmark surfaces use software graphics. CPU allocations/timings are not whole-app frame rates or physical-GPU certification. See [clipping/performance](docs/clipping-and-performance.md) and the [0.4 guide](docs/opacity-masks-and-gradients.md#cache-ownership-and-measured-work).
 
