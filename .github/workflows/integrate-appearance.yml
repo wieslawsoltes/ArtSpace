@@ -1,0 +1,25 @@
+name: Integrate appearance source
+on:
+  push:
+    branches: [feat/appearance-gpu-parity]
+    paths: ['.github/workflows/integrate-appearance.yml']
+permissions:
+  contents: write
+jobs:
+  integrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feat/appearance-gpu-parity
+      - name: Integrate reviewed source changes
+        run: |
+          python3 scripts/integrate-appearance.py
+          git diff --check
+          rm scripts/integrate-appearance.py .github/workflows/integrate-appearance.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src tests Directory.Build.props .github/workflows/build.yml scripts/integrate-appearance.py .github/workflows/integrate-appearance.yml
+          git commit -m 'Integrate live appearance and retained GPU-canvas rendering across model, commands, UI and tests'
+          git push origin HEAD:feat/appearance-gpu-parity
