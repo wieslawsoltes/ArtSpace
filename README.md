@@ -438,9 +438,11 @@ AppearanceOperations.ApplyStyle(session, styleId);
 
 Skia consumers need compatible native assets for the executing platform. Reusable renderer callers must invalidate the retained scene after model mutations; the direct renderer continues to inspect mutable values. See the [ownership contract](docs/appearance-rendering.md#native-rendering-architecture).
 
+Native replay now uses a clip-aware R-tree index. Changing recording policy releases incompatible commands; increasing the budget retries previously rejected scenes. See [spatial replay and its controlled benchmark](docs/spatial-replay.md).
+
 ## Verification and performance
 
-The repository registers **247 engine cases**, **five additional benchmark boundary checks** and **21 browser scenarios**. Browser tests exercise real pointer, keyboard and file-picker input against the published Uno app. Diagnostics enabled by `?test=1` are read-only, not an editing API. A completed workflow result identifies which commit passed.
+The repository registers **256 engine cases**, **five additional benchmark boundary checks** and **21 browser scenarios**. Browser tests exercise real pointer, keyboard and file-picker input against the published Uno app. Diagnostics enabled by `?test=1` are read-only, not an editing API. A completed workflow result identifies which commit passed.
 
 ```bash
 npm ci

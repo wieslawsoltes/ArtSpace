@@ -51,7 +51,7 @@ ArtSpace is an independent illustration editor. Similar workspace conventions do
 
 ## Validation
 
-247 registered engine cases, five additional benchmark safety checks and 21 real Uno browser scenarios are defined. Build and Pages reports determine which commit passed, including new mask source movement, recovery, SVG radial/affine metadata, gradient manipulation and shader retention. Retained screenshots are evidence of captured frames, not complete visual parity.
+256 registered engine cases, five additional benchmark safety checks and 21 real Uno browser scenarios are defined. Build and Pages reports determine which commit passed, including new mask source movement, recovery, SVG radial/affine metadata, gradient manipulation and shader retention. Retained screenshots are evidence of captured frames, not complete visual parity.
 
 Benchmarks compare exact reference snapping/bounds and output pixels. The legacy appearance report records five warmed CPU samples. The new retained-scene report alternates measurement order over seven samples, checks exact reference pixels, and verifies unchanged native resources are not rebuilt. Both use software Skia; scene recording cost is excluded. Cleared-cache comparisons intentionally force rebuilds and are not old-release application FPS measurements. Native build success does not certify every native interaction.
 
