@@ -1,0 +1,112 @@
+name: Finish appearance integration
+on:
+  push:
+    branches: [feat/appearance-gpu-parity]
+    paths: ['.github/workflows/finish-appearance.yml']
+permissions:
+  contents: write
+jobs:
+  integrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feat/appearance-gpu-parity
+      - name: Apply reviewed ownership and documentation changes
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          expected = {
+              'src/ArtSpace.Editing/ComponentService.cs': 'bfe74d0aa782e90aa3290290fb6c96d26672c9e3',
+              'tests/ArtSpace.Tests/Program.cs': '27054f914d4942af04524e0a2e34d534d0044e64',
+              'src/ArtSpace.Workbench/StudioWorkbench.Inspector.cs': '535e4a130e1a15125beb35e055af0cc789b23ced',
+              'src/ArtSpace.Workbench/StudioWorkbench.Illustration.cs': 'b9eb0b8fe4aebb273c4530b86e5a213ee2fb5f02',
+              'CHANGELOG.md': '388d463a07b37b589ea6187ebe896fb8d63a38a2',
+              'docs/feature-matrix.md': '11debd0a2f99f6838402a772715ee9fe3e9a462f',
+              'README.md': 'e7b1be3183eab25fd071d73435bfb433f4d3ec3d'
+          }
+          for path, sha in expected.items():
+              assert subprocess.check_output(['git', 'hash-object', path], text=True).strip() == sha, path
+          def replace(path, old, new, count=1):
+              p = Path(path); s = p.read_text()
+              assert s.count(old) == count, (path, old, s.count(old))
+              p.write_text(s.replace(old, new))
+          p = 'src/ArtSpace.Editing/ComponentService.cs'
+          replace(p, 'explicit text/fill overrides.', 'explicit text, fill and full appearance overrides.')
+          replace(p, '        editor.Edit("Reset instance overrides", () => { foreach (var n in editor.Selection.Where(n => n.Kind == NodeKind.Instance)) n.Overrides.Clear(); Synchronize(editor.Document); });', '''        editor.Edit("Reset instance overrides", () =>
+                  {
+                      foreach (var node in editor.Selection.Where(n => n.Kind == NodeKind.Instance && !n.IsEffectivelyLocked))
+                      {
+                          // Root placement/transparency historically belong to the instance. Reset only
+                          // transparency explicitly captured by a full appearance override.
+                          if (node.SourceId is { } source && node.Overrides.TryGetValue(source, out var entry)
+                              && entry.Appearance is not null && node.ComponentId is { } componentId
+                              && editor.Document.Find(componentId) is { Kind: NodeKind.Component } definition)
+                          { node.Opacity = definition.Opacity; node.Blend = definition.Blend; }
+                          node.Overrides.Clear();
+                      }
+                  });''')
+          replace(p, '        value.Appearance = GraphicStyle.Capture(node, "Appearance override");', '''        var appearance = GraphicStyle.Capture(node, "Appearance override");
+                  // A semantically unchanged override must not introduce a new GUID and undo entry.
+                  appearance.Id = value.Appearance?.Id ?? "appearance-" + node.SourceId;
+                  value.Appearance = appearance;''')
+          replace('tests/ArtSpace.Tests/Program.cs', 'LiveAppearanceTests.Register(Test);', 'LiveAppearanceTests.Register(Test);\nAppearanceBoundaryTests.Register(Test);')
+          p = 'src/ArtSpace.Workbench/StudioWorkbench.Inspector.cs'
+          replace(p, 'Change("Opacity",', 'ChangeAppearance("Opacity",')
+          replace(p, 'Change("Blend mode",', 'ChangeAppearance("Blend mode",')
+          replace(p, 'if (n.Strokes.Count > i) n.Strokes[i].Color = color;', 'if (n.Strokes.Count > i) { n.Strokes[i].Color = color; n.Strokes[i].Paint = null; }')
+          p = 'src/ArtSpace.Workbench/StudioWorkbench.Illustration.cs'
+          for label in ['Swap fill and stroke', 'Remove fill', 'Fill color', 'Stroke color', 'Stroke width', 'Opacity']:
+              replace(p, 'Change("' + label + '",', 'ChangeAppearance("' + label + '",')
+          replace(p, 'n.Strokes[0].Color = color;', 'n.Strokes[0].Color = color; n.Strokes[0].Paint = null;')
+          replace(p, 'Session.UpdateSelection("Remove shadows",', 'ChangeAppearance("Remove shadows",')
+          replace(p, 'Session.UpdateSelection("Apply gradient",', 'ChangeAppearance("Apply gradient",')
+          replace('README.md', '**239 engine cases**', '**247 engine cases**')
+          p = Path('CHANGELOG.md')
+          entry = '''## 0.5.0-alpha.1 — live appearance and retained rendering
+
+          - Add ordered non-destructive Gaussian Blur, Drop Shadow, Outer Glow and Saturation effects, with parameter editing, enablement, reorder, duplicate and delete.
+          - Add document-local Graphic Styles with independent paint/effect ownership, vector thumbnails, bounded paged UI, apply, rename and delete.
+          - Add retained Appearance and Graphic Styles panels, Effect/Window menu integration, fill/stroke ordering and duplication, and appearance clear/reduce actions.
+          - Support gradient strokes, signed dash offsets, odd-length dash patterns and nine additional compositing modes (sixteen total).
+          - Retain native fill/stroke paints, dash effects and image-filter graphs; replay unchanged scenes as native vector display lists into Uno's shared Skia canvas, with separate editing overlays and a bounded direct-render fallback.
+          - Preserve explicit symbol appearance overrides, restore root opacity/blend on reset, respect locked instances and retain stable override identity for no-op edits.
+          - Extend SVG gradient-stroke and dash-phase interchange. Native/PNG retain live effects; SVG export explicitly rejects enabled live effects instead of silently discarding them.
+          - Save native schema 4, read schemas 1–4, and validate new appearance before synchronization and transaction completion.
+          - Add 36 registered appearance/retention regressions (247 total), three real browser scenarios (21 total), actual-control diagnostics and alternating-order reference-pixel CPU benchmarks.
+
+          GPU execution depends on the Uno/Skia host, driver and browser. This increment is not a WebGPU compute rewrite or complete/pixel-identical Illustrator parity. Software benchmark numbers do not establish physical-GPU throughput. See [appearance and rendering](docs/appearance-rendering.md) for semantics, resource limits, workflows and remaining boundaries.
+
+          '''
+          p.write_text(p.read_text().replace('# Changelog\n\n', '# Changelog\n\n' + '\n'.join(line[10:] if line.startswith('          ') else line for line in entry.splitlines()) + '\n'))
+          p = Path('docs/feature-matrix.md'); s = p.read_text()
+          changes = {
+              '0.4.0-alpha.1': '0.5.0-alpha.1',
+              '| Appearance stack/effects | Limited | Multiple fills/strokes, blend subset and shadows, not full nested live-effect semantics |': '| Appearance stack/effects | Implemented with limits | Ordered object-level blur, shadow, glow and saturation; sixteen blends; independent fill/stroke ordering; no arbitrary interleaved per-paint effects or complete Illustrator effect catalog |\n| Graphic Styles | Implemented with limits | Document-local independent appearance presets, native previews, apply/rename/delete and twelve-slot paging; not globally linked styles or Adobe library interchange |\n| Gradient/dashed strokes | Implemented with limits | Linear/radial stroke paint, stop opacity, spread, dash phase and odd-pattern normalization; no variable-width profiles or art/pattern brushes |',
+              'no gradient strokes, linear-light interpolation or complete CSS cascade': 'gradient strokes and dash phase supported; no linear-light interpolation or complete CSS cascade',
+              'Linked local components/instances and mask reference remapping; not full dynamic symbols': 'Linked local components, mask remapping and explicit full appearance overrides/reset; not full dynamic symbols',
+              'Read schemas 1–3; new saves schema 3; previous readers reject new schema': 'Read schemas 1–4; new saves schema 4; previous readers reject new schema',
+              'Exact geometry identity, text/fonts, gradient shaders and selection snapshots; owned-resource pruning': 'Exact geometry/text/gradient caches plus retained paints, dashes, filters and selection snapshots; owned-resource pruning',
+              '| Indexed snapping |': '| Retained native scene | Implemented with limits | Vector SKPicture playback into the host canvas; separate overlays, explicit mutation invalidation, 32 MiB approximate command-storage budget; recording/edits remain CPU-side |\n| Retained property panels | Implemented | Visible-panel routing, topology-keyed sections, current-target bindings, input ownership and incremental layer rows |\n| Indexed snapping |',
+              '195 registered engine cases, five additional benchmark safety checks and 13 real Uno browser scenarios': '247 registered engine cases, five additional benchmark safety checks and 21 real Uno browser scenarios',
+              'The appearance report records five warmed CPU samples and medians on software Skia.': 'The legacy appearance report records five warmed CPU samples. The new retained-scene report alternates measurement order over seven samples, checks exact reference pixels, and verifies unchanged native resources are not rebuilt. Both use software Skia; scene recording cost is excluded.',
+              'Guides: ': 'Guides: [live appearance/rendering](appearance-rendering.md), [UI responsiveness](ui-performance.md), '
+          }
+          for a, b in changes.items():
+              assert a in s, a
+              s = s.replace(a, b)
+          p.write_text(s)
+          # Normalize indentation introduced by the multiline guarded replacement strings.
+          for path in ['src/ArtSpace.Editing/ComponentService.cs']:
+              p = Path(path); s = p.read_text()
+              s = s.replace('\n                  ', '\n        ')
+              p.write_text(s)
+          PY
+          git diff --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src tests README.md CHANGELOG.md docs/feature-matrix.md
+          git commit -m 'Harden appearance ownership and reset, validate nested retained compositing, and document schema-four workflows'
+          git push origin HEAD:feat/appearance-gpu-parity
