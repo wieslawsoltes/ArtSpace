@@ -42,7 +42,7 @@ public sealed partial class SceneRenderer
     {
         if (node.Kind != NodeKind.Text) throw new ArgumentException("The node must contain text.", nameof(node));
         if (node.Text.Length > 100_000) throw new InvalidOperationException("Outline conversion is limited to 100,000 characters per text object.");
-        if (node.TextPath is not null) return TypeOnPathLayout(node).CreateOutline();
+        if (node.TextPath is not null) { ValidateTypeOnPath(node); return TypeOnPathLayout(node).CreateOutline(); }
         var path = new SKPath();
         try
         {

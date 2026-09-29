@@ -37,6 +37,7 @@ public sealed partial class StudioWorkbench
             body.Children.Add(b.Text(() =>
             {
                 var status = Surface.Renderer.GetTypeOnPathStatus(InspectedNode);
+                if (status.Error is not null) return "Invalid baseline: " + status.Error;
                 return (status.Overflow ? "Overflow · " : "Fits · ") + status.VisibleGlyphs + " / " + status.TotalGlyphs
                     + " characters · " + Numbers.Format(status.PathLength) + " px path";
             }, 10, Studio.Muted));

@@ -179,6 +179,9 @@ public sealed partial class SceneRenderer : IDisposable
     }
     public byte[] ExportPng(IEnumerable<DesignNode> nodes, RectD bounds, double scale = 1)
     {
+        nodes = nodes.ToArray();
+        foreach (var node in nodes.SelectMany(n => n.DescendantsAndSelf()))
+            if (node.TextPath is not null && node.IsEffectivelyVisible) ValidateTypeOnPath(node);
         var width = Math.Max(1, (int)Math.Ceiling(bounds.Width * scale)); var height = Math.Max(1, (int)Math.Ceiling(bounds.Height * scale));
         if (!double.IsFinite(scale) || scale <= 0 || width > 16384 || height > 16384 || (long)width * height > 64_000_000) throw new InvalidOperationException("Export is limited to 16,384 pixels per edge and 64 megapixels.");
         using var surface = SKSurface.Create(new SKImageInfo(width, height, SKColorType.Rgba8888, SKAlphaType.Premul)) ?? throw new InvalidOperationException("Could not allocate export surface.");

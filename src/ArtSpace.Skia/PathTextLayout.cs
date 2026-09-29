@@ -4,7 +4,7 @@ using SkiaSharp;
 namespace ArtSpace.Skia;
 
 public readonly record struct PathTextGlyph(int ScalarIndex, int Utf16Index, double Advance, double Distance, Matrix2D Transform);
-public readonly record struct PathTextStatus(double PathLength, double RangeLength, double TextAdvance, int TotalGlyphs, int VisibleGlyphs, bool Overflow, RectD InkBounds);
+public readonly record struct PathTextStatus(double PathLength, double RangeLength, double TextAdvance, int TotalGlyphs, int VisibleGlyphs, bool Overflow, RectD InkBounds, string? Error = null);
 
 /// <summary>
 /// Immutable layout and owned vector glyph geometry. Basic Unicode-scalar layout uses the supplied
@@ -23,6 +23,8 @@ public sealed class PathTextLayout : IDisposable
     {
         _outline = outline; Glyphs = glyphs.AsReadOnly(); Status = status;
     }
+
+    internal static PathTextLayout Invalid(string error) => new(new SKPath(), [], new(0, 0, 0, 0, 0, true, default, error));
 
     public static PathTextLayout Build(MeasuredContour contour, string text, SKFont font, TypeOnPathOptions options,
         double tracking = 0, TextAlignment alignment = TextAlignment.Left)

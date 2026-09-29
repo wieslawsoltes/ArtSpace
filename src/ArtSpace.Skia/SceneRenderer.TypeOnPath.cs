@@ -40,8 +40,18 @@ public sealed partial class SceneRenderer
             node.TextAlign, options.Start, options.End, options.Flip, options.BaselineShift, options.Alignment);
         if (_pathTextLayouts.TryGetValue(node.Id, out var entry) && entry.Key == key && entry.Snapshot.Matches(node))
             return entry.Layout;
-        using var font = CreateTextFont(node);
-        var result = PathTextLayout.Build(TextBaseline(node), node.Text, font, options, node.LetterSpacing, node.TextAlign);
+        PathTextLayout result;
+        try
+        {
+            using var font = CreateTextFont(node);
+            result = PathTextLayout.Build(TextBaseline(node), node.Text, font, options, node.LetterSpacing, node.TextAlign);
+        }
+        catch (Exception error) when (error is InvalidOperationException or InvalidDataException or ArgumentException)
+        {
+            // Native documents remain inspectable when a baseline is malformed. Cache this diagnostic,
+            // rather than repeatedly throwing from the Uno rendering callback. Exports reject it explicitly.
+            result = PathTextLayout.Invalid(error.Message);
+        }
         var bytes = result.Outline.PointCount * 16L + result.Glyphs.Count * 72L;
         if (entry is not null) { entry.Layout.Dispose(); _pathTextBytes -= entry.Bytes; _pathTextLayouts.Remove(node.Id); }
         // Approximate CPU geometry accounting, not a GPU/native allocation ceiling.
@@ -59,6 +69,26 @@ public sealed partial class SceneRenderer
         var baseline = TextBaseline(node); return baseline.At(fraction * baseline.Length);
     }
     public double ProjectTypeOnPath(DesignNode node, Vec2 localPoint) => TextBaseline(node).Project(localPoint);
+
+    public void ValidateTypeOnPath(DesignNode node)
+    {
+        if (GetTypeOnPathStatus(node).Error is { } error)
+            throw new InvalidOperationException("Invalid type-on-path baseline: " + error);
+    }
+
+    /// <summary>Geometric export bounds including path-text ink; excludes general live-effect expansion.</summary>
+    public RectD GetArtworkBounds(DesignNode node)
+    {
+        var bounds = node.WorldBounds;
+        foreach (var child in node.DescendantsAndSelf())
+        {
+            if (child.TextPath is null || !child.IsEffectivelyVisible) continue;
+            var status = GetTypeOnPathStatus(child);
+            if (status.Error is not null) continue;
+            if (!status.InkBounds.IsEmpty) bounds = RectD.Union(bounds, child.WorldMatrix.Map(status.InkBounds));
+        }
+        return bounds;
+    }
 
     private void ClearPathTextLayouts()
     {

@@ -233,7 +233,7 @@ public sealed partial class StudioWorkbench
     {
         var nodes = Session.SelectionRoots.Count > 0 ? Session.SelectionRoots.Where(n => n.Visible).ToArray() : Session.Page.Nodes.Where(n => n.Visible).ToArray();
         if (nodes.Length == 0) { ShowStatus("There are no visible layers to export."); return; }
-        var bounds = nodes.Select(n => n.WorldBounds).Aggregate(RectD.Union);
+        var bounds = nodes.Select(n => Surface.Renderer.GetArtworkBounds(n)).Aggregate(RectD.Union);
         if (nodes.Length == 1 && nodes[0].Kind == NodeKind.Slice) nodes = Session.Page.Nodes.Where(n => n.Visible && n.Kind != NodeKind.Slice).ToArray();
         var bytes = svg ? Encoding.UTF8.GetBytes(ArtSpace.Illustration.IllustrationSvgExport.Export(nodes, bounds, Surface.Renderer)) : Surface.Renderer.ExportPng(nodes, bounds, _exportScale);
         var name = SafeName(Session.SelectionRoots.Count == 1 ? Session.SelectionRoots[0].Name : Session.Page.Name);

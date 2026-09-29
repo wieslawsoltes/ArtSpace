@@ -106,7 +106,7 @@ internal static class BrowserDiagnostics
                     json.WriteStartObject("pathText"); json.WriteNumber("start", pathText.Start); json.WriteNumber("end", pathText.End);
                     json.WriteBoolean("flip", pathText.Flip); json.WriteNumber("baselineShift", pathText.BaselineShift);
                     json.WriteNumber("length", status.PathLength); json.WriteBoolean("overflow", status.Overflow);
-                    json.WriteNumber("visibleGlyphs", status.VisibleGlyphs); json.WriteEndObject();
+                    json.WriteNumber("visibleGlyphs", status.VisibleGlyphs); json.WriteString("error", status.Error); json.WriteEndObject();
                 }
                 json.WriteStartArray("typePathHandles");
                 foreach (var handle in workbench.Surface.GetTypeOnPathHandles())

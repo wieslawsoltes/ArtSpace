@@ -17,6 +17,7 @@ public sealed partial class DesignSurface
     {
         if (Session is not { Tool: EditorTool.Move, Primary: { TextPath: { } options } node } editor
             || editor.SelectionRoots.Count != 1 || node.IsEffectivelyLocked || IsPresenting) return [];
+        if (Renderer.GetTypeOnPathStatus(node).Error is not null) return [];
         var result = new TypeOnPathHandle[3];
         var fractions = new[] { options.Start, options.End, (options.Start + options.End) / 2 };
         for (var i = 0; i < result.Length; i++)
