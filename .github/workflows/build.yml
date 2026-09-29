@@ -33,6 +33,8 @@ jobs:
           cat artifacts/benchmarks/cpu.json
           dotnet run --project tests/ArtSpace.Tests -c Release --no-build -- --appearance-benchmark > artifacts/benchmarks/appearance-retention.json
           cat artifacts/benchmarks/appearance-retention.json
+          dotnet run --project tests/ArtSpace.Tests -c Release --no-build -- --spatial-benchmark > artifacts/benchmarks/spatial-replay.json
+          cat artifacts/benchmarks/spatial-replay.json
       - uses: actions/upload-artifact@v7
         with:
           name: ArtSpace-performance
