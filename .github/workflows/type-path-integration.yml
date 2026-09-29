@@ -1,0 +1,46 @@
+name: Type path integration
+on:
+  push:
+    branches: [feat/type-on-path]
+    paths: ['.github/workflows/type-path-integration.yml']
+permissions:
+  contents: write
+jobs:
+  integrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feat/type-on-path
+      - name: Materialize reviewed source changes
+        run: |
+          if [ -f eng/integrate-type-path.py ]; then
+            python3 eng/integrate-type-path.py
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git add src tests Directory.Build.props
+            git rm eng/integrate-type-path.py
+            git commit -m 'Integrate editable type on a path and retained layout into the shared Uno editor'
+            git push origin HEAD:feat/type-on-path
+          fi
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+      - name: Geometry and typography regression suite
+        run: dotnet run --project tests/ArtSpace.Tests -c Release
+      - name: Reference pixel and CPU cache measurements
+        run: |
+          mkdir -p artifacts/benchmarks
+          dotnet run --project tests/ArtSpace.Tests -c Release --no-build -- --type-on-path-benchmark > artifacts/benchmarks/type-on-path.json
+          cat artifacts/benchmarks/type-on-path.json
+      - name: Compile native Uno host
+        run: |
+          python3 scripts/fetch-assets.py
+          dotnet build src/ArtSpace.App -c Release -f net10.0-desktop -p:ArtSpaceDesktopOnly=true
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: ArtSpace-type-path-measurements
+          path: artifacts/benchmarks
+          if-no-files-found: ignore
