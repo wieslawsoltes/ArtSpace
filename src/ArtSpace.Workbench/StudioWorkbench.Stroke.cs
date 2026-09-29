@@ -48,11 +48,12 @@ public sealed partial class StudioWorkbench
             {
                 var presets = Enum.GetValues<StrokeWidthPreset>();
                 var names = presets.Select(StrokeProfiles.Name).Append("Custom").ToArray();
+                var profiles = presets.Select(StrokeProfiles.Create).ToArray();
                 string ProfileName()
                 {
-                    foreach (var preset in presets)
+                    for (var p = 0; p < presets.Length; p++)
                     {
-                        var candidate = StrokeProfiles.Create(preset); var current = Current().WidthProfile;
+                        var preset = presets[p]; var candidate = profiles[p]; var current = Current().WidthProfile;
                         if (candidate.Count != current.Count) continue;
                         var same = true;
                         for (var i = 0; i < candidate.Count; i++)

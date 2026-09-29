@@ -34,6 +34,9 @@ public static partial class DocumentJson
         {
             if (stroke is null || !double.IsFinite(stroke.DashOffset) || Math.Abs(stroke.DashOffset) > 1e9)
                 throw new InvalidDataException("Invalid stroke dash offset.");
+            StrokeProfiles.Validate(stroke.WidthProfile);
+            if (node.Kind == NodeKind.Text && stroke.WidthProfile.Count != 0)
+                throw new InvalidDataException("Create text outlines before applying a variable-width stroke.");
             if (stroke.Paint is { } paint) ValidatePaint(paint);
         }
         foreach (var shadow in node.Shadows)

@@ -8,8 +8,8 @@ public sealed partial class StudioWorkbench
     private enum UiDirty
     {
         None = 0, Header = 1, Inspector = 2, Layers = 4, LayerSelection = 8,
-        Artboards = 16, History = 32, Tools = 64, ControlBar = 128, Pages = 256, Assets = 512, Appearance = 1024, GraphicStyles = 2048,
-        All = Header | Inspector | Layers | LayerSelection | Artboards | History | Tools | ControlBar | Pages | Assets | Appearance | GraphicStyles
+        Artboards = 16, History = 32, Tools = 64, ControlBar = 128, Pages = 256, Assets = 512, Appearance = 1024, GraphicStyles = 2048, Stroke = 4096,
+        All = Header | Inspector | Layers | LayerSelection | Artboards | History | Tools | ControlBar | Pages | Assets | Appearance | GraphicStyles | Stroke
     }
     private UiDirty _uiDirty;
     private bool _uiQueued;
@@ -43,7 +43,7 @@ public sealed partial class StudioWorkbench
     private void RequestUi(UiDirty dirty)
     {
         if (_disposed) return;
-        if ((dirty & UiDirty.Inspector) != 0) dirty |= UiDirty.Appearance | UiDirty.GraphicStyles;
+        if ((dirty & UiDirty.Inspector) != 0) dirty |= UiDirty.Appearance | UiDirty.GraphicStyles | UiDirty.Stroke;
         _uiDirty |= dirty;
         if (_uiQueued) return;
         _uiQueued = true;
@@ -94,6 +94,7 @@ public sealed partial class StudioWorkbench
                 if (IsPanelVisible("History")) RefreshHistory(); else _uiDirty |= UiDirty.History;
             }
             RefreshAppearancePanels(dirty);
+            RefreshStrokePanel(dirty);
             // The illustration shell does not display the legacy Pages list.
             if ((dirty & UiDirty.Pages) != 0 && !_illustrationReady) RefreshPages();
         }

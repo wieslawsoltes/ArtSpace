@@ -21,7 +21,7 @@ public sealed partial class SceneRenderer : IDisposable
     public void PruneCache(IEnumerable<DesignNode> roots)
     {
         var nodes = roots.SelectMany(n => n.DescendantsAndSelf()).ToArray();
-        InvalidateRetainedScene(); PrunePaints(nodes); PruneGradients(nodes);
+        InvalidateRetainedScene(); PrunePaints(nodes); PruneGradients(nodes); PruneStrokeGeometry(nodes);
         var retained = nodes.Select(n => n.Id).ToHashSet(StringComparer.Ordinal);
         PruneEffects(retained);
         foreach (var id in _paths.Keys.Where(id => !retained.Contains(id)).ToArray())
@@ -37,7 +37,7 @@ public sealed partial class SceneRenderer : IDisposable
     }
     public void ClearCache()
     {
-        InvalidateRetainedScene(); ClearPaints(); ClearEffects();
+        InvalidateRetainedScene(); ClearPaints(); ClearEffects(); ClearStrokeGeometry();
         foreach (var p in _paths.Values) p.Path.Dispose(); _paths.Clear(); ClearTextLayouts(); ClearGradients();
     }
     public static SKColor Color(string? hex, double opacity = 1)
@@ -81,7 +81,7 @@ public sealed partial class SceneRenderer : IDisposable
             var bounds = Geometry(node).TightBounds;
             var outset = 1d;
             foreach (var stroke in node.Strokes)
-                if (stroke.Visible) outset = Math.Max(outset, stroke.Width * .5 * Math.Max(2, stroke.Join == StrokeJoin.Miter ? stroke.MiterLimit : 2));
+                if (stroke.Visible) outset = Math.Max(outset, stroke.Width * StrokeProfiles.MaximumSide(stroke.WidthProfile) * Math.Max(2, stroke.Join == StrokeJoin.Miter ? stroke.MiterLimit : 2));
             var matrix = canvas.TotalMatrix;
             var scale = Math.Max(.000001, Math.Min(Math.Sqrt(matrix.ScaleX * matrix.ScaleX + matrix.SkewY * matrix.SkewY), Math.Sqrt(matrix.ScaleY * matrix.ScaleY + matrix.SkewX * matrix.SkewX)));
             outset += 2 / scale; bounds.Inflate((float)outset, (float)outset);
@@ -114,7 +114,7 @@ public sealed partial class SceneRenderer : IDisposable
             {
                 if (!stroke.Visible || stroke.Width <= 0 || stroke.Paint?.Visible == false) continue;
                 var paint = StrokePaint(stroke, node);
-                if (node.Kind == NodeKind.Text) DrawText(canvas, node, paint); else canvas.DrawPath(Geometry(node), paint);
+                if (node.Kind == NodeKind.Text) DrawText(canvas, node, paint); else canvas.DrawPath(stroke.WidthProfile.Count == 0 ? Geometry(node) : StrokeOutline(node, stroke), paint);
             }
         }
         canvas.Save();
@@ -139,42 +139,6 @@ public sealed partial class SceneRenderer : IDisposable
         var key = node.FontFamily + "|" + node.FontWeight;
         if (!_typefaces.TryGetValue(key, out var typeface)) _typefaces[key] = typeface = SKTypeface.FromFamilyName(node.FontFamily, new SKFontStyle(node.FontWeight, 5, SKFontStyleSlant.Upright)) ?? SKTypeface.Default;
         return typeface;
-    }
-    public DesignNode? HitTest(IEnumerable<DesignNode> roots, Vec2 point, bool deep = false, double tolerance = 4)
-    {
-        foreach (var node in roots.Reverse())
-        {
-            if (!node.IsEffectivelyVisible || node.IsEffectivelyLocked || node.Kind == NodeKind.Slice) continue;
-            var local = node.WorldMatrix.Inverse.Map(point); var inside = node.LocalBounds.Contains(local);
-            if (!Outlines && node.OpacityMaskEnabled && node.OpacityMask is not null && MaskCoverageAt(node, local) <= 1d / 255) continue;
-            if (node.ClippingPath is { } mask)
-            {
-                var maskPoint = mask.LocalMatrix.Inverse.Map(local);
-                if (!Geometry(mask).Contains((float)maskPoint.X, (float)maskPoint.Y)) continue;
-            }
-            if (!node.ClipContent || Geometry(node).Contains((float)local.X, (float)local.Y))
-            {
-                var child = HitTest(node.Children.Where(c => c.Id != node.ClipPathId && c.Id != node.OpacityMaskId), point, deep, tolerance);
-                if (child is not null) return deep || node.Kind == NodeKind.Frame || node.Kind == NodeKind.Section ? child : node;
-            }
-            if (node.Kind == NodeKind.Text && inside) return node;
-            if (node.Kind == NodeKind.Group && node.Children.Count > 0) continue;
-            if (node.Kind == NodeKind.Frame && inside && node.Fills.Count > 0) return node;
-            var path = Geometry(node);
-            var pickBounds = path.TightBounds;
-            // Include the miter reach of both the visible stroke and the tolerance-expanded picking stroke.
-            var pickOutset = Math.Max(tolerance * 4, node.Strokes.Count == 0 ? 0 : node.Strokes.Max(s => s.Width * .5 * Math.Max(4, s.MiterLimit)));
-            pickBounds.Inflate((float)pickOutset + 1, (float)pickOutset + 1);
-            if (!pickBounds.Contains((float)local.X, (float)local.Y)) continue;
-            if (node.Fills.Any(f => f.Visible) && path.Contains((float)local.X, (float)local.Y)) return node;
-            if (node.Strokes.Count > 0)
-            {
-                using var stroke = new SKPaint { Style = SKPaintStyle.Stroke, StrokeWidth = (float)Math.Max(tolerance * 2, node.Strokes.Max(s => s.Width)), StrokeCap = SKStrokeCap.Round };
-                using var outline = new SKPath(); stroke.GetFillPath(path, outline);
-                if (outline.Contains((float)local.X, (float)local.Y)) return node;
-            }
-        }
-        return null;
     }
     public byte[] ExportPng(IEnumerable<DesignNode> nodes, RectD bounds, double scale = 1)
     {

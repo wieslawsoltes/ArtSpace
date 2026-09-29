@@ -81,6 +81,7 @@ public sealed partial class StudioWorkbench
         if (Keyboard.IsTextInput(e.OriginalSource as DependencyObject)) return;
         try
         {
+            if (Surface.HandleWidthKey(e.Key, control, shift, alt)) { e.Handled = true; return; }
             if (Surface.HandlePathKey(e.Key, control, shift, alt)) { e.Handled = true; return; }
         }
         catch (Exception ex) { ShowStatus(ex.Message, true); e.Handled = true; return; }
@@ -130,6 +131,7 @@ public sealed partial class StudioWorkbench
                 VirtualKey.R when shift => () => { Session.RulersVisible = !Session.RulersVisible; Surface.Invalidate(); },
                 VirtualKey.M => () => Session.Tool = EditorTool.Rectangle,
                 VirtualKey.A => () => Session.Tool = EditorTool.DirectSelect,
+                VirtualKey.W when shift => () => Surface.ActivateWidthStroke(Surface.ActiveWidthStroke),
                 VirtualKey.B => () => Session.Tool = EditorTool.Brush,
                 VirtualKey.N => () => Session.Tool = EditorTool.Pencil,
                 VirtualKey.G => () => Session.Tool = EditorTool.Gradient,
@@ -235,7 +237,7 @@ public sealed partial class StudioWorkbench
         if (nodes.Length == 0) { ShowStatus("There are no visible layers to export."); return; }
         var bounds = nodes.Select(n => n.WorldBounds).Aggregate(RectD.Union);
         if (nodes.Length == 1 && nodes[0].Kind == NodeKind.Slice) nodes = Session.Page.Nodes.Where(n => n.Visible && n.Kind != NodeKind.Slice).ToArray();
-        var bytes = svg ? Encoding.UTF8.GetBytes(SvgFormat.Export(nodes, bounds)) : Surface.Renderer.ExportPng(nodes, bounds, _exportScale);
+        var bytes = svg ? Encoding.UTF8.GetBytes(Surface.Renderer.ExportSvg(nodes, bounds)) : Surface.Renderer.ExportPng(nodes, bounds, _exportScale);
         var name = SafeName(Session.SelectionRoots.Count == 1 ? Session.SelectionRoots[0].Name : Session.Page.Name);
         await _storage.SaveAsync(name + (svg ? ".svg" : ".png"), bytes, svg ? "image/svg+xml" : "image/png"); ShowStatus("Exported " + (svg ? "SVG" : "PNG"));
     }

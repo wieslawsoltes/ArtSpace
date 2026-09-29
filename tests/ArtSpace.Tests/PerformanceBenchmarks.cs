@@ -23,7 +23,7 @@ internal static class PerformanceBenchmarks
         var migrated = DocumentJson.Load(legacy);
         Require(migrated.FormatVersion == 1, "Legacy schema must still load.");
         var saved = DocumentJson.Save(migrated);
-        Require(migrated.FormatVersion == 4 && saved.Contains("\"formatVersion\":4", StringComparison.Ordinal), "Native saves must advertise clipping-aware schema 4.");
+        Require(migrated.FormatVersion == DocumentJson.CurrentFormatVersion && saved.Contains("\"formatVersion\":4", StringComparison.Ordinal), "Native saves must advertise clipping-aware schema 4.");
         var node = new DesignNode();
         var editor = new EditorSession(new() { Pages = [new() { Nodes = [node] }] }); editor.Select(node);
         var before = DocumentJson.Save(editor.Document); var failed = false;

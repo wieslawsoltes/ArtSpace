@@ -17,6 +17,7 @@ public sealed partial class SceneRenderer
         public SKPathEffect? Dash;
         public double[] Intervals = [];
         public double Phase = double.NaN;
+        public bool Variable;
         public void Dispose() { Paint.Dispose(); Dash?.Dispose(); }
     }
     private readonly Dictionary<FillStyle, FillPaintEntry> _fillPaints = new(ReferenceEqualityComparer.Instance);
@@ -57,16 +58,19 @@ public sealed partial class SceneRenderer
         if (paint.StrokeCap != (SKStrokeCap)stroke.Cap) paint.StrokeCap = (SKStrokeCap)stroke.Cap;
         if (paint.StrokeJoin != (SKStrokeJoin)stroke.Join) paint.StrokeJoin = (SKStrokeJoin)stroke.Join;
         if (paint.StrokeMiter != (float)stroke.MiterLimit) paint.StrokeMiter = (float)stroke.MiterLimit;
-        var equal = entry.Phase == stroke.DashOffset && entry.Intervals.Length == stroke.Dashes.Count;
+        var variable = stroke.WidthProfile.Count != 0;
+        var style = variable ? SKPaintStyle.Fill : SKPaintStyle.Stroke;
+        if (paint.Style != style) paint.Style = style;
+        var equal = entry.Variable == variable && entry.Phase == stroke.DashOffset && entry.Intervals.Length == stroke.Dashes.Count;
         if (equal)
             for (var i = 0; i < entry.Intervals.Length; i++)
                 if (entry.Intervals[i] != stroke.Dashes[i]) { equal = false; break; }
         if (!equal)
         {
-            var dash = CreateStrokeDash(stroke);
+            var dash = variable ? null : CreateStrokeDash(stroke);
             paint.PathEffect = dash;
             if (!ReferenceEquals(entry.Dash, dash)) entry.Dash?.Dispose();
-            entry.Dash = dash; entry.Phase = stroke.DashOffset; entry.Intervals = [.. stroke.Dashes];
+            entry.Dash = dash; entry.Variable = variable; entry.Phase = stroke.DashOffset; entry.Intervals = [.. stroke.Dashes];
             if (dash is not null) DashBuilds++;
         }
         return paint;

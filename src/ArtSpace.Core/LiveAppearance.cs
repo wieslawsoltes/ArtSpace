@@ -71,6 +71,7 @@ public sealed class GraphicStyle
         Color = value.Color, Width = value.Width, Opacity = value.Opacity, Visible = value.Visible,
         Cap = value.Cap, Join = value.Join, MiterLimit = value.MiterLimit,
         Dashes = [.. value.Dashes], DashOffset = value.DashOffset,
+        WidthProfile = StrokeProfiles.Copy(value.WidthProfile),
         Paint = value.Paint is null ? null : CloneFill(value.Paint)
     };
 

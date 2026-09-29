@@ -15,6 +15,7 @@ if (args.Contains("--benchmark")) return PerformanceBenchmarks.Run();
 
 var tests = new List<(string Name, Action Test)>();
 LiveAppearanceTests.Register(Test);
+VariableStrokeTests.Register(Test);
 SceneSpatialIndexTests.Register(Test);
 AppearanceBoundaryTests.Register(Test);
 void Test(string name, Action action) => tests.Add((name, action));

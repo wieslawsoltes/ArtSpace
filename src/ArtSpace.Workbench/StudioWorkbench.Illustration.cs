@@ -91,6 +91,7 @@ public sealed partial class StudioWorkbench
                 "Layers" => UiDirty.Layers | UiDirty.LayerSelection | UiDirty.Assets,
                 "Artboards" => UiDirty.Artboards,
                 "History" => UiDirty.History,
+                "Stroke" => UiDirty.Stroke,
                 "Appearance" => UiDirty.Appearance,
                 "Graphic Styles" => UiDirty.GraphicStyles,
                 _ => UiDirty.None
@@ -130,6 +131,7 @@ public sealed partial class StudioWorkbench
             (EditorTool.Rectangle,"rectangle","Rectangle (M)"), (EditorTool.Ellipse,"ellipse","Ellipse (L)"),
             (EditorTool.Polygon,"polygon","Polygon"), (EditorTool.Star,"star","Star"),
             (EditorTool.Brush,"brush","Paintbrush (B)"), (EditorTool.Scale,"scale","Scale (S)"),
+            (EditorTool.Width,"scale","Width (Shift W)"), (EditorTool.AnchorPoint,"directselect","Anchor Point (Shift C)"),
             (EditorTool.Gradient,"gradient","Gradient (G)"), (EditorTool.Eyedropper,"eyedropper","Eyedropper (I)"),
             (EditorTool.Frame,"frame","Artboard (Shift O)"), (EditorTool.Slice,"slice","Slice"),
             (EditorTool.Hand,"hand","Hand (H / Space)"), (EditorTool.Zoom,"search","Zoom (Z)")
@@ -255,7 +257,7 @@ public sealed partial class StudioWorkbench
                 yield return Item("Smart Guides / Snapping", () => Session.SnapEnabled = !Session.SnapEnabled);
                 yield return Item("Clear Guides", () => Session.Edit("Clear guides", () => Session.Page.Guides.Clear())); break;
             case "Window":
-                foreach (var name in new[] { "Properties", "Layers", "Artboards", "History", "Appearance", "Graphic Styles" }) yield return Item(name, () => { _uiVisible = true; ResizeIllustrationWorkspace(); _illustrationDock.Select(name); });
+                foreach (var name in new[] { "Properties", "Layers", "Artboards", "History", "Appearance", "Graphic Styles", "Stroke" }) yield return Item(name, () => { _uiVisible = true; ResizeIllustrationWorkspace(); _illustrationDock.Select(name); });
                 yield return Item("Symbols", () => { _assets = true; RefreshLeftContent(); _illustrationDock.Select("Layers"); });
                 yield return Item("Show Layers", () => { _assets = false; RefreshLeftContent(); _illustrationDock.Select("Layers"); });
                 yield return Item("Make Symbol", () => ComponentService.MakeComponent(Session), enabled: selected);

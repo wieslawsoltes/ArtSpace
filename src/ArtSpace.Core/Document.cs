@@ -45,6 +45,7 @@ public sealed class StrokeStyle
     public List<double> Dashes { get; set; } = [];
     public double DashOffset { get; set; }
     public FillStyle? Paint { get; set; }
+    public List<StrokeWidthPoint> WidthProfile { get; set; } = [];
 }
 public sealed class ShadowStyle
 {

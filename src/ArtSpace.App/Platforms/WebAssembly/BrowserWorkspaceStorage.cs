@@ -95,6 +95,21 @@ internal static class BrowserDiagnostics
                 json.WriteBoolean("opacityMaskEnabled", primary?.OpacityMaskEnabled ?? false);
                 json.WriteNumber("opacityMasks", maskCount);
                 json.WriteNumber("gradientBuilds", workbench.Surface.Renderer.GradientBuilds);
+                json.WriteNumber("strokeOutlineBuilds", workbench.Surface.Renderer.StrokeOutlineBuilds);
+                json.WriteNumber("strokeCenterlineBuilds", workbench.Surface.Renderer.StrokeCenterlineBuilds);
+                json.WriteNumber("widthPoints", primary?.Strokes.FirstOrDefault()?.WidthProfile.Count ?? 0);
+                json.WriteNumber("strokePanelBuilds", workbench.StrokePanelBuilds);
+                json.WriteString("renderError", workbench.Surface.LastRenderError);
+                json.WriteStartArray("widthHandles");
+                foreach (var handle in workbench.Surface.WidthHandles)
+                {
+                    json.WriteStartObject(); json.WriteNumber("index", handle.Index); json.WriteNumber("position", handle.Position);
+                    json.WriteNumber("x", handle.X); json.WriteNumber("y", handle.Y);
+                    json.WriteNumber("leftX", handle.LeftX); json.WriteNumber("leftY", handle.LeftY);
+                    json.WriteNumber("rightX", handle.RightX); json.WriteNumber("rightY", handle.RightY);
+                    json.WriteBoolean("selected", handle.Selected); json.WriteEndObject();
+                }
+                json.WriteEndArray();
                 json.WriteNumber("effects", primary?.Effects.Count ?? 0);
                 json.WriteNumber("effectRadius", primary?.Effects.FirstOrDefault()?.Radius ?? 0);
                 json.WriteNumber("graphicStyles", session.Document.GraphicStyles.Count);

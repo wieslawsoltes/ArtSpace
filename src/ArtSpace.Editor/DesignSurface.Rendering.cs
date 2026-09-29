@@ -5,7 +5,26 @@ namespace ArtSpace.Editor;
 
 public sealed partial class DesignSurface
 {
+    public string? LastRenderError { get; private set; }
     private void Paint(SKCanvas canvas, Size size)
+    {
+        var saveCount = canvas.SaveCount;
+        try { PaintCore(canvas, size); LastRenderError = null; }
+        catch (Exception error) when (error is InvalidOperationException or InvalidDataException or ArgumentException)
+        {
+            canvas.RestoreToCount(saveCount);
+            if (LastRenderError != error.Message)
+            {
+                LastRenderError = error.Message;
+                DispatcherQueue.TryEnqueue(() => StatusChanged?.Invoke("Rendering stopped: " + error.Message));
+            }
+            using var paint = new SKPaint { IsAntialias = true, Color = SKColors.OrangeRed };
+            using var font = new SKFont(SKTypeface.Default, 14);
+            canvas.DrawText("Cannot render this artwork: " + error.Message, 24, 44, font, paint);
+        }
+        finally { canvas.RestoreToCount(saveCount); }
+    }
+    private void PaintCore(SKCanvas canvas, Size size)
     {
         if (Session is not { } editor || size.Width < 1 || size.Height < 1) return;
         canvas.Save(); canvas.ClipRect(new(0, 0, (float)size.Width, (float)size.Height));
@@ -53,6 +72,7 @@ public sealed partial class DesignSurface
             }
             DrawSelection(canvas);
             DrawGradientHandles(canvas);
+            DrawWidthHandles(canvas);
             if (_vectorNode is not null) DrawVertices(canvas, _vectorNode);
             var comments = editor.Document.Comments.Where(c => c.PageId == editor.Page.Id && !c.Resolved).ToArray();
             for (var i = 0; i < comments.Length; i++)
@@ -84,7 +104,7 @@ public sealed partial class DesignSurface
     }
     private void DrawSelection(SKCanvas canvas)
     {
-        if (Session is not { } editor || editor.SelectionRoots.Count == 0 || _textEditor is not null || IsPathTool) return;
+        if (Session is not { } editor || editor.SelectionRoots.Count == 0 || _textEditor is not null || IsPathTool || editor.Tool == EditorTool.Width) return;
         var points = GetHandles(); if (points.Length < 8) return;
         using var blue = new SKPaint { IsAntialias = true, Color = new(68, 124, 238), Style = SKPaintStyle.Stroke, StrokeWidth = 1 };
         using var fill = new SKPaint { IsAntialias = true, Color = SKColors.White };

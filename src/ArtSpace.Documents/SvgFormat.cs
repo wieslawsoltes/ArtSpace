@@ -12,11 +12,13 @@ public sealed record SvgImportResult(DesignDocument Document, IReadOnlyList<stri
 public static partial class SvgFormat
 {
     private static readonly XNamespace Ns = "http://www.w3.org/2000/svg";
-    public static string Export(IEnumerable<DesignNode> roots, RectD bounds)
+    public static string Export(IEnumerable<DesignNode> roots, RectD bounds) => Export(roots, bounds, null);
+    public static string Export(IEnumerable<DesignNode> roots, RectD bounds, SvgExportOptions? options)
     {
         if (!double.IsFinite(bounds.X) || !double.IsFinite(bounds.Y) || !double.IsFinite(bounds.Right) || !double.IsFinite(bounds.Bottom) || bounds.IsEmpty) throw new ArgumentException("SVG export needs finite nonempty bounds.", nameof(bounds));
         var defs = new XElement(Ns + "defs");
         defs.AddAnnotation(new ExportViewport(bounds));
+        defs.AddAnnotation(options ?? new SvgExportOptions());
         var svg = new XElement(Ns + "svg", new XAttribute("width", F(bounds.Width)), new XAttribute("height", F(bounds.Height)), new XAttribute("viewBox", $"{F(bounds.X)} {F(bounds.Y)} {F(bounds.Width)} {F(bounds.Height)}"), defs);
         foreach (var node in roots) svg.Add(ExportNode(node, defs, true));
         return new XDocument(new XDeclaration("1.0", "utf-8", null), svg).ToString();
@@ -49,6 +51,23 @@ public static partial class SvgFormat
         {
             var stroke = node.Strokes[strokeIndex];
             if (!stroke.Visible || stroke.Paint?.Visible == false) continue;
+            if (stroke.WidthProfile.Count != 0)
+            {
+                var expand = defs.Annotation<SvgExportOptions>()?.ExpandStroke
+                    ?? throw new InvalidOperationException("Variable-width SVG export requires a stroke geometry provider. Use SceneRenderer.ExportSvg or Outline Stroke.");
+                var expanded = expand(node, stroke);
+                var fill = expanded.Fill; var color = fill.Color;
+                if (fill.Kind != FillKind.Solid)
+                {
+                    var id = $"width-paint-{node.Id}-{strokeIndex}";
+                    defs.Add(ExportGradient(fill, node, id)); color = "url(#" + id + ")";
+                }
+                group.Add(new XElement(Ns + "path", new XAttribute("d", expanded.PathData),
+                    new XAttribute("fill", color), new XAttribute("fill-opacity", F(stroke.Opacity * fill.Opacity)),
+                    new XAttribute("fill-rule", "nonzero"), new XAttribute("stroke", "none"),
+                    new XAttribute("data-artspace-expanded-stroke", strokeIndex)));
+                continue;
+            }
             var strokeColor = stroke.Paint?.Color ?? stroke.Color;
             if (stroke.Paint is { Kind: not FillKind.Solid } paint)
             {

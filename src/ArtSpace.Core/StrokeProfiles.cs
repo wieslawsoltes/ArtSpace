@@ -87,5 +87,16 @@ public static class StrokeProfiles
     }
 
     public static List<StrokeWidthPoint> Copy(IReadOnlyList<StrokeWidthPoint> points) => points.Select(p => p.Clone()).ToList();
+    /// <summary>Insert an interpolated knot, retaining strict ordering and avoiding duplicate locations.</summary>
+    public static int Insert(List<StrokeWidthPoint> points, double position)
+    {
+        Validate(points);
+        if (!double.IsFinite(position) || position is < 0 or > 1) throw new ArgumentOutOfRangeException(nameof(position));
+        for (var i = 0; i < points.Count; i++) if (Math.Abs(points[i].Position - position) < 1e-6) return i;
+        if (points.Count >= MaxPoints) throw new InvalidOperationException("The 64-point stroke profile limit has been reached.");
+        var width = Evaluate(points, position);
+        var index = points.FindIndex(p => p.Position > position); if (index < 0) index = points.Count;
+        points.Insert(index, new() { Position = position, Left = width.Left, Right = width.Right }); return index;
+    }
     private static StrokeWidthPoint Point(double position, double side) => new() { Position = position, Left = side, Right = side };
 }

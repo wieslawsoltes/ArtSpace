@@ -19,6 +19,7 @@ public sealed partial class StudioWorkbench
     public long AppearancePanelBuilds => (_appearanceView?.SectionBuilds ?? 0) + (_graphicStylesView?.SectionBuilds ?? 0);
     public IEnumerable<InspectorFieldState> AppearanceFields => ActivePanel switch
     {
+        "Stroke" when _strokeInspector is not null => _strokeInspector.DescribeFields(),
         "Appearance" when _appearanceView is not null => _appearanceView.DescribeFields(),
         "Graphic Styles" when _graphicStylesView is not null => _graphicStylesView.DescribeFields(),
         _ => []
@@ -28,11 +29,12 @@ public sealed partial class StudioWorkbench
     {
         _illustrationDock.Add("Appearance", Studio.Scroll(_appearanceHost));
         _illustrationDock.Add("Graphic Styles", Studio.Scroll(_graphicStylesHost));
+        _illustrationDock.Add("Stroke", Studio.Scroll(_strokePanelHost));
     }
 
     private void SuspendAppearanceEditing()
     {
-        _appearanceView?.SuspendEditing(); _graphicStylesView?.SuspendEditing();
+        _appearanceView?.SuspendEditing(); _graphicStylesView?.SuspendEditing(); _strokeInspector?.SuspendEditing();
     }
 
     private void RefreshAppearancePanels(UiDirty dirty)
@@ -77,7 +79,7 @@ public sealed partial class StudioWorkbench
                         value => ChangeAppearance("Blend mode", n => n.Blend = Enum.Parse<BlendKind>(value)), "Blend mode"), -1)));
                 });
                 BuildLiveEffects(node);
-                BuildFills(node); BuildStrokes(node); BuildAdvancedStrokes(node); BuildEffects(node);
+                BuildFills(node); BuildStrokes(node); BuildAdvancedStrokes(node); BuildVariableStrokes(node); BuildEffects(node);
                 BuildPaintOrder(node);
                 Inspect("Appearance actions", null, (body, b) =>
                 {

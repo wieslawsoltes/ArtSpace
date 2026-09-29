@@ -40,6 +40,7 @@ public static class IllustrationOperations
         var nodes = Vectors(editor);
         if (!nodes.Any(n => n.Strokes.Any(s => s.Visible && s.Width > 0 && s.Paint?.Visible != false)))
             throw new InvalidOperationException("The selection has no visible strokes.");
+        if (nodes.Any(n => n.Parent?.ClipPathId == n.Id)) throw new InvalidOperationException("Release a clipping path before expanding its stroke into a group.");
         editor.Edit("Outline stroke", () =>
         {
             var selected = new List<string>();
@@ -52,7 +53,7 @@ public static class IllustrationOperations
                 var index = siblings.IndexOf(node);
                 var group = new DesignNode
                 {
-                    Kind = NodeKind.Group, Name = node.Name + " expanded", X = node.X, Y = node.Y,
+                    Id = node.Id, SourceId = node.SourceId, Kind = NodeKind.Group, Name = node.Name + " expanded", X = node.X, Y = node.Y,
                     Width = node.Width, Height = node.Height, Rotation = node.Rotation,
                     FlipX = node.FlipX, FlipY = node.FlipY, Opacity = node.Opacity, Blend = node.Blend,
                     Fills = [], Shadows = node.Shadows, Effects = node.Effects, AffineTransform = node.AffineTransform
@@ -66,9 +67,7 @@ public static class IllustrationOperations
                 }
                 foreach (var stroke in strokes)
                 {
-                    using var paint = StrokePaint(stroke);
-                    using var path = paint.GetFillPath(renderer.Geometry(node))
-                        ?? throw new InvalidOperationException("This stroke could not be expanded.");
+                    using var path = new SKPath(renderer.StrokeOutline(node, stroke));
                     var outlined = PathNode(path, stroke.Color, "Stroke outline");
                     outlined.Opacity = stroke.Opacity;
                     if (stroke.Paint is { } sourcePaint)
@@ -90,7 +89,9 @@ public static class IllustrationOperations
                     }
                     group.Add(outlined);
                 }
+                var maskOwner = parent?.OpacityMaskId == node.Id ? parent : null;
                 editor.RemoveNode(node); editor.AddNode(group, parent);
+                if (maskOwner is not null) maskOwner.OpacityMaskId = group.Id;
                 siblings.Remove(group); siblings.Insert(Math.Max(0, index), group);
                 selected.Add(group.Id);
             }
