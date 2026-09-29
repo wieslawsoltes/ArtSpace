@@ -1,4 +1,4 @@
-# Feature matrix — 0.5.0-alpha.1
+# Feature matrix — 0.6.0-alpha.1
 
 ArtSpace is an independent illustration editor. Similar workspace conventions do not imply complete Illustrator behavior, native format compatibility or pixel parity.
 
@@ -36,7 +36,7 @@ ArtSpace is an independent illustration editor. Similar workspace conventions do
 | Raster placement/tracing | Not implemented | No links manager, Image Trace or raster editor |
 | RGB/PNG | Implemented | Screen-oriented, not press production |
 | CMYK/ICC/spot/overprint | Not implemented | No print proofing or separations guarantee |
-| Native ArtSpace persistence | Implemented | Read schemas 1–4; new saves schema 4; previous readers reject new schema |
+| Native ArtSpace persistence | Implemented | Read schemas 1–5; new saves schema 5; previous readers reject new schema |
 | SVG interchange | Limited | Editable safe subset, not lossless Illustrator roundtripping |
 | AI/EPS/PDF interchange | Not implemented | No native format parity claim |
 | Undo/local recovery | Implemented | Bounded snapshot transactions, IndexedDB/native storage; not a cloud backup |
@@ -56,3 +56,12 @@ ArtSpace is an independent illustration editor. Similar workspace conventions do
 Benchmarks compare exact reference snapping/bounds and output pixels. The legacy appearance report records five warmed CPU samples. The new retained-scene report alternates measurement order over seven samples, checks exact reference pixels, and verifies unchanged native resources are not rebuilt. Both use software Skia; scene recording cost is excluded. Cleared-cache comparisons intentionally force rebuilds and are not old-release application FPS measurements. Native build success does not certify every native interaction.
 
 Guides: [live appearance/rendering](appearance-rendering.md), [UI responsiveness](ui-performance.md), [path editing](path-editing.md), [clipping/performance](clipping-and-performance.md), [opacity masks/gradients](opacity-masks-and-gradients.md).
+
+
+## Type on a Path — implemented boundary
+
+The tangent-oriented single-contour workflow is implemented in 0.6: creation/attachment, editable baseline, start/end/center brackets, flip, metric alignment, baseline shift, overflow, native persistence, cached rendering/picking and reversible outlines. Any broader typography row above must not be read as saying this basic workflow is absent.
+
+General shaping/bidi/fallback, multi-contour threading, seam-wrapping intervals, warp variants and native SVG textPath interchange remain unsupported. The workbench exports vector outlines on a detached snapshot; malformed native baselines remain inspectable but cannot silently export missing text. See [Type on a Path](type-on-path.md).
+
+The current suite registers 301 engine cases and 24 browser scenarios. The completed workflow for a commit, not this count, establishes which tests passed. New software-Skia measurements compare retained path text against forced cache rebuilds; they are not hardware-GPU or older-release FPS claims.

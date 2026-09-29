@@ -47,3 +47,12 @@ Custom menus keep navigation state independent of popup focus timing. Production
 195 engine tests and five benchmark safety checks cover the shared libraries. Thirteen browser scenarios exercise the published app. Build compiles Windows/Linux/macOS, publishes WebAssembly, packages libraries, measures CPU/reference equivalence and retains test artifacts. Pages checks commit provenance and public acceptance. Release builds single-file desktop executables and package outputs; tags publish packages to NuGet.org through Trusted Publishing. No temporary source-integration or toolchain-export workflows are part of ordinary builds.
 
 Read [opacity/gradient design](opacity-masks-and-gradients.md) and [clipping/performance](clipping-and-performance.md) for measurements and limits. CI uses software graphics and native compilation is not native interaction certification. Primary integration references are [Uno SKCanvasElement](https://platform.uno/docs/articles/controls/SKCanvasElement.html), [SkiaSharp](https://github.com/mono/SkiaSharp), [CSS Masking](https://www.w3.org/TR/css-masking-1/) and [SVG paint servers](https://www.w3.org/TR/SVG2/pservers.html).
+
+
+## Retained path typography
+
+Schema 5 adds `DesignNode.TextPath` options while keeping text as a Text node and persisting its owned baseline in PathData/PathWidth/PathHeight. Schemas 1–5 remain readable. `TypeOnPathOperations` provides reversible commands; `MeasuredContour` owns one native path measure and a lazy projection table; `PathTextLayout` owns the positioned glyph path. Renderer keys compare exact options/typography/geometry. Font changes clear owned resources; ordinary paint and placement changes preserve layout.
+
+Drawing, picking and outlines share glyph geometry. Direct Selection edits the baseline, while Selection exposes lazy-transaction text brackets. The existing scene recorder can retain settled output. Arc length, scalar layout and editing remain CPU work; backend hardware selection is unchanged.
+
+Interactive invalid-baseline failures become cached diagnostics, and exports reject them explicitly. `IllustrationSvgExport` clones requested roots and outlines path text without changing document/history. Normalized float serialization may differ at antialiased edges, so outline interchange uses bounded coverage tests; cached/direct replay is tested with exact pixels. See [ownership, performance and limitations](type-on-path.md).

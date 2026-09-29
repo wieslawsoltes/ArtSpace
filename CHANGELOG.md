@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.6.0-alpha.1 — 2026-09-29
+
+- Editable tangent-oriented Type on a Path: create/attach, Start/End/center brackets, flip, metric alignment, baseline shift, explicit overflow and direct baseline anchors.
+- Retained glyph geometry shared by drawing, picking and outlines; independent native arc-length/projection caches, exact invalidation and bounded resource accounting.
+- Reversible text/outline/area-text conversion, linked-symbol compatibility, native schema 5 and safe diagnostic behavior for malformed baselines.
+- SVG outline export on detached snapshots, shifted-ink export bounds and preservation of text gradient coordinate spaces. Native SVG textPath import remains explicitly unsupported.
+- 45 additional engine regressions and three real Uno browser scenarios, plus alternating-order CPU cache measurements with exact reference pixels.
+- Existing scene replay, release packaging and NuGet Trusted Publishing remain unchanged. This is not complete Illustrator typography/UI parity or a physical-GPU benchmark.
+
+
 ## 0.5.0-alpha.1 — live appearance and retained rendering
 
 - Add ordered non-destructive Gaussian Blur, Drop Shadow, Outer Glow and Saturation effects, with parameter editing, enablement, reorder, duplicate and delete.
