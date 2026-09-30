@@ -89,9 +89,9 @@ The initial integration run measured 10.9732 ms / 336,320 managed bytes per forc
 
 ## Persistence and export
 
-Native saves use **schema 5** and retain text, baseline geometry and options. Schemas 1–5 remain readable. Older versions reject schema 5 instead of silently dropping path-text semantics. Keep an original copy for older-version workflows.
+Native saves use **schema 6** and retain text, baseline geometry and options. Schemas 1–6 remain readable. Older versions reject schema 6 instead of silently dropping path-text semantics. Keep an original copy for older-version workflows.
 
-The workbench's SVG export uses `IllustrationSvgExport.Export(roots, bounds, renderer)` on a detached copy, converting path text to vector glyph outlines. This preserves appearance without changing native text or history. The low-level `SvgFormat.Export` rejects unconverted path text; SVG `<textPath>` import is explicitly unsupported. Native SVG text editing/roundtripping is not claimed. Existing SVG filter/effect limitations continue to apply.
+The workbench's SVG export uses `IllustrationSvgExport.Export(roots, bounds, renderer)` on a detached copy, converting path text to vector glyph outlines. This preserves appearance without changing native text or history. The low-level `SvgFormat.Export` rejects unconverted native bracket text. Version 0.7 adds a defined editable SVG textPath subset and an optional editable export command; see [SVG path-text interchange](svg-path-text.md). Full SVG text layout is not claimed. Existing SVG filter/effect limitations continue to apply.
 
 PNG and SVG selection bounds include shifted path-text ink. General live-effect/stroke expansion is not a new full visual-bounds implementation. Cached direct/retained rendering uses exact pixel comparisons; persisted outlined paths can differ at antialiased edges after float coordinate normalization. Regression tests measure a bounded coverage error and also check gradient placement under affine transforms.
 

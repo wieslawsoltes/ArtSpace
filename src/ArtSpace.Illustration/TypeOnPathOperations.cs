@@ -84,6 +84,43 @@ public static class TypeOnPathOperations
         });
     }
 
+    /// <summary>Changes offset units while retaining each selected baseline's own measured position.</summary>
+    public static void SetSvgOffsetUnits(EditorSession editor, SceneRenderer renderer, bool percentage)
+    {
+        ArgumentNullException.ThrowIfNull(editor); ArgumentNullException.ThrowIfNull(renderer);
+        var nodes = editor.SelectionRoots.Where(n => n.TextPath?.SvgPosition is { } position && position.Percentage != percentage && !n.IsEffectivelyLocked).ToArray();
+        if (nodes.Length == 0) return;
+        editor.Edit("SVG text offset units", () =>
+        {
+            foreach (var node in nodes)
+            {
+                renderer.ValidateTypeOnPath(node);
+                var length = renderer.GetTypeOnPathStatus(node).PathLength;
+                var options = node.TextPath!.Clone(); var position = options.SvgPosition!;
+                var distance = position.Resolve(length);
+                position.Percentage = percentage; position.Offset = position.FromDistance(distance, length);
+                options.Validate(); node.TextPath = options;
+            }
+        });
+    }
+
+    /// <summary>Explicitly switches SVG anchor layout to a full native bracket interval; text placement may change.</summary>
+    public static void UseBracketLayout(EditorSession editor, SceneRenderer renderer)
+    {
+        var nodes = editor.SelectionRoots.Where(n => n.TextPath?.SvgPosition is not null && !n.IsEffectivelyLocked).ToArray();
+        if (nodes.Length == 0) throw new InvalidOperationException("Select SVG-positioned path text.");
+        editor.Edit("Use native bracket layout", () =>
+        {
+            foreach (var node in nodes)
+            {
+                renderer.ValidateTypeOnPath(node);
+                var data = renderer.Geometry(node).ToSvgPathData();
+                var options = node.TextPath!.Clone(); options.SvgPosition = null; options.Start = 0; options.End = 1;
+                node.PathData = data; node.PathWidth = node.Width; node.PathHeight = node.Height; node.TextPath = options;
+            }
+        });
+    }
+
     public static bool CanUseBaseline(DesignNode node) => PathEditing.CanEdit(node) && node.Kind != NodeKind.Text && !IsMaskSource(node);
     private static bool IsMaskSource(DesignNode node) => node.Parent is { } parent && (parent.ClipPathId == node.Id || parent.OpacityMaskId == node.Id);
     private static void ValidateText(string text)

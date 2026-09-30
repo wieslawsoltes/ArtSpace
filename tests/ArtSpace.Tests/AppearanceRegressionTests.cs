@@ -101,9 +101,9 @@ internal static class AppearanceRegressionTests
         {
             foreach (var version in new[] { 1, 2 })
             {
-                var json = DocumentJson.Save(new DesignDocument()).Replace("\"formatVersion\":5", "\"formatVersion\":" + version, StringComparison.Ordinal);
+                var json = DocumentJson.Save(new DesignDocument()).Replace("\"formatVersion\":6", "\"formatVersion\":" + version, StringComparison.Ordinal);
                 var document = DocumentJson.Load(json); Check(document.FormatVersion == version);
-                Check(DocumentJson.Save(document).Contains("\"formatVersion\":5", StringComparison.Ordinal));
+                Check(DocumentJson.Save(document).Contains("\"formatVersion\":6", StringComparison.Ordinal));
             }
         });
     }

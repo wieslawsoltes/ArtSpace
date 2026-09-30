@@ -25,15 +25,21 @@ ArtSpace shares its C# document model, transaction engine, geometry, custom cont
 
 The compact dark shell combines menus, appearance controls, toolbox, rulers, pasteboard, artboards, layers, properties, history, Appearance, Graphic Styles and a status bar. The original **Alpine Echoes** sample is editable vector artwork across three artboards.
 
-**Version: `0.6.0-alpha.1`.** This is an independent functional alpha, not complete or pixel-identical Adobe Illustrator parity. The [feature matrix](docs/feature-matrix.md) distinguishes implemented behavior and remaining compatibility boundaries.
+**Version: `0.7.0-alpha.1`.** This is an independent functional alpha, not complete or pixel-identical Adobe Illustrator parity. The [feature matrix](docs/feature-matrix.md) distinguishes implemented behavior and remaining compatibility boundaries.
 
-## New in 0.6
+## New in 0.7
+
+**Editable SVG path text:** import local `textPath` references and inline baselines with signed/percentage offsets, text anchoring, baseline transforms and closed-contour seam wrapping. Edit the SVG offset in retained Properties or with its canvas handle. **Export Editable SVG…** writes genuine textPath data; the existing SVG command remains outline-based. The [interchange guide](docs/svg-path-text.md) defines supported positioning and explicit rejections.
+
+Glyph construction directly appends transformed outlines rather than allocating one native path clone per character. Document-font metrics are linear/unhinted so raster text and outlines agree independently of grid fitting. Existing GPU-capable Uno/Skia composition, native display-list replay and cache retention remain in place.
+
+## Retained from 0.6
 
 **Editable Type on a Path:** create text along a vector contour or attach existing sibling text, with start/end/center brackets, flip, font-metric alignment, baseline shift and explicit overflow. Direct Selection edits the baseline; Create Outlines converts only on request. The retained inspector preserves ordinary field updates and bracket clicks do not begin undo transactions.
 
 **Retained path typography:** one glyph geometry layout serves painting, hit testing and outlines. Native arc-length measurements and lazy projection tables are cached separately. Settled text participates in the existing R-tree display list; there is no extra editor framebuffer. SVG export creates outlines on a detached copy, keeping native text editable.
 
-Read the [Type on a Path guide](docs/type-on-path.md) for APIs, single-contour/shaping boundaries, schema 5, export semantics and reproducible CPU measurements.
+Read the [Type on a Path guide](docs/type-on-path.md) for APIs, single-contour/shaping boundaries, schema 6, export semantics and reproducible CPU measurements.
 
 ## Appearance and rendering introduced in 0.5
 
@@ -196,7 +202,7 @@ Console.WriteLine($"{row.Width} x {row.Height}, correction {snap.Correction}");
 
 ### ArtSpace.Documents
 
-Native JSON (schema 5, reading 1–5) with validation, node clipboard serialization, the supported SVG subset (paths, gradients, masks and affine transforms, returning warnings for anything skipped), the original sample artwork and the `IWorkspaceStorage` host contract. Depends on `ArtSpace.Core`; no UI.
+Native JSON (schema 6, reading 1–6) with validation, node clipboard serialization, the supported SVG subset (paths, gradients, masks and affine transforms, returning warnings for anything skipped), the original sample artwork and the `IWorkspaceStorage` host contract. Depends on `ArtSpace.Core`; no UI.
 
 ```bash
 dotnet add package ArtSpace.Documents --prerelease
@@ -468,7 +474,7 @@ The appearance benchmark alternates warm direct and retained drawing on the same
 
 ## Compatibility
 
-**Native saves use schema 5.** ArtSpace 0.6 reads schemas 1–5 and upgrades older documents when saving. Earlier readers reject schema 5 rather than silently dropping path-text and appearance semantics. Preserve an original copy for older-version workflows. Autosave is local recovery, not durable backup.
+**Native saves use schema 6.** ArtSpace 0.7 reads schemas 1–6 and upgrades older documents when saving. Earlier readers reject schema 6 rather than silently dropping path-text and appearance semantics. Preserve an original copy for older-version workflows. Autosave is local recovery, not durable backup.
 
 Supported SVG gradients and masks are not full SVG/Illustrator roundtripping. Opacity-mask import currently requires user-space units. Inverted masks and enabled live effects retain native/PNG output but SVG export is explicitly rejected. General SVG filters, image/use content, stylesheet cascade and linear-light paint interpolation remain outside the supported subset.
 
@@ -476,7 +482,7 @@ Advanced shaping, variable-font workflows, threaded/warped path typography, grad
 
 ## Documentation and license
 
-[Getting started](docs/getting-started.md) · [Architecture](docs/architecture.md) · [Appearance/rendering](docs/appearance-rendering.md) · [Contours/outlines](docs/path-editing.md) · [Type on a Path](docs/type-on-path.md) · [Clipping/performance](docs/clipping-and-performance.md) · [Opacity/gradients](docs/opacity-masks-and-gradients.md) · [UI performance](docs/ui-performance.md) · [Contributing](CONTRIBUTING.md)
+[Getting started](docs/getting-started.md) · [Architecture](docs/architecture.md) · [Appearance/rendering](docs/appearance-rendering.md) · [Contours/outlines](docs/path-editing.md) · [Type on a Path](docs/type-on-path.md) · [Editable SVG path text](docs/svg-path-text.md) · [Clipping/performance](docs/clipping-and-performance.md) · [Opacity/gradients](docs/opacity-masks-and-gradients.md) · [UI performance](docs/ui-performance.md) · [Contributing](CONTRIBUTING.md)
 
 ArtSpace is [MIT-licensed](LICENSE), derived from the author's MIT [VectorSpace](https://github.com/wieslawsoltes/VectorSpace) snapshot `587f780f2803f6b3aa59dfb5411da2c2fe601dfa`. Attribution is retained in [third-party notices](THIRD-PARTY-NOTICES.md).
 

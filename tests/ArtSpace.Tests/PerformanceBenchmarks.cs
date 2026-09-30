@@ -19,11 +19,11 @@ internal static class PerformanceBenchmarks
     private static void VerifyBoundaryRegressions()
     {
         static void Require(bool success, string message) { if (!success) throw new InvalidOperationException(message); }
-        var legacy = DocumentJson.Save(new DesignDocument()).Replace("\"formatVersion\":5", "\"formatVersion\":1", StringComparison.Ordinal);
+        var legacy = DocumentJson.Save(new DesignDocument()).Replace("\"formatVersion\":6", "\"formatVersion\":1", StringComparison.Ordinal);
         var migrated = DocumentJson.Load(legacy);
         Require(migrated.FormatVersion == 1, "Legacy schema must still load.");
         var saved = DocumentJson.Save(migrated);
-        Require(migrated.FormatVersion == DocumentJson.CurrentFormatVersion && saved.Contains("\"formatVersion\":5", StringComparison.Ordinal), "Native saves must advertise clipping-aware schema 4.");
+        Require(migrated.FormatVersion == DocumentJson.CurrentFormatVersion && saved.Contains("\"formatVersion\":6", StringComparison.Ordinal), "Native saves must advertise clipping-aware schema 4.");
         var node = new DesignNode();
         var editor = new EditorSession(new() { Pages = [new() { Nodes = [node] }] }); editor.Select(node);
         var before = DocumentJson.Save(editor.Document); var failed = false;

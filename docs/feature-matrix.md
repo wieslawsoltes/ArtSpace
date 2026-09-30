@@ -1,4 +1,4 @@
-# Feature matrix — 0.6.0-alpha.1
+# Feature matrix — 0.7.0-alpha.1
 
 ArtSpace is an independent illustration editor. Familiar workspace conventions do not imply complete Illustrator behavior, native format compatibility or pixel parity.
 
@@ -37,8 +37,8 @@ ArtSpace is an independent illustration editor. Familiar workspace conventions d
 | Raster placement/tracing | Not implemented | No links manager, Image Trace or raster editor |
 | RGB/PNG | Implemented | Screen-oriented, not press production |
 | CMYK/ICC/spot/overprint | Not implemented | No proofing or separations guarantee |
-| Native ArtSpace persistence | Implemented | Read schemas 1–5; saves schema 5; older readers reject new semantics |
-| SVG path-text interchange | Limited | Workbench exports detached glyph outlines without mutating text; native SVG textPath import/export remains unsupported |
+| Native ArtSpace persistence | Implemented | Read schemas 1–6; saves schema 6; older readers reject new semantics |
+| SVG path-text interchange | Limited | Editable local single-run textPath import/export, signed offsets, text anchors and closed seams; default export remains outlines; advanced runs/shaping and native bracket-overflow editable export are not supported |
 | Other SVG interchange | Limited | Safe editable subset, not lossless Illustrator roundtrip; unsupported live effects rejected |
 | AI/EPS/PDF interchange | Not implemented | No native format parity claim |
 | Undo/local recovery | Implemented | Bounded transactions and IndexedDB/native recovery, not cloud backup |

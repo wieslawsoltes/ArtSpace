@@ -108,6 +108,12 @@ internal static class BrowserDiagnostics
                     json.WriteNumber("length", status.PathLength); json.WriteBoolean("overflow", status.Overflow);
                     json.WriteNumber("visibleGlyphs", status.VisibleGlyphs); json.WriteString("error", status.Error); json.WriteEndObject();
                 }
+                json.WriteStartObject("svgTextPath");
+                if (primary?.TextPath?.SvgPosition is { } svgPosition)
+                {
+                    json.WriteNumber("offset", svgPosition.Offset); json.WriteBoolean("percentage", svgPosition.Percentage);
+                }
+                json.WriteEndObject();
                 json.WriteStartArray("typePathHandles");
                 foreach (var handle in workbench.Surface.GetTypeOnPathHandles())
                 {

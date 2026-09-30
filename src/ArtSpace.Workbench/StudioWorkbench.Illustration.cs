@@ -189,6 +189,7 @@ public sealed partial class StudioWorkbench
                 yield return Async("New…", NewDocumentAsync, "Ctrl N"); yield return Async("Open…", OpenAsync, "Ctrl O");
                 yield return Async("Save a Copy…", SaveAsync, "Ctrl S"); yield return separator;
                 yield return Async("Export SVG…", () => ExportAsync(true)); yield return Async("Export PNG…", () => ExportAsync(false));
+                yield return Async("Export Editable SVG…", () => ExportAsync(true, true));
                 yield return Item("New Artboard", AddArtboard, "Shift O");
                 yield return Async("Open Alpine sample", async () => { if (Session.IsDirty && !await ConfirmAsync("Replace current artwork?", "Save a local copy first to keep the current document.")) return; Session.Load(IllustrationSample.Create()); Surface.Fit(firstFrame: true); });
                 break;

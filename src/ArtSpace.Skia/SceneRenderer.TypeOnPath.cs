@@ -6,7 +6,7 @@ namespace ArtSpace.Skia;
 public sealed partial class SceneRenderer
 {
     private readonly record struct PathTextKey(string Text, string Family, int Weight, double Size, double Tracking,
-        TextAlignment TextAlignment, double Start, double End, bool Flip, double Shift, PathTextAlignment Alignment);
+        TextAlignment TextAlignment, double Start, double End, bool Flip, double Shift, PathTextAlignment Alignment, bool SvgPosition, double Offset, bool Percentage, double? AuthoredLength);
     private sealed record CachedBaseline(GeometrySnapshot Snapshot, MeasuredContour Measure)
     {
         public long LastUse { get; set; }
@@ -46,7 +46,7 @@ public sealed partial class SceneRenderer
     {
         var options = node.TextPath ?? throw new ArgumentException("The object does not contain path text.", nameof(node));
         var key = new PathTextKey(node.Text, node.FontFamily, node.FontWeight, node.FontSize, node.LetterSpacing,
-            node.TextAlign, options.Start, options.End, options.Flip, options.BaselineShift, options.Alignment);
+            node.TextAlign, options.Start, options.End, options.Flip, options.BaselineShift, options.Alignment, options.SvgPosition is not null, options.SvgPosition?.Offset ?? 0, options.SvgPosition?.Percentage ?? false, options.SvgPosition?.PathLength);
         if (_pathTextLayouts.TryGetValue(node.Id, out var entry) && entry.Key == key && entry.Snapshot.Matches(node))
         {
             entry.LastUse = ++_pathTextClock;
@@ -76,6 +76,20 @@ public sealed partial class SceneRenderer
         _pathTextLayouts[node.Id] = new(new GeometrySnapshot(node), key, result, bytes) { LastUse = ++_pathTextClock };
         _pathTextBytes += bytes; PathTextLayoutBuilds++;
         return result;
+    }
+
+    public double GetTypeOnPathBaselineOffset(DesignNode node)
+    {
+        ArgumentNullException.ThrowIfNull(node);
+        var options = node.TextPath ?? throw new ArgumentException("Select path text.", nameof(node));
+        using var font = CreateTextFont(node);
+        return (options.Alignment switch
+        {
+            PathTextAlignment.Ascender => -font.Metrics.Ascent,
+            PathTextAlignment.Descender => -font.Metrics.Descent,
+            PathTextAlignment.Center => -(font.Metrics.Ascent + font.Metrics.Descent) / 2,
+            _ => 0
+        }) - options.BaselineShift;
     }
 
     public PathTextStatus GetTypeOnPathStatus(DesignNode node) => TypeOnPathLayout(node).Status;

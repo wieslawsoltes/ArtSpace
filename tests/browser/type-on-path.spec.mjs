@@ -83,7 +83,7 @@ test('Type menu creates editable path text and retained inspector options persis
   await expect.poll(async () => (await state(page)).pathText.baselineShift).toBe(0);
   await page.keyboard.press('Control+Shift+z');
   await expect.poll(async () => (await state(page)).pathText.baselineShift).toBe(9);
-  const document = await saved(page); expect(document.formatVersion).toBe(5);
+  const document = await saved(page); expect(document.formatVersion).toBe(6);
   expect(findNode(document, initial.id)).toMatchObject({ kind: 'Text', text: 'ALPINE ECHOES — TYPE ON A PATH', textPath: { start: .2, baselineShift: 9 } });
   await fs.mkdir('artifacts/screenshots', { recursive: true }); await page.screenshot({ path: 'artifacts/screenshots/type-on-path-inspector.png' });
   await page.waitForTimeout(1500); await page.reload();

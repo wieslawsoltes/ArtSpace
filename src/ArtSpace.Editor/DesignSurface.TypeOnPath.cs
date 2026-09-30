@@ -18,8 +18,10 @@ public sealed partial class DesignSurface
         if (Session is not { Tool: EditorTool.Move, Primary: { TextPath: { } options } node } editor
             || editor.SelectionRoots.Count != 1 || node.IsEffectivelyLocked || IsPresenting) return [];
         if (Renderer.GetTypeOnPathStatus(node).Error is not null) return [];
-        var result = new TypeOnPathHandle[3];
-        var fractions = new[] { options.Start, options.End, (options.Start + options.End) / 2 };
+        var svg = options.SvgPosition;
+        var svgFraction = svg is null ? 0 : svg.Resolve(Renderer.GetTypeOnPathStatus(node).PathLength) / Renderer.GetTypeOnPathStatus(node).PathLength;
+        var result = new TypeOnPathHandle[svg is null ? 3 : 1];
+        var fractions = svg is null ? new[] { options.Start, options.End, (options.Start + options.End) / 2 } : new[] { Math.Clamp(options.Flip ? 1 - svgFraction : svgFraction, 0, 1) };
         for (var i = 0; i < result.Length; i++)
         {
             var sample = Renderer.GetTypeOnPathSample(node, fractions[i]);
@@ -29,7 +31,7 @@ public sealed partial class DesignSurface
             var normal = new Vec2(-tangent.Y, tangent.X);
             // Distinct offsets keep coincident start/end handles independently pickable on closed contours.
             var distance = i == 0 ? 16 : i == 1 ? 30 : 24;
-            result[i] = new(i, p + normal * distance, p, fractions[i]);
+            result[i] = new(svg is null ? i : 3, p + normal * distance, p, fractions[i]);
         }
         return result;
     }
@@ -66,7 +68,13 @@ public sealed partial class DesignSurface
             var fraction = Renderer.ProjectTypeOnPath(node, point);
             var delta = fraction - _typePathInitialFraction;
             var changed = original.Clone();
-            if (_typePathHandle == 0) changed.Start = Math.Clamp(original.Start + delta, 0, original.End);
+            if (_typePathHandle == 3 && changed.SvgPosition is { } svg && original.SvgPosition is { } initial)
+            {
+                var length = Renderer.GetTypeOnPathStatus(node).PathLength;
+                var distance = initial.Resolve(length) + delta * length * (original.Flip ? -1 : 1);
+                svg.Offset = Math.Clamp(svg.FromDistance(distance, length), -1e9, 1e9);
+            }
+            else if (_typePathHandle == 0) changed.Start = Math.Clamp(original.Start + delta, 0, original.End);
             else if (_typePathHandle == 1) changed.End = Math.Clamp(original.End + delta, original.Start, 1);
             else
             {
@@ -110,7 +118,7 @@ public sealed partial class DesignSurface
         }
         if (Renderer.GetTypeOnPathStatus(node).Overflow)
         {
-            var end = handles[1].Position; paint.Color = new(229, 90, 75);
+            var end = handles[^1].Position; paint.Color = new(229, 90, 75);
             canvas.DrawLine((float)end.X - 2, (float)end.Y, (float)end.X + 2, (float)end.Y, paint);
             canvas.DrawLine((float)end.X, (float)end.Y - 2, (float)end.X, (float)end.Y + 2, paint);
         }

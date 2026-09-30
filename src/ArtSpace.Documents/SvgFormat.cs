@@ -24,7 +24,7 @@ public static partial class SvgFormat
     private static XElement? ExportNode(DesignNode node, XElement defs, bool world = false)
     {
         if (!node.Visible || node.Kind == NodeKind.Slice) return null;
-        if (node.TextPath is not null) throw new InvalidOperationException("Use IllustrationSvgExport or Create Outlines to export type-on-path text as vector geometry.");
+        if (node.TextPath is not null) ExportTextPathDefinition(node, defs);
         if (node.Effects.Any(effect => effect.Enabled)) throw new InvalidOperationException("Live effects require native or PNG export; SVG filter interchange is not yet supported.");
         var group = new XElement(Ns + "g", new XAttribute("id", "layer-" + node.Id), new XAttribute("data-name", node.Name), new XAttribute("transform", Transform(world ? node.WorldMatrix : node.LocalMatrix)), new XAttribute("opacity", F(node.Opacity)));
         if (node.Blend != BlendKind.Normal) group.SetAttributeValue("style", "mix-blend-mode:" + SvgBlendName(node.Blend));
@@ -90,6 +90,7 @@ public static partial class SvgFormat
     {
         if (node.Kind == NodeKind.Text)
         {
+            if (node.TextPath is not null) return ExportTextPathShape(node);
             var anchor = node.TextAlign == TextAlignment.Center ? "middle" : node.TextAlign == TextAlignment.Right ? "end" : "start";
             var x = node.TextAlign == TextAlignment.Center ? node.Width / 2 : node.TextAlign == TextAlignment.Right ? node.Width : 0;
             var element = new XElement(Ns + "text", new XAttribute("font-family", node.FontFamily), new XAttribute("font-size", F(node.FontSize)), new XAttribute("font-weight", node.FontWeight), new XAttribute("letter-spacing", F(node.LetterSpacing)), new XAttribute("text-anchor", anchor));
@@ -108,8 +109,8 @@ public static partial class SvgFormat
         using var text = new StringReader(source); using var reader = XmlReader.Create(text, settings);
         var xml = XDocument.Load(reader); var root = xml.Root ?? throw new InvalidDataException("SVG is empty.");
         if (root.Name.LocalName != "svg") throw new InvalidDataException("The file root must be svg.");
-        if (root.Descendants().Any(e => e.Name.LocalName == "textPath"))
-            throw new InvalidDataException("SVG textPath import is not supported yet. Convert path text to outlines in the source application.");
+        var textPathIds = root.Descendants().Any(e => e.Name.LocalName == "textPath") ? TextPathDefinitions(root) : new Dictionary<string, XElement>(StringComparer.Ordinal);
+        var textPathCache = new Dictionary<string, SvgBaseline>(StringComparer.Ordinal);
         var warnings = new HashSet<string>(); var viewBox = Values(root.Attribute("viewBox")?.Value);
         var width = Number(root, "width", viewBox.Length == 4 ? viewBox[2] : 800); var height = Number(root, "height", viewBox.Length == 4 ? viewBox[3] : 600);
         var frame = new DesignNode { Kind = NodeKind.Frame, Name = name, Width = Math.Max(1, width), Height = Math.Max(1, height), Fills = [], ClipContent = true };
@@ -140,6 +141,7 @@ public static partial class SvgFormat
             if (kind is "defs" or "title" or "desc" or "metadata") return null;
             if (kind is "script" or "foreignObject" or "image" or "use" or "style" or "filter" or "clipPath" or "mask") { warnings.Add($"{kind} elements were not imported."); return null; }
             var node = new DesignNode { Name = element.Attribute("data-name")?.Value ?? element.Attribute("id")?.Value ?? kind, X = Number(element, "x"), Y = Number(element, "y"), Width = Number(element, "width", width), Height = Number(element, "height", height), Fills = [] };
+            XElement? pathText = null;
             switch (kind)
             {
                 case "g": case "svg": node.Kind = NodeKind.Group; node.X = node.Y = 0; break;
@@ -149,10 +151,13 @@ public static partial class SvgFormat
                 case "line": node.Kind = NodeKind.Path; node.Points = [new() { Position = new(Number(element, "x1"), Number(element, "y1")) }, new() { Position = new(Number(element, "x2"), Number(element, "y2")) }]; node.PathWidth = node.Width; node.PathHeight = node.Height; break;
                 case "polygon": case "polyline": var numbers = Values(element.Attribute("points")?.Value); node.Kind = NodeKind.Path; node.Closed = kind == "polygon"; node.PathWidth = node.Width; node.PathHeight = node.Height; for (var i = 0; i + 1 < numbers.Length; i += 2) node.Points.Add(new() { Position = new(numbers[i], numbers[i + 1]) }); break;
                 case "path": node.Kind = NodeKind.Path; node.PathData = element.Attribute("d")?.Value ?? ""; node.PathWidth = node.Width; node.PathHeight = node.Height; break;
-                case "text": node.Kind = NodeKind.Text; node.Text = element.Value; node.FontSize = Number(element, "font-size", 16); node.FontFamily = element.Attribute("font-family")?.Value ?? "Inter"; node.FontWeight = (int)Number(element, "font-weight", 400); node.Y -= node.FontSize; node.Width = Math.Max(1, node.Text.Length * node.FontSize * .6); node.Height = node.FontSize * 1.3; break;
+                case "text":
+                    pathText = ReadTextPath(element, node, textPathIds, textPathCache);
+                    if (pathText is not null) break;
+                    node.Kind = NodeKind.Text; node.Text = element.Value; node.FontSize = Number(element, "font-size", 16); node.FontFamily = element.Attribute("font-family")?.Value ?? "Inter"; node.FontWeight = (int)Number(element, "font-weight", 400); node.Y -= node.FontSize; node.Width = Math.Max(1, node.Text.Length * node.FontSize * .6); node.Height = node.FontSize * 1.3; break;
                 default: warnings.Add($"{kind} elements were not imported."); return null;
             }
-            string? Attribute(string key) => Inherited(element, key);
+            string? Attribute(string key) => Inherited(pathText ?? element, key);
             node.FillRule = Attribute("fill-rule") == "evenodd" ? PathFillRule.EvenOdd : PathFillRule.NonZero;
             var fill = Attribute("fill") ?? "#000000";
             if (kind is not "g" and not "svg" && fill != "none")
@@ -177,7 +182,7 @@ public static partial class SvgFormat
                 if (Enum.TryParse<BlendKind>(blend.Replace("-", ""), true, out var parsed) && Enum.IsDefined(parsed)) node.Blend = parsed;
                 else warnings.Add("Unsupported SVG blend mode: " + blend);
             }
-            node.Opacity = Math.Clamp(Scalar(Own(element, "opacity"), 1), 0, 1); node.Visible = Attribute("display") != "none" && Attribute("visibility") != "hidden";
+            node.Opacity = Math.Clamp(Scalar(Own(element, "opacity"), 1), 0, 1) * (pathText is null ? 1 : Math.Clamp(Scalar(Own(pathText, "opacity"), 1), 0, 1)); node.Visible = Attribute("display") != "none" && Attribute("visibility") != "hidden";
             if (kind is "g" or "svg") foreach (var child in element.Elements()) { var c = Read(child, depth + 1); if (c is not null) node.Add(c); }
             var clipReference = element.Attribute("clip-path")?.Value ?? Style(element, "clip-path");
             if (!string.IsNullOrWhiteSpace(clipReference) && clipReference != "none")
