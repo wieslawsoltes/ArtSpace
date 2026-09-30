@@ -6,7 +6,7 @@ namespace ArtSpace.Skia;
 /// <summary>Bridges Skia geometry to managed Bézier editing without making Core depend on Skia.</summary>
 public static class PathEditing
 {
-    public static bool CanEdit(DesignNode? node) => node is { IsContainer: false, IsEffectivelyLocked: false } && node.Kind is not NodeKind.Text and not NodeKind.Slice;
+    public static bool CanEdit(DesignNode? node) => node is { IsContainer: false, IsEffectivelyLocked: false } && (node.Kind != NodeKind.Text || node.TextPath is not null) && node.Kind != NodeKind.Slice;
 
     public static EditablePath Read(SKPath source, double conicTolerance = .01)
     {
@@ -112,6 +112,10 @@ public static class PathEditing
         ArgumentNullException.ThrowIfNull(node); ArgumentNullException.ThrowIfNull(localGeometry);
         if (localGeometry.FillType is SKPathFillType.InverseWinding or SKPathFillType.InverseEvenOdd)
             throw new InvalidOperationException("Inverse paths cannot be persisted as bounded artwork.");
+        if (node.TextPath is not null)
+        {
+            using var validate = new MeasuredContour(localGeometry);
+        }
         basis ??= node;
         var oldMatrix = basis.LocalMatrix; var oldWidth = basis.Width; var oldHeight = basis.Height;
         var bounds = localGeometry.TightBounds;
@@ -121,7 +125,9 @@ public static class PathEditing
         var paints = node.Fills.Concat(node.Strokes.Select(s => s.Paint).OfType<FillStyle>()).ToArray();
         var gradients = basis.Fills.Concat(basis.Strokes.Select(s => s.Paint).OfType<FillStyle>()).Select(f => (f.Start, f.End, f.GradientSpace, f.GradientTransform, f.GradientFocus, f.GradientRadius)).ToArray();
         var oldBounds = basis.LocalBounds;
-        if (gradients.Any(f => f.GradientSpace == GradientSpace.ObjectBoundingBox))
+        // Text paint coordinates use its local layout box, not the baseline's tight bounds.
+        // Match SceneRenderer.GradientBounds when outlining text or editing a path-text baseline.
+        if (basis.Kind != NodeKind.Text && gradients.Any(f => f.GradientSpace == GradientSpace.ObjectBoundingBox))
         {
             using var oldPath = SKPath.ParseSvgPathData(VectorPath.Build(basis)) ?? new SKPath();
             if (basis.Kind == NodeKind.Path && basis.PathWidth > 0 && basis.PathHeight > 0)
@@ -131,9 +137,10 @@ public static class PathEditing
         using var normalized = new SKPath(localGeometry);
         normalized.Transform(SKMatrix.CreateTranslation(-bounds.Left, -bounds.Top));
         node.FillRule = localGeometry.FillType == SKPathFillType.EvenOdd ? PathFillRule.EvenOdd : PathFillRule.NonZero;
-        node.Kind = NodeKind.Path; node.PathData = normalized.ToSvgPathData(); node.Points = []; node.Closed = false;
+        node.Kind = node.TextPath is null ? NodeKind.Path : NodeKind.Text; node.PathData = normalized.ToSvgPathData(); node.Points = []; node.Closed = false;
         node.Width = node.PathWidth = width; node.Height = node.PathHeight = height;
-        NodeGeometry.SetLocalMatrix(node, Matrix2D.Translation(bounds.Left, bounds.Top) * oldMatrix);
+        if (node.TextPath is null) NodeGeometry.SetLocalMatrix(node, Matrix2D.Translation(bounds.Left, bounds.Top) * oldMatrix);
+        else NodeGeometry.SetExactMatrix(node, Matrix2D.Translation(bounds.Left, bounds.Top) * oldMatrix);
         for (var i = 0; i < Math.Min(paints.Length, gradients.Length); i++)
         {
             if (paints[i].Kind == FillKind.Solid) continue;

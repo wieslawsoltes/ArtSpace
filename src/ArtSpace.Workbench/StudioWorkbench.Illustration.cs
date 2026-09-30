@@ -40,7 +40,7 @@ public sealed partial class StudioWorkbench
         _leftPanel.BorderThickness = new(0, 0, 1, 0); _rightPanel.BorderThickness = new(1, 0, 0, 0);
         _leftPanel.Background = Studio.Brush("#343434"); _rightPanel.Background = Studio.Brush("#383838");
 
-        var menu = new CommandMenuBar();
+        var menu = _applicationMenu = new CommandMenuBar();
         foreach (var name in new[] { "File", "Edit", "Object", "Type", "Select", "Effect", "View", "Window", "Help" })
             menu.Add(name, () => IllustrationMenu(name));
         var mark = Studio.Text("As", 17, "#FFAF4A", true); mark.Margin = new(12, 0, 8, 0);
@@ -229,6 +229,9 @@ public sealed partial class StudioWorkbench
                 yield return Item("Close Path", () => PathOperations.Close(Session, Surface.Renderer), enabled: selected);
                 break;
             case "Type":
+                yield return Async("Type on a Path…", CreateTypeOnPathAsync);
+                yield return Item("Edit Path Baseline", Surface.EnterPathEditing, enabled: Session.Primary?.TextPath is not null);
+                yield return Item("Flip Path Text", () => TypeOnPathOperations.Update(Session, "Flip path text", o => o.Flip = !o.Flip), enabled: Session.Primary?.TextPath is not null);
                 yield return Item("Create Outlines", () => PathOperations.CreateOutlines(Session, Surface.Renderer), "Ctrl Shift O", Session.SelectionRoots.Any(n => n.DescendantsAndSelf().Any(c => c.Kind == NodeKind.Text && !c.IsEffectivelyLocked)));
                 yield return Item("Type Tool", () => Session.Tool = EditorTool.Text, "T");
                 yield return Item("Edit Text", () => { if (Session.Primary?.Kind == NodeKind.Text) Surface.BeginTextEdit(Session.Primary); }, "Enter", Session.Primary?.Kind == NodeKind.Text);

@@ -70,7 +70,7 @@ test('Appearance panel edits non-destructive effects with undo and schema-four p
   await page.keyboard.press('Control+Shift+z');
   await expect.poll(async () => (await state(page)).effectRadius).toBe(19);
   expect((await state(page)).kind).toBe('Rectangle');
-  const document = await saved(page); expect(document.formatVersion).toBe(4);
+  const document = await saved(page); expect(document.formatVersion).toBe(5);
   expect(findNode(document, selected.id).effects[0]).toMatchObject({ kind: 'GaussianBlur', radius: 19, enabled: true });
   expect((await state(page)).uiFailures).toBe(0); expect(before.effects).toBe(1);
   await fs.mkdir('artifacts/screenshots', { recursive: true });

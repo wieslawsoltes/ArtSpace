@@ -118,6 +118,7 @@ public sealed class DesignNode
     public List<StrokeStyle> Strokes { get; set; } = [];
     public List<ShadowStyle> Shadows { get; set; } = [];
     public List<LiveEffect> Effects { get; set; } = [];
+    public TypeOnPathOptions? TextPath { get; set; }
     public string Text { get; set; } = "Text";
     public string FontFamily { get; set; } = "Inter";
     public double FontSize { get; set; } = 24;
@@ -230,7 +231,7 @@ public static class NodeGeometry
         var sx = Math.Sqrt(matrix.M11 * matrix.M11 + matrix.M12 * matrix.M12);
         var determinant = matrix.M11 * matrix.M22 - matrix.M12 * matrix.M21;
         var sy = determinant / sx;
-        if (!node.IsContainer)
+        if (!node.IsContainer && node.TextPath is null)
         {
             node.Width *= Math.Max(.0001, sx); node.Height *= Math.Max(.0001, Math.Abs(sy));
             matrix = Matrix2D.Scale(oldWidth > 0 ? oldWidth / Math.Max(1e-12, node.Width) : 1, oldHeight > 0 ? oldHeight / Math.Max(1e-12, node.Height) : 1) * matrix;

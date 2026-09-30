@@ -51,7 +51,7 @@ public static class PathOperations
             {
                 using var path = renderer.CreateTextOutline(node);
                 if (path.IsEmpty) continue; // Whitespace has no outlines; do not delete the original object.
-                PathEditing.Write(node, path); node.Name += " outlines"; node.Text = "";
+                node.TextPath = null; PathEditing.Write(node, path); node.Name += " outlines"; node.Text = "";
             }
         });
     }
@@ -59,6 +59,7 @@ public static class PathOperations
     public static void MakeCompound(EditorSession editor, SceneRenderer renderer)
     {
         var selected = Vectors(editor);
+        if (selected.Any(n => n.TextPath is not null)) throw new InvalidOperationException("Create text outlines before making a compound path.");
         if (selected.Length < 2) throw new InvalidOperationException("Select two or more vectors with the same parent.");
         var parent = selected[0].Parent;
         if (selected.Any(n => n.Parent != parent)) throw new InvalidOperationException("Compound path objects must have the same parent.");
@@ -84,6 +85,7 @@ public static class PathOperations
     public static void ReleaseCompound(EditorSession editor, SceneRenderer renderer)
     {
         var nodes = Vectors(editor);
+        if (nodes.Any(n => n.TextPath is not null)) throw new InvalidOperationException("Create text outlines before releasing compound glyph contours.");
         editor.Edit("Release compound path", () =>
         {
             var selection = new List<string>();

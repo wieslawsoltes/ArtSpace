@@ -8,7 +8,8 @@ public sealed class ColorField : UserControl
     private readonly TextBox _text;
     private readonly StudioButton _swatch;
     private string _value = "";
-    private bool _writing, _dirty;
+    private string _displayedText = "";
+    private bool HasPendingEdit => !string.Equals(_text.Text, _displayedText, StringComparison.Ordinal);
     private Flyout? _flyout;
     private long _editGeneration;
     public event Action<string>? ColorCommitted;
@@ -19,14 +20,8 @@ public sealed class ColorField : UserControl
         {
             var changed = _value != value;
             _value = value;
-            _writing = true;
-            try
-            {
-                var text = value.TrimStart('#').ToUpperInvariant();
-                if (_text.Text != text) _text.Text = text;
-                _dirty = false;
-            }
-            finally { _writing = false; }
+            _displayedText = value.TrimStart('#').ToUpperInvariant();
+            if (_text.Text != _displayedText) _text.Text = _displayedText;
             if (changed) { _swatch.RestBackground = value; _swatch.Background = Studio.Brush(value); }
         }
     }
@@ -36,7 +31,6 @@ public sealed class ColorField : UserControl
         _swatch = new StudioButton { Width = 24, Height = 24, Padding = new(0), CornerRadius = new(4), BorderThickness = new(1), BorderBrush = Studio.Brush("#22000000") };
         AutomationProperties.SetName(_swatch, "Choose color");
         Content = Studio.Columns((_swatch, 24), (_text, -1)); Value = color; ColorCommitted += commit;
-        _text.TextChanged += (_, _) => { if (!_writing) _dirty = true; };
         _text.LostFocus += (_, _) => CommitText();
         _text.KeyDown += (_, e) =>
         {
@@ -48,14 +42,14 @@ public sealed class ColorField : UserControl
     public void UpdateFromModel(string value, bool retarget = false)
     {
         if (retarget) CancelEdit();
-        else if (_dirty && _text.FocusState != FocusState.Unfocused) return;
+        else if (HasPendingEdit && _text.FocusState != FocusState.Unfocused) return;
         Value = value;
     }
     public void CancelEdit()
     {
         _editGeneration++;
         _flyout?.Hide(); _flyout = null;
-        if (_dirty) Value = _value;
+        if (HasPendingEdit) Value = _value;
     }
     private void OpenPicker()
     {
@@ -81,7 +75,7 @@ public sealed class ColorField : UserControl
     private void Set(string color) { var changed = _value != color; Value = color; if (changed) ColorCommitted?.Invoke(color); }
     private void CommitText()
     {
-        if (!_dirty) return;
+        if (!HasPendingEdit) return;
         var candidate = "#" + _text.Text.Trim().TrimStart('#');
         if (candidate.Length is 7 or 9 && SKColor.TryParse(candidate, out _)) Set(candidate.ToUpperInvariant()); else Value = _value;
     }

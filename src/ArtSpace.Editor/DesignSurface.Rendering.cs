@@ -53,6 +53,7 @@ public sealed partial class DesignSurface
             }
             DrawSelection(canvas);
             DrawGradientHandles(canvas);
+            DrawTypeOnPathHandles(canvas);
             if (_vectorNode is not null) DrawVertices(canvas, _vectorNode);
             var comments = editor.Document.Comments.Where(c => c.PageId == editor.Page.Id && !c.Resolved).ToArray();
             for (var i = 0; i < comments.Length; i++)

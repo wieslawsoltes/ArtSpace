@@ -59,13 +59,13 @@ public sealed partial class StudioWorkbench : UserControl, IDisposable
             if (presenting) { _inspectorView?.SuspendEditing(); ShowStatus("Prototype preview · Click linked layers · Esc to return"); }
             else RequestUi(UiDirty.All);
         };
-        PreviewKeyDown += (_, e) =>
+        PreviewKeyDown += HandleApplicationPreviewKey;
+        Loaded += (_, _) => DispatcherQueue.TryEnqueue(() =>
         {
-            if (e.Key == VirtualKey.Tab && !Keyboard.IsTextInput(e.OriginalSource as DependencyObject))
-            {
-                TogglePanels(); e.Handled = true;
-            }
-        };
+            // Do not steal a user's focus if an input/menu already acquired it during startup.
+            if (!_disposed && XamlRoot is { } root && FocusManager.GetFocusedElement(root) is null)
+                Surface.FocusCanvas();
+        });
         KeyDown += OnKeyDown; KeyUp += (_, e) => { if (e.Key == VirtualKey.Space) Surface.IsSpaceDown = false; };
         SizeChanged += (_, _) =>
         {

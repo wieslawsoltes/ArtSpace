@@ -12,10 +12,10 @@ public partial class ArtSpaceJsonContext : JsonSerializerContext;
 
 public static partial class DocumentJson
 {
-    public const int CurrentFormatVersion = 4;
+    public const int CurrentFormatVersion = 5;
     public const int MaxDocumentCharacters = 32 * 1024 * 1024;
     public const int MaxNodes = 100_000;
-    /// <summary>Save using schema 4. Older documents upgrade so earlier readers cannot silently discard live appearance semantics.</summary>
+    /// <summary>Save using schema 5. Older documents upgrade so earlier readers cannot silently discard live appearance semantics.</summary>
     public static string Save(DesignDocument document)
     {
         ArgumentNullException.ThrowIfNull(document);
@@ -75,6 +75,15 @@ public static partial class DocumentJson
             if (!double.IsFinite(n.X) || !double.IsFinite(n.Y) || !double.IsFinite(n.Width) || !double.IsFinite(n.Height) || !double.IsFinite(n.Rotation) || n.Width < 0 || n.Height < 0 || n.Width > 1e7 || n.Height > 1e7 || Math.Abs(n.X) > 1e9 || Math.Abs(n.Y) > 1e9) throw new InvalidDataException("A layer has invalid geometry.");
             if (n.Children is null || n.Fills is null || n.Strokes is null || n.Shadows is null || n.Layout is null || n.Points is null || n.Overrides is null) throw new InvalidDataException("A layer is missing required data.");
             ValidateLiveAppearance(n);
+            if (n.TextPath is { } pathText)
+            {
+                pathText.Validate();
+                if (n.Kind != NodeKind.Text || n.Text is null || n.Text.Length > TypeOnPathOptions.MaxTextLength
+                    || string.IsNullOrWhiteSpace(n.PathData) || n.PathData.Length > 2_000_000 || n.Points.Count != 0
+                    || n.PathWidth <= 0 || n.PathHeight <= 0 || !double.IsFinite(n.FontSize) || n.FontSize <= 0
+                    || !double.IsFinite(n.LetterSpacing) || Math.Abs(n.LetterSpacing) > 10000 || !Enum.IsDefined(n.TextAlign))
+                    throw new InvalidDataException("Invalid type-on-path text or baseline data.");
+            }
             if (n.ClipPathId is { } clip)
             {
                 var mask = n.Children.Find(child => child?.Id == clip);

@@ -35,6 +35,8 @@ jobs:
           cat artifacts/benchmarks/appearance-retention.json
           dotnet run --project tests/ArtSpace.Tests -c Release --no-build -- --spatial-benchmark > artifacts/benchmarks/spatial-replay.json
           cat artifacts/benchmarks/spatial-replay.json
+          dotnet run --project tests/ArtSpace.Tests -c Release --no-build -- --type-on-path-benchmark > artifacts/benchmarks/type-on-path.json
+          cat artifacts/benchmarks/type-on-path.json
       - uses: actions/upload-artifact@v7
         with:
           name: ArtSpace-performance
@@ -85,6 +87,7 @@ jobs:
       - name: Test actual browser interactions
         run: |
           npm ci
+          node --test tests/keyboard-bridge.test.mjs
           npx playwright install --with-deps chromium
           python3 scripts/serve-site.py --directory artifacts/site --port 4173 > artifacts/server.log 2>&1 &
           npx playwright test

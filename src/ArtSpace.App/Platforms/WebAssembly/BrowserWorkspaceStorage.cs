@@ -98,6 +98,25 @@ internal static class BrowserDiagnostics
                 json.WriteNumber("effects", primary?.Effects.Count ?? 0);
                 json.WriteNumber("effectRadius", primary?.Effects.FirstOrDefault()?.Radius ?? 0);
                 json.WriteNumber("graphicStyles", session.Document.GraphicStyles.Count);
+                json.WriteNumber("pathTextLayoutBuilds", workbench.Surface.Renderer.PathTextLayoutBuilds);
+                json.WriteNumber("textBaselineBuilds", workbench.Surface.Renderer.TextBaselineBuilds);
+                if (primary?.TextPath is { } pathText)
+                {
+                    var status = workbench.Surface.Renderer.GetTypeOnPathStatus(primary);
+                    json.WriteStartObject("pathText"); json.WriteNumber("start", pathText.Start); json.WriteNumber("end", pathText.End);
+                    json.WriteBoolean("flip", pathText.Flip); json.WriteNumber("baselineShift", pathText.BaselineShift);
+                    json.WriteNumber("length", status.PathLength); json.WriteBoolean("overflow", status.Overflow);
+                    json.WriteNumber("visibleGlyphs", status.VisibleGlyphs); json.WriteString("error", status.Error); json.WriteEndObject();
+                }
+                json.WriteStartArray("typePathHandles");
+                foreach (var handle in workbench.Surface.GetTypeOnPathHandles())
+                {
+                    json.WriteStartObject(); json.WriteNumber("kind", handle.Kind);
+                    json.WriteNumber("x", handle.Position.X + origin.X); json.WriteNumber("y", handle.Position.Y + origin.Y);
+                    json.WriteNumber("baseX", handle.BaselinePosition.X + origin.X); json.WriteNumber("baseY", handle.BaselinePosition.Y + origin.Y);
+                    json.WriteEndObject();
+                }
+                json.WriteEndArray();
                 json.WriteNumber("appearanceBuilds", workbench.AppearancePanelBuilds);
                 json.WriteNumber("sceneRecordings", workbench.Surface.Renderer.SceneRecordings);
                 json.WriteNumber("sceneReplays", workbench.Surface.Renderer.SceneReplays);
@@ -115,6 +134,10 @@ internal static class BrowserDiagnostics
                 json.WriteString("inspectorName", workbench.InspectorTargetName);
                 json.WriteNumber("inspectorSelection", workbench.InspectorSelectionCount);
                 json.WriteString("activePanel", workbench.ActivePanel);
+                json.WriteString("openMenu", workbench.OpenMenuName);
+                json.WriteString("activeMenuCommand", workbench.ActiveMenuCommandName);
+                json.WriteString("dialogTitle", workbench.ActiveDialogTitle);
+                json.WriteString("focusedControl", workbench.FocusedControlName);
                 json.WriteBoolean("uiPending", workbench.UiPending);
                 json.WriteNumber("uiFlushes", workbench.UiFlushes);
                 json.WriteNumber("uiFailures", workbench.UiRefreshFailures);

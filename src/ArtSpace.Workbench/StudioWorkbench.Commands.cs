@@ -79,6 +79,9 @@ public sealed partial class StudioWorkbench
         if (Surface.IsPresenting) { if (e.Key == VirtualKey.Escape) { Surface.ExitPresentation(); e.Handled = true; } return; }
         if (control && e.Key == VirtualKey.S) { RunAsync(SaveAsync); e.Handled = true; return; }
         if (Keyboard.IsTextInput(e.OriginalSource as DependencyObject)) return;
+        // Escape ends an in-flight gesture first. A second Escape can deselect the artwork.
+        if (!control && e.Key == VirtualKey.Escape && Surface.TryCancelGesture())
+        { e.Handled = true; return; }
         try
         {
             if (Surface.HandlePathKey(e.Key, control, shift, alt)) { e.Handled = true; return; }
@@ -233,9 +236,9 @@ public sealed partial class StudioWorkbench
     {
         var nodes = Session.SelectionRoots.Count > 0 ? Session.SelectionRoots.Where(n => n.Visible).ToArray() : Session.Page.Nodes.Where(n => n.Visible).ToArray();
         if (nodes.Length == 0) { ShowStatus("There are no visible layers to export."); return; }
-        var bounds = nodes.Select(n => n.WorldBounds).Aggregate(RectD.Union);
+        var bounds = nodes.Select(n => Surface.Renderer.GetArtworkBounds(n)).Aggregate(RectD.Union);
         if (nodes.Length == 1 && nodes[0].Kind == NodeKind.Slice) nodes = Session.Page.Nodes.Where(n => n.Visible && n.Kind != NodeKind.Slice).ToArray();
-        var bytes = svg ? Encoding.UTF8.GetBytes(SvgFormat.Export(nodes, bounds)) : Surface.Renderer.ExportPng(nodes, bounds, _exportScale);
+        var bytes = svg ? Encoding.UTF8.GetBytes(ArtSpace.Illustration.IllustrationSvgExport.Export(nodes, bounds, Surface.Renderer)) : Surface.Renderer.ExportPng(nodes, bounds, _exportScale);
         var name = SafeName(Session.SelectionRoots.Count == 1 ? Session.SelectionRoots[0].Name : Session.Page.Name);
         await _storage.SaveAsync(name + (svg ? ".svg" : ".png"), bytes, svg ? "image/svg+xml" : "image/png"); ShowStatus("Exported " + (svg ? "SVG" : "PNG"));
     }
@@ -243,12 +246,23 @@ public sealed partial class StudioWorkbench
     {
         var invalid = Path.GetInvalidFileNameChars().Concat(['/', '\\', ':']).ToHashSet(); var result = new string(name.Select(c => invalid.Contains(c) ? '-' : c).ToArray()).Trim(); return string.IsNullOrEmpty(result) ? "ArtSpace" : result;
     }
-    private ContentDialog Dialog(string title, UIElement content, string primary = "", string close = "Close") => new()
+    private ContentDialog Dialog(string title, UIElement content, string primary = "", string close = "Close")
     {
-        Title = title, Content = content, PrimaryButtonText = primary, CloseButtonText = close, XamlRoot = XamlRoot,
-        FontFamily = Studio.Font, RequestedTheme = ElementTheme.Dark, DefaultButton = string.IsNullOrEmpty(primary) ? ContentDialogButton.Close : ContentDialogButton.Primary,
-        MinWidth = 320, MaxWidth = 560
-    };
+        var dialog = new ContentDialog
+        {
+            Title = title, Content = content, PrimaryButtonText = primary, CloseButtonText = close, XamlRoot = XamlRoot,
+            FontFamily = Studio.Font, RequestedTheme = ElementTheme.Dark,
+            DefaultButton = string.IsNullOrEmpty(primary) ? ContentDialogButton.Close : ContentDialogButton.Primary,
+            MinWidth = 320, MaxWidth = 560
+        };
+        dialog.Opened += (_, _) => { _activeDialog = dialog; UiRefreshed?.Invoke(); };
+        dialog.Closed += (_, _) =>
+        {
+            if (ReferenceEquals(_activeDialog, dialog)) _activeDialog = null;
+            UiRefreshed?.Invoke();
+        };
+        return dialog;
+    }
     private async Task<string?> PromptAsync(string title, string value, bool multiline = false)
     {
         var input = Studio.Input(value, title); input.Width = 350; input.Height = multiline ? 110 : 34; input.AcceptsReturn = multiline; input.TextWrapping = multiline ? TextWrapping.Wrap : TextWrapping.NoWrap;

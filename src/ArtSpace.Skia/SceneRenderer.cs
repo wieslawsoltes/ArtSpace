@@ -24,6 +24,7 @@ public sealed partial class SceneRenderer : IDisposable
         InvalidateRetainedScene(); PrunePaints(nodes); PruneGradients(nodes);
         var retained = nodes.Select(n => n.Id).ToHashSet(StringComparer.Ordinal);
         PruneEffects(retained);
+        PruneTypeOnPath(nodes.Where(n => n.TextPath is not null).Select(n => n.Id).ToHashSet(StringComparer.Ordinal));
         foreach (var id in _paths.Keys.Where(id => !retained.Contains(id)).ToArray())
         { _paths[id].Path.Dispose(); _paths.Remove(id); }
         foreach (var id in _textLayouts.Keys.Where(id => !retained.Contains(id)).ToArray())
@@ -53,7 +54,7 @@ public sealed partial class SceneRenderer : IDisposable
         { GeometryCacheHits++; return cache.Path; }
         var path = SKPath.ParseSvgPathData(VectorPath.Build(node)) ?? new SKPath();
         GeometryBuilds++;
-        if (node.Kind == NodeKind.Path && node.PathWidth > 0 && node.PathHeight > 0) path.Transform(SKMatrix.CreateScale((float)(node.Width / node.PathWidth), (float)(node.Height / node.PathHeight)));
+        if ((node.Kind == NodeKind.Path || node.TextPath is not null) && node.PathWidth > 0 && node.PathHeight > 0) path.Transform(SKMatrix.CreateScale((float)(node.Width / node.PathWidth), (float)(node.Height / node.PathHeight)));
         path.FillType = node.FillRule == PathFillRule.EvenOdd ? SKPathFillType.EvenOdd : SKPathFillType.Winding;
         if (cache is not null) cache.Path.Dispose();
         if (_paths.Count > 100_000) ClearCache();
@@ -157,10 +158,10 @@ public sealed partial class SceneRenderer : IDisposable
                 var child = HitTest(node.Children.Where(c => c.Id != node.ClipPathId && c.Id != node.OpacityMaskId), point, deep, tolerance);
                 if (child is not null) return deep || node.Kind == NodeKind.Frame || node.Kind == NodeKind.Section ? child : node;
             }
-            if (node.Kind == NodeKind.Text && inside) return node;
+            if (node.Kind == NodeKind.Text && node.TextPath is null && inside) return node;
             if (node.Kind == NodeKind.Group && node.Children.Count > 0) continue;
             if (node.Kind == NodeKind.Frame && inside && node.Fills.Count > 0) return node;
-            var path = Geometry(node);
+            var path = node.TextPath is not null ? TypeOnPathLayout(node).Outline : Geometry(node);
             var pickBounds = path.TightBounds;
             // Include the miter reach of both the visible stroke and the tolerance-expanded picking stroke.
             var pickOutset = Math.Max(tolerance * 4, node.Strokes.Count == 0 ? 0 : node.Strokes.Max(s => s.Width * .5 * Math.Max(4, s.MiterLimit)));
@@ -178,6 +179,9 @@ public sealed partial class SceneRenderer : IDisposable
     }
     public byte[] ExportPng(IEnumerable<DesignNode> nodes, RectD bounds, double scale = 1)
     {
+        nodes = nodes.ToArray();
+        foreach (var node in nodes.SelectMany(n => n.DescendantsAndSelf()))
+            if (node.TextPath is not null && node.IsEffectivelyVisible) ValidateTypeOnPath(node);
         var width = Math.Max(1, (int)Math.Ceiling(bounds.Width * scale)); var height = Math.Max(1, (int)Math.Ceiling(bounds.Height * scale));
         if (!double.IsFinite(scale) || scale <= 0 || width > 16384 || height > 16384 || (long)width * height > 64_000_000) throw new InvalidOperationException("Export is limited to 16,384 pixels per edge and 64 megapixels.");
         using var surface = SKSurface.Create(new SKImageInfo(width, height, SKColorType.Rgba8888, SKAlphaType.Premul)) ?? throw new InvalidOperationException("Could not allocate export surface.");

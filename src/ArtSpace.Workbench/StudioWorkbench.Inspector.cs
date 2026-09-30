@@ -63,6 +63,7 @@ public sealed partial class StudioWorkbench
                 if (InspectedNode.Kind == NodeKind.Star) body.Children.Add(b.Number("Star ratio", () => InspectedNode.StarRatio * 100, v => Change("Star ratio", n => n.StarRatio = v / 100), 1, 100));
             });
             if (node.Kind == NodeKind.Text) BuildTypography();
+            if (node.TextPath is not null) BuildTypeOnPath();
             BuildFills(node); BuildStrokes(node); BuildEffects(node);
             AddIllustrationSections();
             if (Session.SelectionRoots.Count >= 2)

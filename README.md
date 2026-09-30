@@ -25,9 +25,17 @@ ArtSpace shares its C# document model, transaction engine, geometry, custom cont
 
 The compact dark shell combines menus, appearance controls, toolbox, rulers, pasteboard, artboards, layers, properties, history, Appearance, Graphic Styles and a status bar. The original **Alpine Echoes** sample is editable vector artwork across three artboards.
 
-**Version: `0.5.0-alpha.1`.** This is an independent functional alpha, not complete or pixel-identical Adobe Illustrator parity. The [feature matrix](docs/feature-matrix.md) distinguishes implemented behavior and remaining compatibility boundaries.
+**Version: `0.6.0-alpha.1`.** This is an independent functional alpha, not complete or pixel-identical Adobe Illustrator parity. The [feature matrix](docs/feature-matrix.md) distinguishes implemented behavior and remaining compatibility boundaries.
 
-## New in 0.5
+## New in 0.6
+
+**Editable Type on a Path:** create text along a vector contour or attach existing sibling text, with start/end/center brackets, flip, font-metric alignment, baseline shift and explicit overflow. Direct Selection edits the baseline; Create Outlines converts only on request. The retained inspector preserves ordinary field updates and bracket clicks do not begin undo transactions.
+
+**Retained path typography:** one glyph geometry layout serves painting, hit testing and outlines. Native arc-length measurements and lazy projection tables are cached separately. Settled text participates in the existing R-tree display list; there is no extra editor framebuffer. SVG export creates outlines on a detached copy, keeping native text editable.
+
+Read the [Type on a Path guide](docs/type-on-path.md) for APIs, single-contour/shaping boundaries, schema 5, export semantics and reproducible CPU measurements.
+
+## Appearance and rendering introduced in 0.5
 
 **Live Appearance:** non-destructive Gaussian Blur, Drop Shadow, Outer Glow and Saturation, with editable parameters, enablement, ordering, duplication and removal. Effects compose with masks and object transparency without replacing editable geometry.
 
@@ -49,7 +57,7 @@ The compact dark shell combines menus, appearance controls, toolbox, rulers, pas
 | Geometry | Shape/stroke expansion, offsets, Boolean union/subtract/intersect/exclude and compound paths with nonzero/even-odd rules |
 | Appearance | Multiple fills/strokes, gradient fills/strokes, dashed strokes with phase, sixteen blend modes, ordered live effects, legacy shadows and appearance presets |
 | Masking | Vector clipping and editable nested alpha/luminance masks, inversion, enablement and independent source/content selection |
-| Text | Basic wrapping, tracking/alignment and Create Outlines using the same glyph runs as painting |
+| Text | Basic wrapping, tracking/alignment, editable single-contour Type on a Path and Create Outlines using shared glyph geometry |
 | Reuse | Bounded editable blends/repeats, linked local symbols/components and graphic styles |
 | Files | Native JSON, supported SVG interchange, SVG/PNG export and IndexedDB/native recovery |
 | Performance | Retained inspector/layer controls, indexed selection/snapping, lazy drag transactions, cached native paints/filters and vector scene replay |
@@ -188,7 +196,7 @@ Console.WriteLine($"{row.Width} x {row.Height}, correction {snap.Correction}");
 
 ### ArtSpace.Documents
 
-Native JSON (schema 4, reading 1–4) with validation, node clipboard serialization, the supported SVG subset (paths, gradients, masks and affine transforms, returning warnings for anything skipped), the original sample artwork and the `IWorkspaceStorage` host contract. Depends on `ArtSpace.Core`; no UI.
+Native JSON (schema 5, reading 1–5) with validation, node clipboard serialization, the supported SVG subset (paths, gradients, masks and affine transforms, returning warnings for anything skipped), the original sample artwork and the `IWorkspaceStorage` host contract. Depends on `ArtSpace.Core`; no UI.
 
 ```bash
 dotnet add package ArtSpace.Documents --prerelease
@@ -442,7 +450,7 @@ Native replay now uses a clip-aware R-tree index. Changing recording policy rele
 
 ## Verification and performance
 
-The repository registers **256 engine cases**, **five additional benchmark boundary checks** and **21 browser scenarios**. Browser tests exercise real pointer, keyboard and file-picker input against the published Uno app. Diagnostics enabled by `?test=1` are read-only, not an editing API. A completed workflow result identifies which commit passed.
+The repository registers **301 engine cases**, **five additional benchmark boundary checks** and **24 browser scenarios**. Browser tests exercise real pointer, keyboard and file-picker input against the published Uno app. Diagnostics enabled by `?test=1` are read-only, not an editing API. A completed workflow result identifies which commit passed.
 
 ```bash
 npm ci
@@ -451,6 +459,7 @@ npx playwright test # after starting the local static server
 
 dotnet run --project tests/ArtSpace.Tests -c Release --no-build -- --benchmark
 dotnet run --project tests/ArtSpace.Tests -c Release --no-build -- --appearance-benchmark
+dotnet run --project tests/ArtSpace.Tests -c Release --no-build -- --type-on-path-benchmark
 ```
 
 Build validates engine regressions, reference-pixel benchmarks, Windows/Linux/macOS compilation, browser publication/acceptance and all nine packages. Pages deploys successful main-branch artifacts, verifies `build-info.json` and tests the public application. Release runs for `v*` tags or a supplied manual version and repeats engine/browser gates before packaging. Tagged publication uses NuGet Trusted Publishing from the protected `nuget` environment; manual release runs are dry runs that upload workflow artifacts.
@@ -459,15 +468,15 @@ The appearance benchmark alternates warm direct and retained drawing on the same
 
 ## Compatibility
 
-**Native saves use schema 4.** ArtSpace 0.5 reads schemas 1–4 and upgrades older documents when saving. Earlier readers reject schema 4 rather than silently dropping new appearance semantics. Preserve an original copy for older-version workflows. Autosave is local recovery, not durable backup.
+**Native saves use schema 5.** ArtSpace 0.6 reads schemas 1–5 and upgrades older documents when saving. Earlier readers reject schema 5 rather than silently dropping path-text and appearance semantics. Preserve an original copy for older-version workflows. Autosave is local recovery, not durable backup.
 
 Supported SVG gradients and masks are not full SVG/Illustrator roundtripping. Opacity-mask import currently requires user-space units. Inverted masks and enabled live effects retain native/PNG output but SVG export is explicitly rejected. General SVG filters, image/use content, stylesheet cascade and linear-light paint interpolation remain outside the supported subset.
 
-Advanced shaping, variable-font workflows, type-on-path, gradient meshes, the complete Illustrator effect catalog, arbitrary per-paint effect graphs, image tracing, pressure/art/pattern brushes, AI/EPS/PDF interchange, CMYK/ICC/spot/overprint production, multiple documents and arbitrary floating docking remain unfinished. Direct contour editing works on one object's contours at a time; rational curves are approximated on editing. Appearance radius calibration and UI layout are not asserted to be pixel-identical to Illustrator.
+Advanced shaping, variable-font workflows, threaded/warped path typography, gradient meshes, the complete Illustrator effect catalog, arbitrary per-paint effect graphs, image tracing, pressure/art/pattern brushes, AI/EPS/PDF interchange, CMYK/ICC/spot/overprint production, multiple documents and arbitrary floating docking remain unfinished. Direct contour editing works on one object's contours at a time; rational curves are approximated on editing. Appearance radius calibration and UI layout are not asserted to be pixel-identical to Illustrator.
 
 ## Documentation and license
 
-[Getting started](docs/getting-started.md) · [Architecture](docs/architecture.md) · [Appearance/rendering](docs/appearance-rendering.md) · [Contours/outlines](docs/path-editing.md) · [Clipping/performance](docs/clipping-and-performance.md) · [Opacity/gradients](docs/opacity-masks-and-gradients.md) · [UI performance](docs/ui-performance.md) · [Contributing](CONTRIBUTING.md)
+[Getting started](docs/getting-started.md) · [Architecture](docs/architecture.md) · [Appearance/rendering](docs/appearance-rendering.md) · [Contours/outlines](docs/path-editing.md) · [Type on a Path](docs/type-on-path.md) · [Clipping/performance](docs/clipping-and-performance.md) · [Opacity/gradients](docs/opacity-masks-and-gradients.md) · [UI performance](docs/ui-performance.md) · [Contributing](CONTRIBUTING.md)
 
 ArtSpace is [MIT-licensed](LICENSE), derived from the author's MIT [VectorSpace](https://github.com/wieslawsoltes/VectorSpace) snapshot `587f780f2803f6b3aa59dfb5411da2c2fe601dfa`. Attribution is retained in [third-party notices](THIRD-PARTY-NOTICES.md).
 
