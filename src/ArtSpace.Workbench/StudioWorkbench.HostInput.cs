@@ -17,7 +17,9 @@ public sealed partial class StudioWorkbench
     /// navigation even when a stale browser text overlay has not yet relinquished DOM focus.
     /// Other native text inputs and modal dialogs retain normal editing/focus traversal.
     /// </summary>
-    public bool HandleHostNavigation(VirtualKey key, bool nativeTextInput = false)
+    public bool HandleHostNavigation(VirtualKey key) => HandleHostNavigation(key, false);
+
+    public bool HandleHostNavigation(VirtualKey key, bool nativeTextInput)
     {
         if (_disposed || XamlRoot is null || _activeDialog is not null) return false;
         if (_applicationMenu?.IsOpen == true) return _applicationMenu.HandleNavigationKey(key);
