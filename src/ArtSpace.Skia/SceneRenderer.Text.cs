@@ -33,7 +33,9 @@ public sealed partial class SceneRenderer
 
     private SKFont CreateTextFont(DesignNode node) => new(Typeface(node), (float)node.FontSize)
     {
-        Edging = SKFontEdging.SubpixelAntialias, Subpixel = true,
+        // Illustration coordinates are resolution-independent. Grid-fitted glyph metrics can diverge
+        // from Create Outlines on systems with different fallback fonts or at fractional zoom levels.
+        Edging = SKFontEdging.SubpixelAntialias, Subpixel = true, Hinting = SKFontHinting.None, LinearMetrics = true,
         Embolden = _customTypeface is not null && node.FontFamily == "Inter" && node.FontWeight >= 600
     };
 

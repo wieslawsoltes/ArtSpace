@@ -14,6 +14,8 @@ public sealed class CommandMenuBar : UserControl
     private int _activeIndex = -1;
     private bool _userNavigated;
     public bool IsOpen => _popup?.IsOpen == true;
+    /// <summary>Raised after the open menu or active command changes; never requests layout or edits a document.</summary>
+    public event Action? NavigationChanged;
     public string? OpenMenuName => IsOpen && _anchor is not null ? AutomationProperties.GetName(_anchor) : null;
     public string? ActiveCommandName => IsOpen && _activeIndex >= 0 && _activeIndex < _items.Count ? _items[_activeIndex].Command.Label : null;
 
@@ -37,6 +39,7 @@ public sealed class CommandMenuBar : UserControl
         var popup = _popup; _popup = null;
         if (popup is not null) popup.IsOpen = false;
         _items.Clear(); _activeIndex = -1;
+        if (popup is not null) NavigationChanged?.Invoke();
     }
 
     /// <summary>Host keyboard adapters can forward navigation when native/browser focus routing is unavailable.</summary>
@@ -68,9 +71,16 @@ public sealed class CommandMenuBar : UserControl
 
     private void Activate(int index)
     {
-        _activeIndex = index;
-        for (var i = 0; i < _items.Count; i++) _items[i].Button.IsSelected = i == index;
+        var changed = _activeIndex != index;
+        var previous = _activeIndex; _activeIndex = index;
+        if (changed)
+        {
+            if (previous >= 0 && previous < _items.Count) _items[previous].Button.IsSelected = false;
+            if (index >= 0 && index < _items.Count) _items[index].Button.IsSelected = true;
+        }
+        // Re-focus even an unchanged initial index: popup loading can complete after its first activation.
         if (index >= 0 && index < _items.Count) _items[index].Button.Focus(FocusState.Keyboard);
+        if (changed) NavigationChanged?.Invoke();
     }
 
     private void Execute(MenuCommand command)
@@ -127,5 +137,7 @@ public sealed class CommandMenuBar : UserControl
         items.Loaded += (_, _) => DispatcherQueue.TryEnqueue(InitialFocus);
         popup.IsOpen = true;
         InitialFocus();
+        // Also publish menus containing no enabled command.
+        if (_activeIndex < 0) NavigationChanged?.Invoke();
     }
 }

@@ -127,10 +127,10 @@ internal static class LiveAppearanceTests
             var json = DocumentJson.Save(new());
             foreach (var version in new[] { 1, 2, 3 })
             {
-                var legacy = DocumentJson.Load(json.Replace("\"formatVersion\":5", "\"formatVersion\":" + version));
+                var legacy = DocumentJson.Load(json.Replace("\"formatVersion\":6", "\"formatVersion\":" + version));
                 Check(DocumentJson.Load(DocumentJson.Save(legacy)).FormatVersion == DocumentJson.CurrentFormatVersion);
             }
-            Throws(() => DocumentJson.Load(json.Replace("\"formatVersion\":5", "\"formatVersion\":99")));
+            Throws(() => DocumentJson.Load(json.Replace("\"formatVersion\":6", "\"formatVersion\":99")));
         });
         test("malformed graphic styles are validated even when unused", () =>
         {

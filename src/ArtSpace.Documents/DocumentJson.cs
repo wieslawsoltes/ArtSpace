@@ -12,7 +12,7 @@ public partial class ArtSpaceJsonContext : JsonSerializerContext;
 
 public static partial class DocumentJson
 {
-    public const int CurrentFormatVersion = 5;
+    public const int CurrentFormatVersion = 6;
     public const int MaxDocumentCharacters = 32 * 1024 * 1024;
     public const int MaxNodes = 100_000;
     /// <summary>Save using schema 5. Older documents upgrade so earlier readers cannot silently discard live appearance semantics.</summary>

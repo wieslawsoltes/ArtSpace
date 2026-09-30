@@ -39,6 +39,8 @@ internal static partial class BrowserFiles
     internal static partial bool IsTestMode();
     [JSImport("globalThis.artSpaceStorage.publishDiagnostics")]
     internal static partial void PublishDiagnostics(string json);
+    [JSImport("globalThis.artSpaceStorage.publishMenuDiagnostics")]
+    internal static partial void PublishMenuDiagnostics(string? openMenu, string? activeMenuCommand);
     [JSImport("globalThis.artSpaceStorage.publishFrameDiagnostics")]
     internal static partial void PublishFrameDiagnostics(double sceneRecordings, double sceneReplays,
         double sceneBytes, double paintBuilds, double dashBuilds, double effectFilterBuilds,
@@ -108,6 +110,12 @@ internal static class BrowserDiagnostics
                     json.WriteNumber("length", status.PathLength); json.WriteBoolean("overflow", status.Overflow);
                     json.WriteNumber("visibleGlyphs", status.VisibleGlyphs); json.WriteString("error", status.Error); json.WriteEndObject();
                 }
+                json.WriteStartObject("svgTextPath");
+                if (primary?.TextPath?.SvgPosition is { } svgPosition)
+                {
+                    json.WriteNumber("offset", svgPosition.Offset); json.WriteBoolean("percentage", svgPosition.Percentage);
+                }
+                json.WriteEndObject();
                 json.WriteStartArray("typePathHandles");
                 foreach (var handle in workbench.Surface.GetTypeOnPathHandles())
                 {
@@ -193,6 +201,13 @@ internal static class BrowserDiagnostics
             QueuePublish();
         };
         workbench.UiRefreshed += QueuePublish;
+        workbench.MenuNavigationChanged += () =>
+        {
+            if (workbench.IsDisposed) return;
+            // Navigation changes selection paint/focus without requiring layout. Publish only the
+            // two authoritative scalars instead of traversing the document/inspector for every key.
+            BrowserFiles.PublishMenuDiagnostics(workbench.OpenMenuName, workbench.ActiveMenuCommandName);
+        };
         workbench.Surface.FrameRendered += () =>
         {
             if (workbench.IsDisposed) return;

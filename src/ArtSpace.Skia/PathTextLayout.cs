@@ -42,6 +42,7 @@ public sealed class PathTextLayout : IDisposable
         var output = new SKPath();
         try
         {
+            var svg = options.SvgPosition;
             var total = 0d;
             for (var i = 0; i < runes.Length; i++)
             {
@@ -54,12 +55,20 @@ public sealed class PathTextLayout : IDisposable
                     if (!double.IsFinite(width) || width < 0) throw new InvalidOperationException("Invalid glyph advance.");
                     glyph = (value, width, font.GetTextPath(value, SKPoint.Empty)); unique.Add(scalar, glyph);
                 }
-                advances[i] = glyph.Advance; total += glyph.Advance;
+                // SVG rotates/anchors the complete character cell, including its trailing spacing.
+                // Native brackets retain their existing inter-glyph tracking and whole-glyph fit.
+                advances[i] = glyph.Advance + (svg is null ? 0 : tracking);
+                if (svg is not null && advances[i] < 0)
+                    throw new InvalidOperationException("SVG letter spacing that reverses a character advance is unsupported; use outlined text.");
+                total += advances[i];
             }
-            total += Math.Max(0, runes.Length - 1) * tracking;
+            if (svg is null) total += Math.Max(0, runes.Length - 1) * tracking;
             total = Math.Max(0, total);
-            var range = (options.End - options.Start) * contour.Length;
+            var svgAnchor = svg?.Resolve(contour.Length) ?? 0;
+            var alignmentFraction = alignment == TextAlignment.Center ? .5 : alignment == TextAlignment.Right ? 1d : 0;
+            var range = svg is null ? (options.End - options.Start) * contour.Length : contour.Length;
             var cursor = alignment == TextAlignment.Center ? (range - total) / 2 : alignment == TextAlignment.Right ? range - total : 0;
+            if (svg is not null) cursor = svgAnchor - total * alignmentFraction;
             var metrics = font.Metrics;
             var offset = (options.Alignment switch
             {
@@ -73,23 +82,34 @@ public sealed class PathTextLayout : IDisposable
             for (var i = 0; i < runes.Length; i++)
             {
                 var advance = advances[i]; var midpoint = cursor + advance / 2;
-                if (cursor < -.0001 || cursor + advance > range + .0001 || range <= .0001)
-                    overflow = true;
+                // SVG clips by glyph midpoint. Closed contours permit one circuit about the anchor;
+                // native brackets retain their existing whole-glyph-fit policy.
+                var outside = svg is null
+                    ? cursor < -.0001 || cursor + advance > range + .0001 || range <= .0001
+                    : contour.IsClosed
+                        ? midpoint < svgAnchor - range * alignmentFraction || midpoint >= svgAnchor + range * (1 - alignmentFraction)
+                        : midpoint < 0 || midpoint > range;
+                if (outside) overflow = true;
                 else
                 {
                     var distance = options.Flip ? options.End * contour.Length - midpoint : options.Start * contour.Length + midpoint;
+                    if (svg is not null)
+                    {
+                        var onPath = contour.IsClosed ? ((midpoint % range) + range) % range : midpoint;
+                        distance = options.Flip ? range - onPath : onPath;
+                    }
                     var sample = contour.At(distance);
                     var t = options.Flip ? sample.Tangent * -1 : sample.Tangent;
                     var normal = new Vec2(-t.Y, t.X);
                     var origin = sample.Position - t * (advance / 2) + normal * offset;
                     var matrix = new Matrix2D(t.X, t.Y, -t.Y, t.X, origin.X, origin.Y);
                     var scalar = runes[i].Value is 9 or 10 or 13 ? 32 : runes[i].Value;
-                    using var glyph = new SKPath(unique[scalar].Outline);
-                    glyph.Transform(SceneRenderer.Matrix(matrix)); output.AddPath(glyph);
+                    // Append with the transform directly; no per-character native SKPath clone.
+                    output.AddPath(unique[scalar].Outline, SceneRenderer.Matrix(matrix));
                     if (output.PointCount > 1_000_000) throw new InvalidOperationException("Text outline point budget exceeded.");
                     placements.Add(new(i, utf16, advance, distance, matrix));
                 }
-                cursor += advance + tracking; utf16 += runes[i].Utf16SequenceLength;
+                cursor += advance + (svg is null ? tracking : 0); utf16 += runes[i].Utf16SequenceLength;
             }
             var bounds = output.TightBounds;
             var status = new PathTextStatus(contour.Length, range, total, runes.Length, placements.Count, overflow,

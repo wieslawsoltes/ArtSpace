@@ -87,7 +87,7 @@ jobs:
       - name: Test actual browser interactions
         run: |
           npm ci
-          node --test tests/keyboard-bridge.test.mjs
+          node --test tests/*.test.mjs
           npx playwright install --with-deps chromium
           python3 scripts/serve-site.py --directory artifacts/site --port 4173 > artifacts/server.log 2>&1 &
           npx playwright test

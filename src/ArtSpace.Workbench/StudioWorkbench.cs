@@ -243,6 +243,8 @@ public sealed partial class StudioWorkbench : UserControl, IDisposable
     private static string Glyph(NodeKind kind) => kind == NodeKind.Path ? "pen" : kind.ToString().ToLowerInvariant();
     public new void Dispose()
     {
-        if (_disposed) return; _disposed = true; Session.Changed -= OnSessionChanged; _autosaveTimer.Stop(); _toastTimer.Stop(); _inspectorView?.Dispose(); _appearanceView?.Dispose(); _graphicStylesView?.Dispose(); _layerEntries.Clear(); _artboardButtons.Clear(); UiRefreshed = null; Surface.Dispose();
+        if (_disposed) return; _disposed = true; Session.Changed -= OnSessionChanged; _autosaveTimer.Stop(); _toastTimer.Stop(); _inspectorView?.Dispose(); _appearanceView?.Dispose(); _graphicStylesView?.Dispose(); _layerEntries.Clear(); _artboardButtons.Clear(); UiRefreshed = null;
+        if (_applicationMenu is not null) _applicationMenu.NavigationChanged -= OnMenuNavigationChanged;
+        MenuNavigationChanged = null; Surface.Dispose();
     }
 }

@@ -152,9 +152,10 @@ internal static class TypeOnPathBoundaryTests
                 Check(PixelError(reference, r.ExportPng([n], region)) < .005, "Create Outlines changed the gradient coordinate system.");
             });
         }
-        test("unsupported native SVG textPath never silently imports as straight text", () =>
+        test("supported SVG textPath remains path text and raw native bracket export stays guarded", () =>
         {
-            Reject(() => SvgFormat.Import("<svg><defs><path id='p' d='M0 0L100 0'/></defs><text><textPath href='#p'>Curved</textPath></text></svg>"));
+            var imported = SvgFormat.Import("<svg><defs><path id='p' d='M0 0L100 0'/></defs><text><textPath href='#p'>Curved</textPath></text></svg>");
+            Check(imported.Document.AllNodes().Any(n => n.Kind == NodeKind.Text && n.TextPath?.SvgPosition is not null));
             Reject(() => SvgFormat.Export([Node()], new(0, 0, 440, 240)));
         });
         test("path text export bounds include shifted ink without expanding clipped artboards", () =>

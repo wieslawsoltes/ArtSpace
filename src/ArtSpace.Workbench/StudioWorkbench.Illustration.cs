@@ -41,6 +41,7 @@ public sealed partial class StudioWorkbench
         _leftPanel.Background = Studio.Brush("#343434"); _rightPanel.Background = Studio.Brush("#383838");
 
         var menu = _applicationMenu = new CommandMenuBar();
+        menu.NavigationChanged += OnMenuNavigationChanged;
         foreach (var name in new[] { "File", "Edit", "Object", "Type", "Select", "Effect", "View", "Window", "Help" })
             menu.Add(name, () => IllustrationMenu(name));
         var mark = Studio.Text("As", 17, "#FFAF4A", true); mark.Margin = new(12, 0, 8, 0);
@@ -189,6 +190,7 @@ public sealed partial class StudioWorkbench
                 yield return Async("New…", NewDocumentAsync, "Ctrl N"); yield return Async("Open…", OpenAsync, "Ctrl O");
                 yield return Async("Save a Copy…", SaveAsync, "Ctrl S"); yield return separator;
                 yield return Async("Export SVG…", () => ExportAsync(true)); yield return Async("Export PNG…", () => ExportAsync(false));
+                yield return Async("Export Editable SVG…", () => ExportAsync(true, true));
                 yield return Item("New Artboard", AddArtboard, "Shift O");
                 yield return Async("Open Alpine sample", async () => { if (Session.IsDirty && !await ConfirmAsync("Replace current artwork?", "Save a local copy first to keep the current document.")) return; Session.Load(IllustrationSample.Create()); Surface.Fit(firstFrame: true); });
                 break;

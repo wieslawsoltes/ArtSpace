@@ -138,6 +138,7 @@ public static class PathEditing
         normalized.Transform(SKMatrix.CreateTranslation(-bounds.Left, -bounds.Top));
         node.FillRule = localGeometry.FillType == SKPathFillType.EvenOdd ? PathFillRule.EvenOdd : PathFillRule.NonZero;
         node.Kind = node.TextPath is null ? NodeKind.Path : NodeKind.Text; node.PathData = normalized.ToSvgPathData(); node.Points = []; node.Closed = false;
+        if (node.TextPath?.SvgPosition is { } svgPosition) svgPosition.PathTransform = Matrix2D.Identity;
         node.Width = node.PathWidth = width; node.Height = node.PathHeight = height;
         if (node.TextPath is null) NodeGeometry.SetLocalMatrix(node, Matrix2D.Translation(bounds.Left, bounds.Top) * oldMatrix);
         else NodeGeometry.SetExactMatrix(node, Matrix2D.Translation(bounds.Left, bounds.Top) * oldMatrix);

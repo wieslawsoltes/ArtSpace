@@ -55,6 +55,7 @@ public sealed partial class SceneRenderer : IDisposable
         var path = SKPath.ParseSvgPathData(VectorPath.Build(node)) ?? new SKPath();
         GeometryBuilds++;
         if ((node.Kind == NodeKind.Path || node.TextPath is not null) && node.PathWidth > 0 && node.PathHeight > 0) path.Transform(SKMatrix.CreateScale((float)(node.Width / node.PathWidth), (float)(node.Height / node.PathHeight)));
+        if (node.TextPath?.SvgPosition is { } svgPosition) path.Transform(Matrix(svgPosition.PathTransform));
         path.FillType = node.FillRule == PathFillRule.EvenOdd ? SKPathFillType.EvenOdd : SKPathFillType.Winding;
         if (cache is not null) cache.Path.Dispose();
         if (_paths.Count > 100_000) ClearCache();

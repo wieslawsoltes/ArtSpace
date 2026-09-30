@@ -20,10 +20,19 @@ public sealed partial class StudioWorkbench
 
     private void BuildTypeOnPath()
     {
-        Inspect("Type on a Path", null, (body, b) =>
+        Inspect("Type on a Path", InspectedNode.TextPath!.SvgPosition is not null, (body, b) =>
         {
             void ChangeOptions(string label, Action<TypeOnPathOptions> edit) => Run(() => TypeOnPathOperations.Update(Session, label, edit));
-            body.Children.Add(Studio.Columns(
+            if (InspectedNode.TextPath!.SvgPosition is not null)
+            {
+                body.Children.Add(b.Number("SVG offset", () => InspectedNode.TextPath!.SvgPosition!.Offset,
+                    value => ChangeOptions("Move SVG text anchor", o => { if (o.SvgPosition is { } p) p.Offset = value; }), -1e9, 1e9));
+                body.Children.Add(b.Choice(["Percent", "Path units"], () => InspectedNode.TextPath!.SvgPosition!.Percentage ? "Percent" : "Path units",
+                    value => Run(() => TypeOnPathOperations.SetSvgOffsetUnits(Session, Surface.Renderer, value == "Percent")), "SVG offset units"));
+                body.Children.Add(b.Text(() => "SVG anchor layout · " + (InspectedNode.TextPath!.SvgPosition!.PathLength is { } length ? "author pathLength " + Numbers.Format(length) : "measured path units"), 10, Studio.Muted));
+                body.Children.Add(b.Button(() => "Use native bracket layout", () => Run(() => TypeOnPathOperations.UseBracketLayout(Session, Surface.Renderer))));
+            }
+            else body.Children.Add(Studio.Columns(
                 (b.Number("Start %", () => InspectedNode.TextPath!.Start * 100,
                     value => ChangeOptions("Start path text", o => o.Start = Math.Min(o.End, value / 100)), 0, 100), -1),
                 (b.Number("End %", () => InspectedNode.TextPath!.End * 100,
@@ -42,7 +51,7 @@ public sealed partial class StudioWorkbench
                     + " characters · " + Numbers.Format(status.PathLength) + " px path";
             }, 10, Studio.Muted));
             body.Children.Add(b.Button(() => "Edit baseline anchors", () => Run(Surface.EnterPathEditing)));
-            body.Children.Add(b.Button(() => "Move text brackets", () => { Session.Tool = EditorTool.Move; Surface.FocusCanvas(); }));
+            body.Children.Add(b.Button(() => InspectedNode.TextPath!.SvgPosition is null ? "Move text brackets" : "Move SVG text anchor", () => { Session.Tool = EditorTool.Move; Surface.FocusCanvas(); }));
             body.Children.Add(b.Button(() => "Create Outlines", () => Run(() => PathOperations.CreateOutlines(Session, Surface.Renderer))));
             body.Children.Add(b.Button(() => "Convert to area text", () => Run(() => TypeOnPathOperations.ConvertToAreaText(Session))));
         });

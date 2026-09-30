@@ -12,17 +12,19 @@ public sealed class TypeOnPathOptions
     public const int MaxTextLength = 8192;
     public double Start { get; set; }
     public double End { get; set; } = 1;
+    public SvgTextPathPosition? SvgPosition { get; set; }
     public bool Flip { get; set; }
     public double BaselineShift { get; set; }
     public PathTextAlignment Alignment { get; set; }
 
     public TypeOnPathOptions Clone() => new()
     {
-        Start = Start, End = End, Flip = Flip, BaselineShift = BaselineShift, Alignment = Alignment
+        Start = Start, End = End, Flip = Flip, BaselineShift = BaselineShift, Alignment = Alignment, SvgPosition = SvgPosition?.Clone()
     };
 
     public void Validate()
     {
+        SvgPosition?.Validate();
         if (!double.IsFinite(Start) || !double.IsFinite(End) || Start < 0 || End > 1 || Start > End)
             throw new InvalidDataException("Type-on-path brackets must satisfy 0 ≤ Start ≤ End ≤ 1.");
         if (!double.IsFinite(BaselineShift) || Math.Abs(BaselineShift) > 10000 || !Enum.IsDefined(Alignment))

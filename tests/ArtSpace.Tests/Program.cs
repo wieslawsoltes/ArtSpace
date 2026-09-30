@@ -13,9 +13,21 @@ if (args.Contains("--appearance-benchmark")) return LiveAppearanceBenchmarks.Run
 
 if (args.Contains("--benchmark")) return PerformanceBenchmarks.Run();
 
-if (args.Contains("--type-on-path-benchmark")) return TypeOnPathBenchmarks.Run();
+if (args.Contains("--type-on-path-benchmark"))
+{
+    Directory.CreateDirectory("artifacts/benchmarks");
+    File.WriteAllText("artifacts/benchmarks/glyph-append.json", GlyphAppendBenchmarks.Report());
+    File.WriteAllText("artifacts/benchmarks/polyline-projection.json", PolylineProjectionBenchmarks.Report());
+    return TypeOnPathBenchmarks.Run();
+}
+
+if (args.Contains("--projection-benchmark")) return PolylineProjectionBenchmarks.Run();
+
+if (args.Contains("--glyph-append-benchmark")) return GlyphAppendBenchmarks.Run();
 
 var tests = new List<(string Name, Action Test)>();
+SvgTextPathTests.Register(Test);
+PolylineProjectionTests.Register(Test);
 TypeOnPathTests.Register(Test);
 TypeOnPathBoundaryTests.Register(Test);
 LiveAppearanceTests.Register(Test);

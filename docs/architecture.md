@@ -36,7 +36,7 @@ Commands use `EditorSession.Edit` and gestures begin once, preview, then commit/
 
 ## Files, trust and compatibility
 
-Native saves use schema 3; schemas 1 and 2 remain readable. Earlier releases reject schema 3 rather than losing new semantics. Computed inverse/bounds properties are excluded from JSON. Validation enforces geometry, resource-count, depth, mask-reference and paint invariants. Local recovery is not backup; no document upload service exists.
+Native saves use schema 6; schemas 1–6 remain readable. Earlier releases reject schema 6 rather than losing new semantics. Computed inverse/bounds properties are excluded from JSON. Validation enforces geometry, resource-count, depth, mask-reference and paint invariants. Local recovery is not backup; no document upload service exists.
 
 SVG parsing prohibits DTD/external entities and never executes imported scripts. Local gradient references are bounded and cycle checked. Mask import supports explicitly documented user-space source/region semantics; unsupported definitions fail closed. Export uses finite mask regions and precise affine numbers. Inverted mask SVG export remains an explicit error. General filters, image/use sources, CSS cascade, gradient strokes and native Illustrator formats are outside this subset.
 
@@ -51,8 +51,12 @@ Read [opacity/gradient design](opacity-masks-and-gradients.md) and [clipping/per
 
 ## Retained path typography
 
-Schema 5 adds `DesignNode.TextPath` options while keeping text as a Text node and persisting its owned baseline in PathData/PathWidth/PathHeight. Schemas 1–5 remain readable. `TypeOnPathOperations` provides reversible commands; `MeasuredContour` owns one native path measure and a lazy projection table; `PathTextLayout` owns the positioned glyph path. Renderer keys compare exact options/typography/geometry. Font changes clear owned resources; ordinary paint and placement changes preserve layout.
+Schema 5 adds `DesignNode.TextPath` options while keeping text as a Text node and persisting its owned baseline in PathData/PathWidth/PathHeight. This was introduced in schema 5; the current schema 6 reader retains compatibility with schemas 1–6. `TypeOnPathOperations` provides reversible commands; `MeasuredContour` owns one native path measure and a lazy projection table; `PathTextLayout` owns the positioned glyph path. Renderer keys compare exact options/typography/geometry. Font changes clear owned resources; ordinary paint and placement changes preserve layout.
 
 Drawing, picking and outlines share glyph geometry. Direct Selection edits the baseline, while Selection exposes lazy-transaction text brackets. The existing scene recorder can retain settled output. Arc length, scalar layout and editing remain CPU work; backend hardware selection is unchanged.
 
 Interactive invalid-baseline failures become cached diagnostics, and exports reject them explicitly. `IllustrationSvgExport` clones requested roots and outlines path text without changing document/history. Normalized float serialization may differ at antialiased edges, so outline interchange uses bounded coverage tests; cached/direct replay is tested with exact pixels. See [ownership, performance and limitations](type-on-path.md).
+
+## SVG anchor layout and direct glyph append
+
+See [editable SVG path text](svg-path-text.md). Core retains `SvgTextPathPosition`; Documents indexes local references without taking a Skia dependency. The renderer distinguishes SVG anchor/midpoint/seam layout from native whole-glyph bracket layout. Its exact cache identity covers positioning data and supplemental baseline transforms. Glyph construction appends transformed paths without temporary per-glyph native wrappers. The optional editable SVG writer preserves text; the default export remains detached outlines.
