@@ -31,14 +31,14 @@ ArtSpace is an independent illustration editor. Familiar workspace conventions d
 | Symbols | Limited | Local linked components, mask remapping, text and appearance overrides; no full dynamic symbol semantics |
 | Basic typography | Limited | Configured fonts, wrapping, tracking and alignment; no general shaping/bidi/fallback certification |
 | Type on a Path | Implemented with limits | One open/closed contour, create/attach, editable baseline, Start/End/center brackets, flip, metric alignment, baseline shift and overflow |
-| Path-text threading/warps | Not implemented | No cross-seam wrapping, multiple-contour flow or Skew/Ribbon/Stair/Gravity variants |
+| Path-text threading/warps | Not implemented | No native-bracket seam wrapping or multiple-contour flow or Skew/Ribbon/Stair/Gravity variants |
 | Create Outlines | Implemented with limits | Shared glyph geometry/layout, retained identity/appearance/placement and undo; no advanced shaping upgrade |
 | Advanced typography | Not implemented | Variable-font axes, glyph panel, general ligature/kerning resolution, complex-script/bidi and fallback |
 | Raster placement/tracing | Not implemented | No links manager, Image Trace or raster editor |
 | RGB/PNG | Implemented | Screen-oriented, not press production |
 | CMYK/ICC/spot/overprint | Not implemented | No proofing or separations guarantee |
 | Native ArtSpace persistence | Implemented | Read schemas 1–6; saves schema 6; older readers reject new semantics |
-| SVG path-text interchange | Limited | Editable local single-run textPath import/export, signed offsets, text anchors and closed seams; default export remains outlines; advanced runs/shaping and native bracket-overflow editable export are not supported |
+| SVG path-text interchange | Limited | Editable local single-run textPath import/export, signed offsets, text anchors and closed seams; default export remains outlines; advanced runs/shaping and native bracket-overflow/nonzero-tracking editable export are not supported |
 | Other SVG interchange | Limited | Safe editable subset, not lossless Illustrator roundtrip; unsupported live effects rejected |
 | AI/EPS/PDF interchange | Not implemented | No native format parity claim |
 | Undo/local recovery | Implemented | Bounded transactions and IndexedDB/native recovery, not cloud backup |
@@ -54,7 +54,7 @@ ArtSpace is an independent illustration editor. Familiar workspace conventions d
 
 ## Validation
 
-The repository registers 301 engine cases, five additional benchmark safety checks and 24 real Uno browser scenarios. Workflow conclusions and artifacts identify the tested commit; the existence of tests alone is not a claim that a particular build passed.
+The repository registers 361 engine cases, five additional benchmark safety checks and 29 real Uno browser scenarios plus one independent browser SVG reference. Workflow conclusions and artifacts identify the tested commit; the existence of tests alone is not a claim that a particular build passed.
 
 Type-on-path tests cover measurement/projection, alignment, flip, Unicode scalar indices, overflow, transactions, caches, baseline editing, invalid input, symbols, gradients, export bounds and outlines. Browser scenarios exercise real menu/prompt input, retained field values, bracket manipulation, cancellation, baseline editing, outlines and recovery.
 

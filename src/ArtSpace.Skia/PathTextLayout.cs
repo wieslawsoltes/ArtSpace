@@ -42,6 +42,7 @@ public sealed class PathTextLayout : IDisposable
         var output = new SKPath();
         try
         {
+            var svg = options.SvgPosition;
             var total = 0d;
             for (var i = 0; i < runes.Length; i++)
             {
@@ -54,11 +55,15 @@ public sealed class PathTextLayout : IDisposable
                     if (!double.IsFinite(width) || width < 0) throw new InvalidOperationException("Invalid glyph advance.");
                     glyph = (value, width, font.GetTextPath(value, SKPoint.Empty)); unique.Add(scalar, glyph);
                 }
-                advances[i] = glyph.Advance; total += glyph.Advance;
+                // SVG rotates/anchors the complete character cell, including its trailing spacing.
+                // Native brackets retain their existing inter-glyph tracking and whole-glyph fit.
+                advances[i] = glyph.Advance + (svg is null ? 0 : tracking);
+                if (svg is not null && advances[i] < 0)
+                    throw new InvalidOperationException("SVG letter spacing that reverses a character advance is unsupported; use outlined text.");
+                total += advances[i];
             }
-            total += Math.Max(0, runes.Length - 1) * tracking;
+            if (svg is null) total += Math.Max(0, runes.Length - 1) * tracking;
             total = Math.Max(0, total);
-            var svg = options.SvgPosition;
             var svgAnchor = svg?.Resolve(contour.Length) ?? 0;
             var alignmentFraction = alignment == TextAlignment.Center ? .5 : alignment == TextAlignment.Right ? 1d : 0;
             var range = svg is null ? (options.End - options.Start) * contour.Length : contour.Length;
@@ -104,7 +109,7 @@ public sealed class PathTextLayout : IDisposable
                     if (output.PointCount > 1_000_000) throw new InvalidOperationException("Text outline point budget exceeded.");
                     placements.Add(new(i, utf16, advance, distance, matrix));
                 }
-                cursor += advance + tracking; utf16 += runes[i].Utf16SequenceLength;
+                cursor += advance + (svg is null ? tracking : 0); utf16 += runes[i].Utf16SequenceLength;
             }
             var bounds = output.TightBounds;
             var status = new PathTextStatus(contour.Length, range, total, runes.Length, placements.Count, overflow,

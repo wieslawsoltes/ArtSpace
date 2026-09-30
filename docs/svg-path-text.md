@@ -16,7 +16,9 @@ Font properties and paint inheritance are read from the text run. Default XML wh
 
 The existing **Export SVG** command remains the appearance-oriented choice: it converts path text to vector outlines on a detached copy. It never changes the editable source or history.
 
-**File → Export Editable SVG…** writes actual `<textPath>` content and local path definitions. Imported SVG offsets retain their original units and authored path length. Native bracket text with no overflow is exported against a trimmed, optionally reversed baseline; font-metric vertical alignment is resolved to a scalar `dy`. Original text content remains editable in other tools, but the receiving font engine determines its metrics.
+**File → Export Editable SVG…** writes actual `<textPath>` content and local path definitions. Imported SVG offsets retain their original units and authored path length. Native bracket text with no overflow and zero tracking is exported against a trimmed, optionally reversed baseline; font-metric vertical alignment is resolved to a scalar `dy`. Original text content remains editable in other tools, but the receiving font engine determines its metrics.
+
+Native bracket tracking uses inter-glyph spacing and glyph-width tangents, whereas SVG uses complete character cells including trailing letter spacing. Editable export rejects nonzero native tracking; default outlined export preserves its appearance. Imported SVG spacing remains editable and includes trailing spacing in text-anchor placement and tangent sampling. Spacing that reverses a character advance and fractional font-weight values are explicitly unsupported.
 
 Native bracket overflow cannot be represented exactly by SVG's different midpoint clipping rule. Editable export rejects that case rather than dropping characters; use the default outlined export. SVG-positioned overflow can be exported with its original offset semantics. Existing restrictions on enabled live-effect filters and unsupported masks still apply.
 
@@ -48,7 +50,7 @@ The `--glyph-append-benchmark` mode compares both construction paths using 2,048
 
 Native saves use **schema 6**, reading schemas 1–6. Older readers reject schema 6 rather than ignoring SVG positioning semantics. Clone, undo, recovery and symbol serialization preserve independently owned options. Cache keys include offset units, authored length and baseline transform; changing an offset rebuilds layout but does not remeasure unchanged geometry.
 
-The engine suite includes 44 new SVG/path-append cases, and three browser scenarios cover actual import, inspector editing, anchor manipulation, cancellation, editable export/reimport and native recovery. Workflow reports are authoritative for which commit passed. No physical-GPU speedup or complete Illustrator parity is claimed.
+The engine suite includes 55 new SVG/path-append cases, and three application browser scenarios cover actual import, inspector editing, anchor manipulation, cancellation, editable export/reimport and native recovery. An additional independent Chromium SVG reference checks spacing/anchoring and authored-length calibration using the browser's own font metrics. Workflow reports are authoritative for which commit passed. No physical-GPU speedup or complete Illustrator parity is claimed.
 
 ## Primary references
 

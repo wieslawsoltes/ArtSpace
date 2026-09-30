@@ -51,7 +51,7 @@ Read [opacity/gradient design](opacity-masks-and-gradients.md) and [clipping/per
 
 ## Retained path typography
 
-Schema 5 adds `DesignNode.TextPath` options while keeping text as a Text node and persisting its owned baseline in PathData/PathWidth/PathHeight. Schemas 1–5 remain readable. `TypeOnPathOperations` provides reversible commands; `MeasuredContour` owns one native path measure and a lazy projection table; `PathTextLayout` owns the positioned glyph path. Renderer keys compare exact options/typography/geometry. Font changes clear owned resources; ordinary paint and placement changes preserve layout.
+Schema 5 adds `DesignNode.TextPath` options while keeping text as a Text node and persisting its owned baseline in PathData/PathWidth/PathHeight. This was introduced in schema 5; the current schema 6 reader retains compatibility with schemas 1–6. `TypeOnPathOperations` provides reversible commands; `MeasuredContour` owns one native path measure and a lazy projection table; `PathTextLayout` owns the positioned glyph path. Renderer keys compare exact options/typography/geometry. Font changes clear owned resources; ordinary paint and placement changes preserve layout.
 
 Drawing, picking and outlines share glyph geometry. Direct Selection edits the baseline, while Selection exposes lazy-transaction text brackets. The existing scene recorder can retain settled output. Arc length, scalar layout and editing remain CPU work; backend hardware selection is unchanged.
 

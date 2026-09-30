@@ -127,7 +127,10 @@ public static partial class SvgFormat
         node.FontSize = TextLength(Inherited(pathText, "font-size"), 16);
         node.FontFamily = (Inherited(pathText, "font-family") ?? "Inter").Split(',')[0].Trim().Trim('\'', '"');
         var weight = Inherited(pathText, "font-weight") ?? "400";
-        node.FontWeight = weight switch { "normal" => 400, "bold" => 700, _ => checked((int)TextNumber(weight)) };
+        var numericWeight = weight switch { "normal" => 400d, "bold" => 700d, _ => TextNumber(weight) };
+        if (numericWeight < 1 || numericWeight > 1000 || numericWeight != Math.Truncate(numericWeight))
+            throw new InvalidDataException("Only integral SVG font weights between 1 and 1000 are supported.");
+        node.FontWeight = (int)numericWeight;
         if (node.FontSize is < 1 or > 4096 || node.FontWeight is < 1 or > 1000) throw new InvalidDataException("Invalid SVG path-text font metrics.");
         var fontStyle = Inherited(pathText, "font-style");
         if (fontStyle is not (null or "normal")) throw new InvalidDataException("Italic SVG path text needs an explicitly supported font or outlines.");

@@ -456,7 +456,7 @@ Native replay now uses a clip-aware R-tree index. Changing recording policy rele
 
 ## Verification and performance
 
-The repository registers **301 engine cases**, **five additional benchmark boundary checks** and **24 browser scenarios**. Browser tests exercise real pointer, keyboard and file-picker input against the published Uno app. Diagnostics enabled by `?test=1` are read-only, not an editing API. A completed workflow result identifies which commit passed.
+The repository registers **361 engine cases**, **five additional benchmark boundary checks** and **30 browser scenarios (29 application workflows and one independent SVG reference)**. Browser tests exercise real pointer, keyboard and file-picker input against the published Uno app. Diagnostics enabled by `?test=1` are read-only, not an editing API. A completed workflow result identifies which commit passed.
 
 ```bash
 npm ci

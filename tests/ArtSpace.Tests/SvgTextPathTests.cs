@@ -26,6 +26,7 @@ internal static class SvgTextPathTests
     }
     public static void Register(Action<string, Action> test)
     {
+        SvgTextSpacingTests.Register(test);
         test("SVG path text remains editable and stores a detached baseline", () =>
         {
             var n = Import(Svg()); Check(n.Kind == NodeKind.Text && n.Text == "ABC");

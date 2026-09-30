@@ -12,21 +12,23 @@ public sealed partial class DesignSurface
     private int _typePathHandle;
     private double _typePathInitialFraction, _typePathInitialSide;
 
-    /// <summary>Read-only bracket positions in surface screen coordinates. 0=start, 1=end, 2=center.</summary>
+    /// <summary>Read-only bracket positions in surface screen coordinates. 0=start, 1=end, 2=center, 3=SVG anchor.</summary>
     public IReadOnlyList<TypeOnPathHandle> GetTypeOnPathHandles()
     {
         if (Session is not { Tool: EditorTool.Move, Primary: { TextPath: { } options } node } editor
             || editor.SelectionRoots.Count != 1 || node.IsEffectivelyLocked || IsPresenting) return [];
-        if (Renderer.GetTypeOnPathStatus(node).Error is not null) return [];
+        var status = Renderer.GetTypeOnPathStatus(node);
+        if (status.Error is not null) return [];
         var svg = options.SvgPosition;
-        var svgFraction = svg is null ? 0 : svg.Resolve(Renderer.GetTypeOnPathStatus(node).PathLength) / Renderer.GetTypeOnPathStatus(node).PathLength;
+        var svgFraction = svg is null ? 0 : svg.Resolve(status.PathLength) / status.PathLength;
         var result = new TypeOnPathHandle[svg is null ? 3 : 1];
         var fractions = svg is null ? new[] { options.Start, options.End, (options.Start + options.End) / 2 } : new[] { Math.Clamp(options.Flip ? 1 - svgFraction : svgFraction, 0, 1) };
+        var world = node.WorldMatrix;
         for (var i = 0; i < result.Length; i++)
         {
             var sample = Renderer.GetTypeOnPathSample(node, fractions[i]);
-            var p = editor.Viewport.WorldToScreen(node.WorldMatrix.Map(sample.Position));
-            var next = editor.Viewport.WorldToScreen(node.WorldMatrix.Map(sample.Position + sample.Tangent));
+            var p = editor.Viewport.WorldToScreen(world.Map(sample.Position));
+            var next = editor.Viewport.WorldToScreen(world.Map(sample.Position + sample.Tangent));
             var tangent = next - p; var length = Math.Max(1e-12, tangent.DistanceTo(Vec2.Zero)); tangent /= length;
             var normal = new Vec2(-tangent.Y, tangent.X);
             // Distinct offsets keep coincident start/end handles independently pickable on closed contours.

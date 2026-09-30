@@ -3,7 +3,7 @@ import fs from 'node:fs/promises';
 const state = page => page.evaluate(() => globalThis.__artSpaceState);
 const frames = page => page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 const field = (s, label) => s.inspectorFields?.find(f => f.section === 'Type on a Path' && f.label === label);
-const fixture = `<svg xmlns="http://www.w3.org/2000/svg" width="500" height="240"><defs><path id="b" d="M20 150H480"/></defs><text id="Editable SVG label" font-family="Inter" font-size="32" fill="#254F70" text-anchor="middle"><textPath href="#b" startOffset="50%">EDITABLE SVG TEXT</textPath></text></svg>`;
+const fixture = `<svg xmlns="http://www.w3.org/2000/svg" width="500" height="240"><defs><path id="b" d="M20 150H480"/></defs><text id="Editable SVG label" font-family="Inter" font-size="32" letter-spacing="2" fill="#254F70" text-anchor="middle"><textPath href="#b" startOffset="50%">EDITABLE SVG TEXT</textPath></text></svg>`;
 async function ready(page) {
   await page.setViewportSize({ width: 1600, height: 1450 });
   await page.goto('?test=1');
@@ -46,7 +46,7 @@ test('editable SVG path text imports with retained offset controls and survives 
   await expect.poll(async () => (await state(page)).svgTextPath.offset).toBe(35);
   expect((await state(page)).inspectorBuilds).toBe(builds);
   const document = await save(page); expect(document.formatVersion).toBe(6);
-  expect(nodes(document).find(n => n.id === initial.id)).toMatchObject({ text: 'EDITABLE SVG TEXT', textPath: { svgPosition: { offset: 35, percentage: true } } });
+  expect(nodes(document).find(n => n.id === initial.id)).toMatchObject({ text: 'EDITABLE SVG TEXT', letterSpacing: 2, textPath: { svgPosition: { offset: 35, percentage: true } } });
   await fs.mkdir('artifacts/screenshots', { recursive: true });
   await page.screenshot({ path: 'artifacts/screenshots/svg-text-path-inspector.png' });
   await page.waitForTimeout(1500); await page.reload();
@@ -83,4 +83,30 @@ test('File menu exports genuine editable textPath without mutating native text',
   await (await chooser).setFiles({ name: 'roundtrip.svg', mimeType: 'image/svg+xml', buffer: Buffer.from(svg) });
   await expect.poll(async () => (await state(page)).roots).toBe(before.roots + 1);
   const document = await save(page); expect(nodes(document).filter(n => n.text === 'EDITABLE SVG TEXT' && n.textPath?.svgPosition)).toHaveLength(2);
+});
+
+// Independent browser layout oracle: expected anchors are derived from the browser's own font metrics,
+// not from ArtSpace or a font file bundled specifically for the test.
+test('native SVG reference includes trailing spacing in anchors and authored offset calibration', async ({ page }) => {
+  const measurements = [];
+  for (const spacing of [-2, 0, 2]) for (const anchor of ['start', 'middle', 'end']) {
+    await page.setContent(`<svg xmlns="http://www.w3.org/2000/svg" width="500" height="200"><defs><path id="baseline" pathLength="100" d="M20 100H420"/></defs><text id="reference" font-family="monospace" font-size="20" letter-spacing="${spacing}" text-anchor="${anchor}" style="font-kerning:none;font-variant-ligatures:none"><textPath href="#baseline" startOffset="50%">ABCD</textPath></text></svg>`);
+    const result = await page.evaluate(() => {
+      const text = document.querySelector('#reference');
+      const start = text.getStartPositionOfChar(0);
+      return { advance: text.getComputedTextLength(), cell: text.getSubStringLength(0, 1), startX: start.x };
+    });
+    const fraction = anchor === 'middle' ? .5 : anchor === 'end' ? 1 : 0;
+    expect(result.advance).toBeCloseTo(result.cell * 4, 2);
+    expect(result.startX).toBeCloseTo(220 - result.advance * fraction, 2);
+    measurements.push({ spacing, anchor, ...result });
+  }
+  const middle = measurements.filter(m => m.anchor === 'middle');
+  expect(middle[2].advance - middle[1].advance).toBeCloseTo(8, 2);
+  await page.evaluate(() => {
+    document.querySelector('#reference').setAttribute('text-anchor', 'start');
+    document.querySelector('textPath').setAttribute('startOffset', '25');
+  });
+  expect(await page.evaluate(() => document.querySelector('#reference').getStartPositionOfChar(0).x)).toBeCloseTo(120, 2);
+  await test.info().attach('svg-native-reference-metrics', { body: JSON.stringify(measurements, null, 2), contentType: 'application/json' });
 });

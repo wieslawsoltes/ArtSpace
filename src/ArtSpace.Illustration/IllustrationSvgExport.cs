@@ -56,6 +56,8 @@ public static class IllustrationSvgExport
         var shift = renderer.GetTypeOnPathBaselineOffset(node);
         if (options.SvgPosition is null)
         {
+            if (node.LetterSpacing != 0)
+                throw new InvalidOperationException("Native tracked brackets use different character-cell rotation and anchoring than SVG letter spacing. Use outline SVG export to preserve appearance.");
             if (renderer.GetTypeOnPathStatus(node).Overflow)
                 throw new InvalidOperationException("Bracket-overflow text needs outline SVG export; editable SVG cannot preserve its whole-glyph clipping policy.");
             using var measure = new SKPathMeasure(renderer.Geometry(node), false, 4);
