@@ -89,7 +89,12 @@ public sealed partial class DesignSurface : UserControl, IDisposable
             if (IsPathTool)
             { e.Handled = true; return; }
             if (_penNode is not null) { FinishPath(false); e.Handled = true; return; }
-            var p = e.GetPosition(_canvas); var hit = Renderer.HitTest(Session.Page.Nodes, Session.Viewport.ScreenToWorld(new(p.X, p.Y)), true, 4 / Session.Viewport.Zoom);
+            var p = e.GetPosition(_canvas);
+            // A rapid second bracket press belongs to the same range gesture, not to the
+            // generic double-click text editor or the artwork underneath that bracket.
+            if (GetTypeOnPathHandles().Any(h => h.Position.DistanceTo(new(p.X, p.Y)) <= 8))
+            { e.Handled = true; return; }
+            var hit = Renderer.HitTest(Session.Page.Nodes, Session.Viewport.ScreenToWorld(new(p.X, p.Y)), true, 4 / Session.Viewport.Zoom);
             if (hit?.Kind == NodeKind.Text) { BeginTextEdit(hit); e.Handled = true; }
             else if (hit is not null && PathEditing.CanEdit(hit)) { Session.Select(hit); EnterPathEditing(); e.Handled = true; }
         };
@@ -117,7 +122,8 @@ public sealed partial class DesignSurface : UserControl, IDisposable
             if (Session is not null) Renderer.PruneCache(Session.Document.Pages.SelectMany(p => p.Nodes)); _snapIndex = null; _hover = null;
             if (_vectorNode is not null) _vectorNode = Session?.Document.Find(_vectorNode.Id);
         }
-        if (e.Kind == EditorChangeKind.Tool && _gesture is Gesture.PendingTransform or Gesture.PendingVertex) _gesture = Gesture.None;
+        if (e.Kind == EditorChangeKind.Tool && _gesture is Gesture.PendingTransform or Gesture.PendingVertex or Gesture.PendingTypePath)
+        { ResetTypeOnPathGesture(); _gesture = Gesture.None; }
         if (e.Kind == EditorChangeKind.Tool && _penNode is not null) FinishPath(false);
         _canvas.Invalidate();
     }

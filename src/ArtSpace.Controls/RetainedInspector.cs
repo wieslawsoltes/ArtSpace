@@ -193,23 +193,21 @@ public sealed class InspectorBindings
     {
         var modelValue = read();
         var field = Studio.Input(modelValue, label);
-        var dirty = false;
-        var writing = false;
+        var displayed = modelValue;
+        bool HasPendingEdit() => !string.Equals(field.Text, displayed, StringComparison.Ordinal);
         void Display(string value)
         {
-            writing = true;
-            try { if (field.Text != value) field.Text = value; dirty = false; }
-            finally { writing = false; }
+            displayed = value;
+            if (field.Text != value) field.Text = value;
         }
-        field.TextChanged += (_, _) => { if (!writing && !_updating) dirty = true; };
         field.LostFocus += (_, _) =>
         {
-            if (!CanWrite || !dirty) return;
+            if (!CanWrite || !HasPendingEdit()) return;
             var value = field.Text;
-            dirty = false;
+            displayed = value;
             if (value != read()) write(value);
         };
-        Observe(retarget => { modelValue = read(); if (retarget || !dirty || field.FocusState == FocusState.Unfocused) Display(modelValue); });
+        Observe(retarget => { modelValue = read(); if (retarget || !HasPendingEdit() || field.FocusState == FocusState.Unfocused) Display(modelValue); });
         _cancel.Add(() => Display(modelValue));
         _fields.Add((label, field, () => field.Text));
         return field;

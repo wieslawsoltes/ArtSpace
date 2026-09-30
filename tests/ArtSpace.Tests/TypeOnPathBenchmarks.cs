@@ -53,8 +53,43 @@ internal static class TypeOnPathBenchmarks
             note = "Alternating-order CPU experiment on software Skia. Reference deliberately clears all renderer caches each draw; not an old-release or physical-GPU FPS comparison. Warm path excludes baseline measurement and glyph construction.",
             reference = Report(reference), retained = Report(retained), pixelsEqual = true,
             warmBaselineRebuilds = warm.TextBaselineBuilds - baseline, warmLayoutRebuilds = warm.PathTextLayoutBuilds - layouts,
-            approximateRetainedLayoutBytes = warm.ApproximatePathTextBytes
+            approximateRetainedLayoutBytes = warm.ApproximatePathTextBytes,
+            workingSet = WorkingSet()
         }, new JsonSerializerOptions { WriteIndented = true }));
         return 0;
+    }
+    private static object WorkingSet()
+    {
+        const int hotCount = 16, newLabels = 256;
+        var nodes = Enumerable.Range(0, 128 + newLabels).Select(i => new DesignNode
+        {
+            Kind = NodeKind.Text, TextPath = new(), Text = "Label " + i,
+            FontSize = 18, Width = 480, Height = 200, PathWidth = 480, PathHeight = 200,
+            PathData = "M20 180C80 0 370 0 460 180"
+        }).ToArray();
+        using var r = new SceneRenderer();
+        for (var i = 0; i < 128; i++) r.GetTypeOnPathStatus(nodes[i]);
+        long hotRebuilds = 0, hotMeasurements = 0;
+        var sample = Measure(() =>
+        {
+            for (var i = 128; i < nodes.Length; i++)
+            {
+                var layouts = r.PathTextLayoutBuilds; var baselines = r.TextBaselineBuilds;
+                for (var h = 0; h < hotCount; h++)
+                { r.GetTypeOnPathStatus(nodes[h]); r.GetTypeOnPathSample(nodes[h], .5); }
+                hotRebuilds += r.PathTextLayoutBuilds - layouts; hotMeasurements += r.TextBaselineBuilds - baselines;
+                r.GetTypeOnPathStatus(nodes[i]);
+            }
+        });
+        if (hotRebuilds != 0 || hotMeasurements != 0 || r.CachedPathTextCount != 128 || r.PathTextLayoutEvictions != newLabels)
+            throw new InvalidOperationException("Path-text working set was flushed rather than evicting cold entries.");
+        return new
+        {
+            note = "CPU cache-pressure fixture, not a rendering/FPS or paired old-release benchmark. Cold population excluded; each new label is interleaved with sixteen hot labels.",
+            hotCount, newLabels, elapsedMs = sample.Milliseconds, managedBytes = sample.ManagedBytes,
+            hotLayoutRebuilds = hotRebuilds, hotBaselineRebuilds = hotMeasurements,
+            retainedLayouts = r.CachedPathTextCount, retainedBaselines = r.CachedTextBaselineCount,
+            layoutEvictions = r.PathTextLayoutEvictions, baselineEvictions = r.TextBaselineEvictions
+        };
     }
 }

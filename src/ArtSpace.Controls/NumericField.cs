@@ -8,7 +8,11 @@ public sealed class NumericField : UserControl
     private readonly TextBox _input;
     private readonly Border _prefix;
     private double _value, _startX, _startValue;
-    private bool _scrubbing, _dirty, _writing;
+    private bool _scrubbing;
+    // TextChanged may be dispatched after Enter. Compare the live edit buffer with the last
+    // model display instead of using an asynchronously delivered dirty notification.
+    private string _displayedText = "";
+    private bool HasPendingEdit => !string.Equals(_input.Text, _displayedText, StringComparison.Ordinal);
     public event Action<double>? ValueCommitted;
     public double Minimum { get; set; } = -1_000_000;
     public double Maximum { get; set; } = 1_000_000;
@@ -36,7 +40,6 @@ public sealed class NumericField : UserControl
         Content = new Border { Background = Studio.Brush(Studio.Field), CornerRadius = new(5), Child = grid, Height = 30 };
         Value = value;
         if (commit is not null) ValueCommitted += commit;
-        _input.TextChanged += (_, _) => { if (!_writing) _dirty = true; };
         _input.LostFocus += (_, _) => Commit();
         _input.KeyDown += (_, e) =>
         {
@@ -74,7 +77,7 @@ public sealed class NumericField : UserControl
     public void UpdateFromModel(double value, bool retarget = false)
     {
         if (retarget) CancelEdit();
-        else if (_scrubbing || (_dirty && _input.FocusState != FocusState.Unfocused)) return;
+        else if (_scrubbing || (HasPendingEdit && _input.FocusState != FocusState.Unfocused)) return;
         Value = value;
     }
 
@@ -82,7 +85,7 @@ public sealed class NumericField : UserControl
     public void CancelEdit()
     {
         if (_scrubbing) { _scrubbing = false; _value = _startValue; _prefix.ReleasePointerCaptures(); Display(); }
-        if (_dirty) Display();
+        if (HasPendingEdit) Display();
     }
 
     private void CancelScrub()
@@ -94,14 +97,13 @@ public sealed class NumericField : UserControl
     private void Display()
     {
         var text = _value.ToString("0.##", CultureInfo.InvariantCulture);
-        _writing = true;
-        try { if (_input.Text != text) _input.Text = text; _dirty = false; }
-        finally { _writing = false; }
+        _displayedText = text;
+        if (_input.Text != text) _input.Text = text;
     }
 
     private void Commit()
     {
-        if (!_dirty) return;
+        if (!HasPendingEdit) return;
         if (!double.TryParse(_input.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out var value) || !double.IsFinite(value)) { Display(); return; }
         value = Math.Clamp(value, Minimum, Maximum);
         var changed = value != _value;

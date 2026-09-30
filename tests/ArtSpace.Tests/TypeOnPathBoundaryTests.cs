@@ -36,6 +36,56 @@ internal static class TypeOnPathBoundaryTests
     }
     public static void Register(Action<string, Action> test)
     {
+        test("path-text LRU preserves warm layouts and baselines while cold labels churn", () =>
+        {
+            using var r = new SceneRenderer(); var hot = Node();
+            r.GetTypeOnPathStatus(hot);
+            for (var i = 0; i < 127; i++) r.GetTypeOnPathStatus(Node());
+            for (var i = 0; i < 200; i++)
+            {
+                r.GetTypeOnPathStatus(hot); r.GetTypeOnPathStatus(Node());
+                var layouts = r.PathTextLayoutBuilds; var baselines = r.TextBaselineBuilds;
+                Check(r.GetTypeOnPathStatus(hot).Error is null);
+                r.GetTypeOnPathSample(hot, .5);
+                Check(layouts == r.PathTextLayoutBuilds && baselines == r.TextBaselineBuilds);
+            }
+            Check(r.CachedPathTextCount == 128 && r.CachedTextBaselineCount == 128);
+            Check(r.PathTextLayoutEvictions == 200 && r.TextBaselineEvictions == 200);
+        });
+        test("replacing a full-cache path-text entry does not evict other objects", () =>
+        {
+            using var r = new SceneRenderer(); var nodes = Enumerable.Range(0, 128).Select(_ => Node()).ToArray();
+            foreach (var n in nodes) r.GetTypeOnPathStatus(n);
+            nodes[0].PathData = "M0 80L400 80"; r.GetTypeOnPathStatus(nodes[0]);
+            var builds = r.PathTextLayoutBuilds; var measures = r.TextBaselineBuilds;
+            foreach (var n in nodes) r.GetTypeOnPathStatus(n);
+            Check(r.PathTextLayoutBuilds == builds && r.TextBaselineBuilds == measures);
+            Check(r.PathTextLayoutEvictions == 0 && r.TextBaselineEvictions == 0);
+        });
+        test("baseline-only queries evict the oldest measurement without clearing layouts", () =>
+        {
+            using var r = new SceneRenderer(); var hot = Node(); r.GetTypeOnPathStatus(hot);
+            for (var i = 0; i < 300; i++) { r.GetTypeOnPathSample(hot, .5); r.GetTypeOnPathSample(Node(), .5); }
+            var builds = r.TextBaselineBuilds;
+            r.GetTypeOnPathStatus(hot); r.GetTypeOnPathSample(hot, .5);
+            Check(r.TextBaselineBuilds == builds && r.CachedPathTextCount == 1);
+            Check(r.CachedTextBaselineCount == 128 && r.TextBaselineEvictions > 0);
+        });
+        test("evicted path-text glyph geometry rebuilds to identical pixels", () =>
+        {
+            using var r = new SceneRenderer(); var n = Node();
+            var before = r.ExportPng([n], new(0, 0, 440, 240));
+            for (var i = 0; i < 128; i++) r.GetTypeOnPathStatus(Node());
+            Check(r.PathTextLayoutEvictions == 1);
+            var after = r.ExportPng([n], new(0, 0, 440, 240)); Check(before.SequenceEqual(after));
+            r.ClearCache(); Check(r.ApproximatePathTextBytes == 0 && r.CachedTextBaselineCount == 0);
+        });
+        test("converting path text to area text prunes its native cache resources", () =>
+        {
+            var n = Node(); var e = Editor(n); e.Select(n); using var r = new SceneRenderer();
+            r.GetTypeOnPathStatus(n); TypeOnPathOperations.ConvertToAreaText(e); r.PruneCache(e.Page.Nodes);
+            Check(r.CachedPathTextCount == 0 && r.CachedTextBaselineCount == 0 && r.ApproximatePathTextBytes == 0);
+        });
         test("invalid native path baseline is cached as a diagnostic rather than throwing from Draw", () =>
         {
             var n = Node(); n.PathData = "M0 0"; using var r = new SceneRenderer();

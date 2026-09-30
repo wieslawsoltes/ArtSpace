@@ -122,3 +122,25 @@ test('baseline anchor edits preserve text and Create Outlines remains reversible
   expect((await state(page)).pathText.error).toBeNull();
   await fs.mkdir('artifacts/screenshots', { recursive: true }); await page.screenshot({ path: 'artifacts/screenshots/type-on-path-baseline-editing.png' });
 });
+
+test('rapid single-character inspector commits are synchronous, idempotent and cancellable', async ({ page }) => {
+  await create(page, 'FAST INPUT');
+  const builds = (await state(page)).inspectorBuilds;
+  for (const value of [9, 4, -3, 0, 7]) {
+    const before = await state(page);
+    await number(page, 'Baseline shift', value);
+    await expect.poll(async () => (await state(page)).pathText.baselineShift).toBe(value);
+    await expect.poll(async () => (await state(page)).history).toBe(before.history + 1);
+    await page.keyboard.press('Enter'); await frames(page);
+    expect((await state(page)).history).toBe(before.history + 1);
+  }
+  const before = await state(page);
+  const f = await visibleField(page, 'Type on a Path', 'Baseline shift');
+  await page.mouse.click(f.x + f.width * .8, f.y + f.height / 2);
+  await page.keyboard.press('Control+a'); await page.keyboard.type('5'); await page.keyboard.press('Escape');
+  await page.keyboard.press('Tab'); await frames(page);
+  expect((await state(page)).pathText.baselineShift).toBe(7);
+  expect((await state(page)).history).toBe(before.history);
+  expect((await state(page)).inspectorBuilds).toBe(builds);
+  expect((await state(page)).uiFailures).toBe(0);
+});

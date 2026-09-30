@@ -7,11 +7,22 @@ public sealed partial class SceneRenderer
 {
     private readonly record struct PathTextKey(string Text, string Family, int Weight, double Size, double Tracking,
         TextAlignment TextAlignment, double Start, double End, bool Flip, double Shift, PathTextAlignment Alignment);
-    private sealed record CachedBaseline(GeometrySnapshot Snapshot, MeasuredContour Measure);
-    private sealed record CachedPathText(GeometrySnapshot Snapshot, PathTextKey Key, PathTextLayout Layout, long Bytes);
+    private sealed record CachedBaseline(GeometrySnapshot Snapshot, MeasuredContour Measure)
+    {
+        public long LastUse { get; set; }
+    }
+    private sealed record CachedPathText(GeometrySnapshot Snapshot, PathTextKey Key, PathTextLayout Layout, long Bytes)
+    {
+        public long LastUse { get; set; }
+    }
     private readonly Dictionary<string, CachedBaseline> _textBaselines = [];
     private readonly Dictionary<string, CachedPathText> _pathTextLayouts = [];
-    private long _pathTextBytes;
+    private const int PathTextEntryLimit = 128;
+    private const long PathTextByteBudget = 32 * 1024 * 1024;
+    private long _pathTextBytes, _pathTextClock;
+    public long PathTextLayoutEvictions { get; private set; }
+    public long TextBaselineEvictions { get; private set; }
+    public int CachedTextBaselineCount => _textBaselines.Count;
     public long PathTextLayoutBuilds { get; private set; }
     public long TextBaselineBuilds { get; private set; }
     public int CachedPathTextCount => _pathTextLayouts.Count;
@@ -21,15 +32,13 @@ public sealed partial class SceneRenderer
     {
         if (node.Kind != NodeKind.Text || node.TextPath is null)
             throw new ArgumentException("Select a type-on-path object.", nameof(node));
-        if (_textBaselines.TryGetValue(node.Id, out var entry) && entry.Snapshot.Matches(node)) return entry.Measure;
+        if (_textBaselines.TryGetValue(node.Id, out var entry) && entry.Snapshot.Matches(node))
+        { entry.LastUse = ++_pathTextClock; return entry.Measure; }
         var measure = new MeasuredContour(Geometry(node));
-        entry?.Measure.Dispose();
-        if (_textBaselines.Count >= 128)
-        {
-            foreach (var baseline in _textBaselines.Values) baseline.Measure.Dispose();
-            _textBaselines.Clear();
-        }
-        _textBaselines[node.Id] = new(new GeometrySnapshot(node), measure); TextBaselineBuilds++;
+        if (entry is not null) { entry.Measure.Dispose(); _textBaselines.Remove(node.Id); }
+        if (_textBaselines.Count >= PathTextEntryLimit) EvictOldestBaseline();
+        _textBaselines[node.Id] = new(new GeometrySnapshot(node), measure) { LastUse = ++_pathTextClock };
+        TextBaselineBuilds++;
         return measure;
     }
 
@@ -39,7 +48,13 @@ public sealed partial class SceneRenderer
         var key = new PathTextKey(node.Text, node.FontFamily, node.FontWeight, node.FontSize, node.LetterSpacing,
             node.TextAlign, options.Start, options.End, options.Flip, options.BaselineShift, options.Alignment);
         if (_pathTextLayouts.TryGetValue(node.Id, out var entry) && entry.Key == key && entry.Snapshot.Matches(node))
+        {
+            entry.LastUse = ++_pathTextClock;
+            // Painting a cached layout is also baseline use: keep its measurement available
+            // for imminent bracket/typography editing without constructing it on a cache hit.
+            if (_textBaselines.TryGetValue(node.Id, out var baseline)) baseline.LastUse = _pathTextClock;
             return entry.Layout;
+        }
         PathTextLayout result;
         try
         {
@@ -54,9 +69,11 @@ public sealed partial class SceneRenderer
         }
         var bytes = result.Outline.PointCount * 16L + result.Glyphs.Count * 72L;
         if (entry is not null) { entry.Layout.Dispose(); _pathTextBytes -= entry.Bytes; _pathTextLayouts.Remove(node.Id); }
-        // Approximate CPU geometry accounting, not a GPU/native allocation ceiling.
-        if (_pathTextLayouts.Count >= 128 || _pathTextBytes + bytes > 32 * 1024 * 1024) ClearPathTextLayouts();
-        _pathTextLayouts[node.Id] = new(new GeometrySnapshot(node), key, result, bytes);
+        // Approximate CPU geometry accounting, not a GPU geometry or total native allocation ceiling.
+        while (_pathTextLayouts.Count > 0 &&
+            (_pathTextLayouts.Count >= PathTextEntryLimit || _pathTextBytes + bytes > PathTextByteBudget))
+            EvictOldestPathText();
+        _pathTextLayouts[node.Id] = new(new GeometrySnapshot(node), key, result, bytes) { LastUse = ++_pathTextClock };
         _pathTextBytes += bytes; PathTextLayoutBuilds++;
         return result;
     }
@@ -79,31 +96,45 @@ public sealed partial class SceneRenderer
     /// <summary>Geometric export bounds including path-text ink; excludes general live-effect expansion.</summary>
     public RectD GetArtworkBounds(DesignNode node)
     {
-        ArgumentNullException.ThrowIfNull(node);
         var bounds = node.WorldBounds;
-        // An artboard export keeps its chosen dimensions even when text extends past its clip.
-        if (node.IsContainer && node.ClipContent) return bounds;
-        foreach (var child in node.DescendantsAndSelf())
+        void Include(DesignNode current)
         {
-            if (child.TextPath is null || !child.IsEffectivelyVisible) continue;
-            var status = GetTypeOnPathStatus(child);
-            if (status.Error is not null || status.InkBounds.IsEmpty) continue;
-            var ink = child.WorldMatrix.Map(status.InkBounds);
-            // Respect frame clips inside this exported subtree. Ancestors outside a selected root
-            // are deliberately excluded, matching DrawWorldNode's independent-selection export.
-            for (var parent = ReferenceEquals(child, node) ? null : child.Parent; parent is not null; parent = parent.Parent)
+            if (!current.IsEffectivelyVisible) return;
+            if (current.TextPath is not null)
             {
-                if (parent.ClipContent)
-                {
-                    var clip = parent.WorldBounds;
-                    var left = Math.Max(ink.X, clip.X); var top = Math.Max(ink.Y, clip.Y);
-                    ink = new(left, top, Math.Max(0, Math.Min(ink.Right, clip.Right) - left), Math.Max(0, Math.Min(ink.Bottom, clip.Bottom) - top));
-                }
-                if (ReferenceEquals(parent, node)) break;
+                var status = GetTypeOnPathStatus(current);
+                if (status.Error is null && !status.InkBounds.IsEmpty)
+                    bounds = RectD.Union(bounds, current.WorldMatrix.Map(status.InkBounds));
             }
-            if (!ink.IsEmpty) bounds = RectD.Union(bounds, ink);
+            // Clipped artboards preserve their explicit export dimensions. Selected descendants
+            // exported independently are intentionally not constrained by their external ancestors.
+            if (current.ClipContent || current.ClipPathId is not null) return;
+            foreach (var child in current.Children)
+                if (child.Id != current.OpacityMaskId) Include(child);
         }
+        Include(node);
         return bounds;
+    }
+
+    // Work proportional to retained entries occurs only on eviction. Warm lookup is O(1),
+    // allocation-free and never clears unrelated text when a new label enters the working set.
+    private void EvictOldestBaseline()
+    {
+        string? oldest = null; var stamp = long.MaxValue;
+        foreach (var pair in _textBaselines)
+            if (pair.Value.LastUse < stamp) { oldest = pair.Key; stamp = pair.Value.LastUse; }
+        if (oldest is null) return;
+        _textBaselines[oldest].Measure.Dispose(); _textBaselines.Remove(oldest); TextBaselineEvictions++;
+    }
+
+    private void EvictOldestPathText()
+    {
+        string? oldest = null; var stamp = long.MaxValue;
+        foreach (var pair in _pathTextLayouts)
+            if (pair.Value.LastUse < stamp) { oldest = pair.Key; stamp = pair.Value.LastUse; }
+        if (oldest is null) return;
+        var entry = _pathTextLayouts[oldest];
+        entry.Layout.Dispose(); _pathTextBytes -= entry.Bytes; _pathTextLayouts.Remove(oldest); PathTextLayoutEvictions++;
     }
 
     private void ClearPathTextLayouts()
