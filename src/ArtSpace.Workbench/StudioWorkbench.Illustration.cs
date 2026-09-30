@@ -40,7 +40,7 @@ public sealed partial class StudioWorkbench
         _leftPanel.BorderThickness = new(0, 0, 1, 0); _rightPanel.BorderThickness = new(1, 0, 0, 0);
         _leftPanel.Background = Studio.Brush("#343434"); _rightPanel.Background = Studio.Brush("#383838");
 
-        var menu = new CommandMenuBar();
+        var menu = _applicationMenu = new CommandMenuBar();
         foreach (var name in new[] { "File", "Edit", "Object", "Type", "Select", "Effect", "View", "Window", "Help" })
             menu.Add(name, () => IllustrationMenu(name));
         var mark = Studio.Text("As", 17, "#FFAF4A", true); mark.Margin = new(12, 0, 8, 0);

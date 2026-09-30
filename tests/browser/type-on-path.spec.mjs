@@ -28,8 +28,12 @@ async function ready(page) {
 async function create(page, text = 'ALPINE ECHOES — TYPE ON A PATH') {
   await ready(page);
   // Activate the real custom Type menu and its first command.
-  await page.mouse.click(200, 15); await page.keyboard.press('Home'); await page.keyboard.press('Enter');
-  await page.waitForTimeout(350);
+  await page.mouse.click(200, 15);
+  await page.waitForFunction(() => globalThis.__artSpaceState?.openMenu === 'Type');
+  await page.keyboard.press('Home'); await page.keyboard.press('Enter');
+  // Observe the actual opened/focused XAML input, not a guessed animation delay.
+  await page.waitForFunction(() => globalThis.__artSpaceState?.dialogTitle === 'Type on a Path'
+    && globalThis.__artSpaceState?.focusedControl === 'Type on a Path');
   await page.keyboard.press('Control+a'); await page.keyboard.type(text); await page.keyboard.press('Enter');
   await page.waitForFunction(() => globalThis.__artSpaceState?.pathText && !globalThis.__artSpaceState.uiPending);
   await expect.poll(async () => (await state(page)).kind).toBe('Text'); await frames(page);
@@ -101,7 +105,8 @@ test('path text bracket clicks are snapshot-free and dragging is one cancellable
   await frames(page); const restored = await state(page); const end = restored.typePathHandles[1];
   await page.mouse.move(end.x, end.y); await page.mouse.down(); await page.mouse.move(end.x - 45, end.y - 5, { steps: 8 });
   await page.keyboard.press('Escape'); await page.mouse.up();
-  await expect.poll(async () => (await state(page)).pathText.end).toBe(.8);
+  await expect.poll(async () => (await state(page)).id).toBe(initial.id);
+  await expect.poll(async () => (await state(page)).pathText?.end).toBe(.8);
   expect((await state(page)).history).toBe(initial.history);
   expect((await state(page)).uiFailures).toBe(0);
 });
@@ -142,5 +147,26 @@ test('rapid single-character inspector commits are synchronous, idempotent and c
   expect((await state(page)).pathText.baselineShift).toBe(7);
   expect((await state(page)).history).toBe(before.history);
   expect((await state(page)).inspectorBuilds).toBe(builds);
+  expect((await state(page)).uiFailures).toBe(0);
+});
+
+
+test('menu presses keep ownership across popup closure and a modal never edits the background', async ({ page }) => {
+  const initial = await ready(page);
+  for (let repeat = 0; repeat < 3; repeat++) {
+    // Deliberately do not wait between pointer and navigation; the shared routed-preview
+    // fallback must preserve event order when the browser bridge sees an unopened popup.
+    await page.mouse.click(200, 15);
+    await page.keyboard.press('Home');
+    await page.keyboard.press('Enter');
+    await page.waitForFunction(() => globalThis.__artSpaceState?.dialogTitle === 'Type on a Path'
+      && globalThis.__artSpaceState?.focusedControl === 'Type on a Path');
+    await page.keyboard.press('Control+a'); await page.keyboard.type('DO NOT COMMIT');
+    expect((await state(page)).selection).toBe(initial.selection);
+    await page.keyboard.press('Escape');
+    await page.waitForFunction(() => globalThis.__artSpaceState?.dialogTitle == null);
+    expect((await state(page)).id).toBe(initial.id);
+    expect((await state(page)).history).toBe(initial.history);
+  }
   expect((await state(page)).uiFailures).toBe(0);
 });

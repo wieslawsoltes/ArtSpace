@@ -79,6 +79,9 @@ public sealed partial class StudioWorkbench
         if (Surface.IsPresenting) { if (e.Key == VirtualKey.Escape) { Surface.ExitPresentation(); e.Handled = true; } return; }
         if (control && e.Key == VirtualKey.S) { RunAsync(SaveAsync); e.Handled = true; return; }
         if (Keyboard.IsTextInput(e.OriginalSource as DependencyObject)) return;
+        // Escape ends an in-flight gesture first. A second Escape can deselect the artwork.
+        if (!control && e.Key == VirtualKey.Escape && Surface.TryCancelGesture())
+        { e.Handled = true; return; }
         try
         {
             if (Surface.HandlePathKey(e.Key, control, shift, alt)) { e.Handled = true; return; }
@@ -243,12 +246,23 @@ public sealed partial class StudioWorkbench
     {
         var invalid = Path.GetInvalidFileNameChars().Concat(['/', '\\', ':']).ToHashSet(); var result = new string(name.Select(c => invalid.Contains(c) ? '-' : c).ToArray()).Trim(); return string.IsNullOrEmpty(result) ? "ArtSpace" : result;
     }
-    private ContentDialog Dialog(string title, UIElement content, string primary = "", string close = "Close") => new()
+    private ContentDialog Dialog(string title, UIElement content, string primary = "", string close = "Close")
     {
-        Title = title, Content = content, PrimaryButtonText = primary, CloseButtonText = close, XamlRoot = XamlRoot,
-        FontFamily = Studio.Font, RequestedTheme = ElementTheme.Dark, DefaultButton = string.IsNullOrEmpty(primary) ? ContentDialogButton.Close : ContentDialogButton.Primary,
-        MinWidth = 320, MaxWidth = 560
-    };
+        var dialog = new ContentDialog
+        {
+            Title = title, Content = content, PrimaryButtonText = primary, CloseButtonText = close, XamlRoot = XamlRoot,
+            FontFamily = Studio.Font, RequestedTheme = ElementTheme.Dark,
+            DefaultButton = string.IsNullOrEmpty(primary) ? ContentDialogButton.Close : ContentDialogButton.Primary,
+            MinWidth = 320, MaxWidth = 560
+        };
+        dialog.Opened += (_, _) => { _activeDialog = dialog; UiRefreshed?.Invoke(); };
+        dialog.Closed += (_, _) =>
+        {
+            if (ReferenceEquals(_activeDialog, dialog)) _activeDialog = null;
+            UiRefreshed?.Invoke();
+        };
+        return dialog;
+    }
     private async Task<string?> PromptAsync(string title, string value, bool multiline = false)
     {
         var input = Studio.Input(value, title); input.Width = 350; input.Height = multiline ? 110 : 34; input.AcceptsReturn = multiline; input.TextWrapping = multiline ? TextWrapping.Wrap : TextWrapping.NoWrap;

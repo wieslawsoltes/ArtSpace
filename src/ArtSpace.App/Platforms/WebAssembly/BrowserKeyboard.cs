@@ -14,7 +14,7 @@ internal static partial class BrowserKeyboard
 
     public static void Attach(StudioWorkbench workbench)
     {
-        Install(key => workbench.HandleHostNavigation((VirtualKey)key) ? 1 : 0,
+        Install(key => workbench.HandleHostNavigation((VirtualKey)(key & 0xffff), (key & 0x10000) != 0) ? 1 : 0,
             modifiers => workbench.Surface.HostModifiers = (VirtualKeyModifiers)modifiers);
     }
 }

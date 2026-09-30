@@ -381,11 +381,17 @@ public sealed partial class DesignSurface : UserControl, IDisposable
         else editor.Viewport.Pan += new Vec2(0, delta * .65);
         editor.Notify(EditorChangeKind.Viewport); e.Handled = true;
     }
+    /// <summary>Cancel pointer work without also clearing the restored object selection.</summary>
+    public bool TryCancelGesture()
+    {
+        if (_gesture == Gesture.None && Session?.IsInteracting != true) return false;
+        CancelGesture(); return true;
+    }
     public void CancelGesture()
     {
         ResetTypeOnPathGesture();
         _gesture = Gesture.None; _created = null; _marquee = null; _snapLines = []; _guide = null; _penNode = null; _vectorNode = null;
-        ResetPathGesture(); Session?.CancelInteraction(); _canvas.Invalidate();
+        ResetPathGesture(); Session?.CancelInteraction(); _canvas.ReleasePointerCaptures(); _canvas.Invalidate();
     }
     private DesignNode NewNode(EditorTool tool, Vec2 point)
     {

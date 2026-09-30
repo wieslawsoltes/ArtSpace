@@ -14,6 +14,8 @@ public sealed class CommandMenuBar : UserControl
     private int _activeIndex = -1;
     private bool _userNavigated;
     public bool IsOpen => _popup?.IsOpen == true;
+    public string? OpenMenuName => IsOpen && _anchor is not null ? AutomationProperties.GetName(_anchor) : null;
+    public string? ActiveCommandName => IsOpen && _activeIndex >= 0 && _activeIndex < _items.Count ? _items[_activeIndex].Command.Label : null;
 
     public CommandMenuBar()
     {
@@ -26,7 +28,7 @@ public sealed class CommandMenuBar : UserControl
     {
         var button = new StudioButton(label, () => { }) { Height = 29, Padding = new(10, 3), CornerRadius = new(0) };
         button.Click += (_, _) => Open(button, commands());
-        button.KeyDown += (_, e) => { if (HandleNavigationKey(e.Key)) e.Handled = true; };
+        button.PreviewKeyDown += (_, e) => { if (!e.Handled && HandleNavigationKey(e.Key)) e.Handled = true; };
         _bar.Children.Add(button);
     }
 
@@ -101,7 +103,7 @@ public sealed class CommandMenuBar : UserControl
             };
             AutomationProperties.SetName(button, command.Label);
             button.Click += (_, _) => Execute(command);
-            button.KeyDown += (_, e) => { if (HandleNavigationKey(e.Key)) e.Handled = true; };
+            button.PreviewKeyDown += (_, e) => { if (!e.Handled && HandleNavigationKey(e.Key)) e.Handled = true; };
             var index = _items.Count;
             button.PointerEntered += (_, _) => { if (command.Enabled) { _userNavigated = true; Activate(index); } };
             _items.Add((button, command)); items.Children.Add(button);

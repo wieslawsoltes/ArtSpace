@@ -134,6 +134,10 @@ internal static class BrowserDiagnostics
                 json.WriteString("inspectorName", workbench.InspectorTargetName);
                 json.WriteNumber("inspectorSelection", workbench.InspectorSelectionCount);
                 json.WriteString("activePanel", workbench.ActivePanel);
+                json.WriteString("openMenu", workbench.OpenMenuName);
+                json.WriteString("activeMenuCommand", workbench.ActiveMenuCommandName);
+                json.WriteString("dialogTitle", workbench.ActiveDialogTitle);
+                json.WriteString("focusedControl", workbench.FocusedControlName);
                 json.WriteBoolean("uiPending", workbench.UiPending);
                 json.WriteNumber("uiFlushes", workbench.UiFlushes);
                 json.WriteNumber("uiFailures", workbench.UiRefreshFailures);
