@@ -69,7 +69,7 @@ public sealed partial class SceneRenderer
         }
         var bytes = result.Outline.PointCount * 16L + result.Glyphs.Count * 72L;
         if (entry is not null) { entry.Layout.Dispose(); _pathTextBytes -= entry.Bytes; _pathTextLayouts.Remove(node.Id); }
-        // Approximate CPU geometry accounting, not a GPU geometry or total native allocation ceiling.
+        // Approximate CPU geometry accounting, not a GPU/native allocation ceiling.
         while (_pathTextLayouts.Count > 0 &&
             (_pathTextLayouts.Count >= PathTextEntryLimit || _pathTextBytes + bytes > PathTextByteBudget))
             EvictOldestPathText();
@@ -96,28 +96,35 @@ public sealed partial class SceneRenderer
     /// <summary>Geometric export bounds including path-text ink; excludes general live-effect expansion.</summary>
     public RectD GetArtworkBounds(DesignNode node)
     {
+        ArgumentNullException.ThrowIfNull(node);
         var bounds = node.WorldBounds;
-        void Include(DesignNode current)
+        // An artboard export keeps its chosen dimensions even when text extends past its clip.
+        if (node.IsContainer && node.ClipContent) return bounds;
+        foreach (var child in node.DescendantsAndSelf())
         {
-            if (!current.IsEffectivelyVisible) return;
-            if (current.TextPath is not null)
+            if (child.TextPath is null || !child.IsEffectivelyVisible) continue;
+            var status = GetTypeOnPathStatus(child);
+            if (status.Error is not null || status.InkBounds.IsEmpty) continue;
+            var ink = child.WorldMatrix.Map(status.InkBounds);
+            // Respect frame clips inside this exported subtree. Ancestors outside a selected root
+            // are deliberately excluded, matching DrawWorldNode's independent-selection export.
+            for (var parent = ReferenceEquals(child, node) ? null : child.Parent; parent is not null; parent = parent.Parent)
             {
-                var status = GetTypeOnPathStatus(current);
-                if (status.Error is null && !status.InkBounds.IsEmpty)
-                    bounds = RectD.Union(bounds, current.WorldMatrix.Map(status.InkBounds));
+                if (parent.ClipContent)
+                {
+                    var clip = parent.WorldBounds;
+                    var left = Math.Max(ink.X, clip.X); var top = Math.Max(ink.Y, clip.Y);
+                    ink = new(left, top, Math.Max(0, Math.Min(ink.Right, clip.Right) - left), Math.Max(0, Math.Min(ink.Bottom, clip.Bottom) - top));
+                }
+                if (ReferenceEquals(parent, node)) break;
             }
-            // Clipped artboards preserve their explicit export dimensions. Selected descendants
-            // exported independently are intentionally not constrained by their external ancestors.
-            if (current.ClipContent || current.ClipPathId is not null) return;
-            foreach (var child in current.Children)
-                if (child.Id != current.OpacityMaskId) Include(child);
+            if (!ink.IsEmpty) bounds = RectD.Union(bounds, ink);
         }
-        Include(node);
         return bounds;
     }
 
-    // Work proportional to retained entries occurs only on eviction. Warm lookup is O(1),
-    // allocation-free and never clears unrelated text when a new label enters the working set.
+    // Only eviction scans the bounded cache. Warm lookup retains exact key/geometry comparison
+    // without allocating eviction bookkeeping or clearing unrelated labels.
     private void EvictOldestBaseline()
     {
         string? oldest = null; var stamp = long.MaxValue;
