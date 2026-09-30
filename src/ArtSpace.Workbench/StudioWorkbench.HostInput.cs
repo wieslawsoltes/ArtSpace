@@ -4,6 +4,9 @@ public sealed partial class StudioWorkbench
 {
     private CommandMenuBar? _applicationMenu;
     private ContentDialog? _activeDialog;
+    /// <summary>Observe application-menu navigation without subscribing to layout or document changes.</summary>
+    public event Action? MenuNavigationChanged;
+    private void OnMenuNavigationChanged() => MenuNavigationChanged?.Invoke();
     public string? OpenMenuName => _applicationMenu?.OpenMenuName;
     public string? ActiveMenuCommandName => _applicationMenu?.ActiveCommandName;
     public string? ActiveDialogTitle => _activeDialog?.Title?.ToString();

@@ -54,10 +54,10 @@ ArtSpace is an independent illustration editor. Familiar workspace conventions d
 
 ## Validation
 
-The repository registers 361 engine cases, five additional benchmark safety checks and 29 real Uno browser scenarios plus one independent browser SVG reference. Workflow conclusions and artifacts identify the tested commit; the existence of tests alone is not a claim that a particular build passed.
+The repository registers 373 engine cases, five additional benchmark safety checks and 29 real Uno browser scenarios plus one independent browser SVG reference. Workflow conclusions and artifacts identify the tested commit; the existence of tests alone is not a claim that a particular build passed.
 
 Type-on-path tests cover measurement/projection, alignment, flip, Unicode scalar indices, overflow, transactions, caches, baseline editing, invalid input, symbols, gradients, export bounds and outlines. Browser scenarios exercise real menu/prompt input, retained field values, bracket manipulation, cancellation, baseline editing, outlines and recovery.
 
 Cache/replay reference comparisons require exact output pixels. Serialized outlines normalize float coordinates and use bounded coverage/color-error tests; this is distinct from exact cached replay. The CPU reports retain all samples and rebuild counts. Forced-cold comparisons deliberately rebuild caches and are not older-release or physical-GPU FPS comparisons. Screenshots show captured frames, not complete UI parity; native compilation is not interactive certification.
 
-Guides: [Type on a Path](type-on-path.md), [Appearance/rendering](appearance-rendering.md), [UI responsiveness](ui-performance.md), [path editing](path-editing.md), [clipping/performance](clipping-and-performance.md), [opacity/gradients](opacity-masks-and-gradients.md).
+Guides: [Projection/menu observation](projection-index.md), [Type on a Path](type-on-path.md), [Appearance/rendering](appearance-rendering.md), [UI responsiveness](ui-performance.md), [path editing](path-editing.md), [clipping/performance](clipping-and-performance.md), [opacity/gradients](opacity-masks-and-gradients.md).

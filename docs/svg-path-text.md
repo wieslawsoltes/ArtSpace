@@ -46,6 +46,12 @@ Document fonts use unhinted linear metrics. Grid-fitted raster metrics could dis
 
 The `--glyph-append-benchmark` mode compares both construction paths using 2,048 placements, eight layouts per sample, and seven alternating-order samples after warmup. Reports include all samples, managed allocations, temporary path counts and exact-geometry agreement. This excludes font lookup, arc-length measurement, rasterization and physical-GPU work. The ordinary CI path-text benchmark also writes `glyph-append.json` into its existing performance artifact.
 
+## Pointer projection and read-only observations
+
+SVG anchor dragging uses the retained spatial projection index described in [projection and menu observation](projection-index.md). Exact closest-segment ties and the existing native refinement are preserved. The first query constructs the index; warm queries allocate no managed objects.
+
+Application menu observations are published directly when the active command changes rather than waiting for a layout pass. This fixes stale automation feedback without adding document or inspector work to keyboard navigation.
+
 ## Persistence and verification
 
 Native saves use **schema 6**, reading schemas 1–6. Older readers reject schema 6 rather than ignoring SVG positioning semantics. Clone, undo, recovery and symbol serialization preserve independently owned options. Cache keys include offset units, authored length and baseline transform; changing an offset rebuilds layout but does not remeasure unchanged geometry.

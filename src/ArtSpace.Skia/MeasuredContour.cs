@@ -13,10 +13,13 @@ public sealed class MeasuredContour : IDisposable
     private readonly SKPath _path;
     private readonly SKPathMeasure _measure;
     private Vec2[]? _projectionPoints;
+    private PolylineProjectionIndex? _projectionIndex;
     private bool _disposed;
     public double Length { get; }
     public bool IsClosed { get; }
     public long ProjectionTableBuilds { get; private set; }
+    public long ProjectionIndexBuilds { get; private set; }
+    public int LastProjectionSegmentsExamined { get; private set; }
 
     public MeasuredContour(SKPath source)
     {
@@ -51,7 +54,10 @@ public sealed class MeasuredContour : IDisposable
     }
 
     /// <summary>Return the closest arc-length fraction using a retained coarse table and local refinement.</summary>
-    public double Project(Vec2 point)
+    public double Project(Vec2 point) => Project(point, useSpatialIndex: true);
+
+    /// <summary>The linear mode is retained as a reference; both paths use identical refinement.</summary>
+    public double Project(Vec2 point, bool useSpatialIndex)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         if (!point.IsFinite) throw new ArgumentOutOfRangeException(nameof(point));
@@ -63,15 +69,28 @@ public sealed class MeasuredContour : IDisposable
             _projectionPoints = positions; ProjectionTableBuilds++;
         }
         var points = _projectionPoints;
-        var best = double.PositiveInfinity; var fraction = 0d; var segment = 0;
-        for (var i = 0; i < points.Length - 1; i++)
+        var fraction = 0d; var segment = 0;
+        if (useSpatialIndex)
         {
-            var a = points[i]; var d = points[i + 1] - a; var q = point - a;
-            var denominator = d.X * d.X + d.Y * d.Y;
-            var t = denominator <= 1e-20 ? 0 : Math.Clamp((q.X * d.X + q.Y * d.Y) / denominator, 0, 1);
-            var candidate = a + d * t; var error = Squared(candidate - point);
-            if (error >= best) continue;
-            best = error; segment = i; fraction = (i + t) / (points.Length - 1);
+            if (_projectionIndex is null) { _projectionIndex = new(points); ProjectionIndexBuilds++; }
+            var hit = _projectionIndex.Project(point, out var statistics);
+            LastProjectionSegmentsExamined = statistics.ExaminedSegments;
+            segment = hit.SegmentIndex;
+            fraction = (segment + hit.Parameter) / (points.Length - 1);
+        }
+        else
+        {
+            LastProjectionSegmentsExamined = points.Length - 1;
+            var best = double.PositiveInfinity;
+            for (var i = 0; i < points.Length - 1; i++)
+            {
+                var a = points[i]; var d = points[i + 1] - a; var q = point - a;
+                var denominator = d.X * d.X + d.Y * d.Y;
+                var t = denominator <= 1e-20 ? 0 : Math.Clamp((q.X * d.X + q.Y * d.Y) / denominator, 0, 1);
+                var candidate = a + d * t; var error = Squared(candidate - point);
+                if (error >= best) continue;
+                best = error; segment = i; fraction = (i + t) / (points.Length - 1);
+            }
         }
         var lo = Math.Max(0, segment - 1d) / (points.Length - 1);
         var hi = Math.Min(points.Length - 1, segment + 2d) / (points.Length - 1);
@@ -92,6 +111,6 @@ public sealed class MeasuredContour : IDisposable
     public void Dispose()
     {
         if (_disposed) return;
-        _disposed = true; _projectionPoints = null; _measure.Dispose(); _path.Dispose();
+        _disposed = true; _projectionPoints = null; _projectionIndex = null; _measure.Dispose(); _path.Dispose();
     }
 }

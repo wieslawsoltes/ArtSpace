@@ -2,6 +2,10 @@
 
 ## 0.7.0-alpha.1 — 2026-09-30
 
+- Retain a managed bounding-volume projection index for path-text handles; preserve exact coarse-search ties and unchanged native arc-length refinement, with zero-allocation warm queries.
+- Publish menu-navigation observations directly instead of relying on layout, update only changed selection rows, and retain frame/inspector state without full diagnostic traversals.
+- Add twelve projection regressions, three storage-observation tests, a retained-projection benchmark and guarded browser menu-transition assertions.
+
 - Add editable SVG single-run textPath import with local/legacy references, inline paths, supported basic-shape baselines, signed and percentage offsets, positive authored path lengths, text anchors, inherited text/paint settings and own-reference transforms.
 - Preserve distinct SVG midpoint/open-path and single-circuit/closed-path layout instead of forcing SVG anchors into native bracket intervals.
 - Add retained SVG offset controls, an undoable on-canvas offset handle, explicit conversion to native brackets, and editable SVG export alongside the existing default outlined export.

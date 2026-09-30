@@ -74,8 +74,17 @@ test('File menu exports genuine editable textPath without mutating native text',
   const original = await ready(page); const download = page.waitForEvent('download');
   await page.mouse.click(61, 15); await page.waitForFunction(() => globalThis.__artSpaceState?.openMenu === 'File');
   await page.keyboard.press('Home');
-  for (let i = 0; i < 16 && (await state(page)).activeMenuCommand !== 'Export Editable SVG…'; i++) await page.keyboard.press('ArrowDown');
-  expect((await state(page)).activeMenuCommand).toBe('Export Editable SVG…'); await page.keyboard.press('Enter');
+  await expect.poll(async () => (await state(page)).activeMenuCommand).toBe('New…');
+  const seen = ['New…'];
+  for (let i = 0; i < 16 && seen.at(-1) !== 'Export Editable SVG…'; i++) {
+    const previous = seen.at(-1);
+    await page.keyboard.press('ArrowDown');
+    await expect.poll(async () => (await state(page)).activeMenuCommand).not.toBe(previous);
+    seen.push((await state(page)).activeMenuCommand);
+  }
+  expect(seen.at(-1)).toBe('Export Editable SVG…');
+  expect(new Set(seen).size).toBe(seen.length); // No stale observations, wraparound or skipped readiness.
+  await page.keyboard.press('Enter');
   const file = await download; const svg = await fs.readFile(await file.path(), 'utf8');
   expect(svg).toContain('<textPath'); expect(svg).toContain('startOffset="50%"'); expect(svg).toContain('EDITABLE SVG TEXT');
   expect((await state(page)).history).toBe(original.history); expect((await state(page)).kind).toBe('Text');

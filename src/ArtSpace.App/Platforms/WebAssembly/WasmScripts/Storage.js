@@ -46,6 +46,13 @@
     },
     isTestMode: () => new URLSearchParams(location.search).get("test") === "1",
     publishDiagnostics: json => { if (new URLSearchParams(location.search).get("test") === "1") globalThis.__artSpaceState = Object.freeze(JSON.parse(json)); },
+    publishMenuDiagnostics: (openMenu, activeMenuCommand) => {
+      if (new URLSearchParams(location.search).get("test") !== "1") return;
+      const current = globalThis.__artSpaceState;
+      if (!current || (current.openMenu === openMenu && current.activeMenuCommand === activeMenuCommand)) return;
+      // Read-only observation; no document/control mutation, readiness change or engine round trip.
+      globalThis.__artSpaceState = Object.freeze({ ...current, openMenu, activeMenuCommand });
+    },
     publishFrameDiagnostics: (sceneRecordings, sceneReplays, sceneBytes, paintBuilds, dashBuilds, effectFilterBuilds, gradientBuilds, geometryBuilds, culledNodes) => {
       if (new URLSearchParams(location.search).get("test") !== "1") return;
       const current = globalThis.__artSpaceState;
